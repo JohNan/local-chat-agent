@@ -7,6 +7,8 @@ A lightweight, self-hosted web interface to chat with your local codebase using 
 - Docker and Docker Compose
 - Google Gemini API Key
 
+> **Note:** This tool requires an API key with access to the `gemini-3-pro-preview` model.
+
 ## Setup
 
 1.  **Get your Google API Key** from [Google AI Studio](https://makersuite.google.com/app/apikey).
@@ -39,7 +41,7 @@ The interface will show a "🛠" indicator whenever the agent uses a tool to lis
 ## Architecture
 
 -   **Backend**: Flask (Python)
--   **AI**: Google Gemini 1.5 Flash (via `google-generativeai` SDK)
+-   **AI**: Google Gemini 3 Pro Preview (via `google-generativeai` SDK)
 -   **Frontend**: Embedded HTML/JS with Markdown support
 -   **Deployment**: Docker
 
