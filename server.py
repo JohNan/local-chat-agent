@@ -20,21 +20,27 @@ CODEBASE_ROOT = "/codebase" if os.path.exists("/codebase") else "."
 # --- Thread Local for Logs ---
 request_context = threading.local()
 
+
 def log_tool_usage(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         # Construct a log message
-        arg_str = ", ".join([repr(a) for a in args] + [f"{k}={v!r}" for k, v in kwargs.items()])
+        arg_str = ", ".join(
+            [repr(a) for a in args] + [f"{k}={v!r}" for k, v in kwargs.items()]
+        )
         log_msg = f"🛠 {func.__name__}({arg_str})"
 
         # Append to thread local logs if initialized
-        if hasattr(request_context, 'tool_logs'):
+        if hasattr(request_context, "tool_logs"):
             request_context.tool_logs.append(log_msg)
 
         return func(*args, **kwargs)
+
     return wrapper
 
+
 # --- Tools ---
+
 
 @log_tool_usage
 def list_files(directory: str = ".") -> list[str]:
@@ -55,7 +61,11 @@ def list_files(directory: str = ".") -> list[str]:
 
     for root, dirs, files in os.walk(base_path):
         # Ignore directories
-        dirs[:] = [d for d in dirs if d not in {'.git', '__pycache__', 'node_modules', 'venv', '.env'}]
+        dirs[:] = [
+            d
+            for d in dirs
+            if d not in {".git", "__pycache__", "node_modules", "venv", ".env"}
+        ]
 
         for file in files:
             full_path = os.path.join(root, file)
@@ -64,6 +74,7 @@ def list_files(directory: str = ".") -> list[str]:
             files_list.append(rel_path)
 
     return files_list
+
 
 @log_tool_usage
 def read_file(filepath: str) -> str:
@@ -75,20 +86,25 @@ def read_file(filepath: str) -> str:
         filepath = filepath.lstrip("/")
 
     full_path = os.path.abspath(os.path.join(CODEBASE_ROOT, filepath))
-
-    # Security check: Ensure we are still inside CODEBASE_ROOT
     root_abs = os.path.abspath(CODEBASE_ROOT)
-    if not full_path.startswith(root_abs):
+
+    # Security check: Ensure we are still inside CODEBASE_ROOT using commonpath
+    try:
+        if os.path.commonpath([full_path, root_abs]) != root_abs:
+            return "Error: Access denied. Cannot read outside of codebase."
+    except ValueError:
+        # Can happen on different drives on Windows, essentially outside
         return "Error: Access denied. Cannot read outside of codebase."
 
     if not os.path.exists(full_path):
         return f"Error: File {filepath} not found."
 
     try:
-        with open(full_path, 'r', encoding='utf-8') as f:
+        with open(full_path, "r", encoding="utf-8") as f:
             return f.read()
     except Exception as e:
         return f"Error reading file: {str(e)}"
+
 
 tools = [list_files, read_file]
 
@@ -272,48 +288,51 @@ HTML_TEMPLATE = """
 </html>
 """
 
-@app.route('/')
+
+@app.route("/")
 def index():
     return render_template_string(HTML_TEMPLATE)
 
-@app.route('/chat', methods=['POST'])
+
+@app.route("/chat", methods=["POST"])
 def chat():
     # Initialize tool logs for this request
     request_context.tool_logs = []
 
     data = request.json
-    user_msg = data.get('message')
-    history = data.get('history', [])
+    user_msg = data.get("message")
+    history = data.get("history", [])
 
     formatted_history = []
     for h in history:
-        formatted_history.append({
-            "role": h['role'],
-            "parts": h['parts']
-        })
+        formatted_history.append({"role": h["role"], "parts": h["parts"]})
 
     model = genai.GenerativeModel(
-        model_name='gemini-3-pro-preview',
+        model_name="gemini-3-pro-preview",
         tools=tools,
-        system_instruction="You are the Technical Lead and Prompt Architect for this project. Your purpose is to analyze the user's local codebase and construct precise, high-context prompts that the user will send to another AI agent named 'Jules'.\n\nWhen the user asks for a feature or bug fix:\n1. Use your tools (`list_files`, `read_file`) to thoroughly investigate the relevant code.\n2. Explain your findings briefly to the user.\n3. Generate a 'Jules Prompt' block. This block must contain a standalone, technically detailed instruction that includes file paths, existing code context, and strict acceptance criteria. The user should be able to copy-paste this prompt directly to Jules to get the job done."
+        system_instruction="You are the Technical Lead and Prompt Architect. Your goal is to analyze the user's local codebase and construct precise, high-context prompts that the user will send to another AI agent named 'Jules'. When asked for help, investigate code using tools, then output a structured 'Jules Prompt' block with file paths and acceptance criteria.",
     )
 
     chat_session = model.start_chat(
-        history=formatted_history,
-        enable_automatic_function_calling=True
+        history=formatted_history, enable_automatic_function_calling=True
     )
 
     try:
         response = chat_session.send_message(user_msg)
-        return jsonify({
-            "response": response.text,
-            "tool_logs": request_context.tool_logs
-        })
+        return jsonify(
+            {"response": response.text, "tool_logs": request_context.tool_logs}
+        )
     except Exception as e:
-        return jsonify({
-            "response": f"Server Error: {str(e)}",
-            "tool_logs": request_context.tool_logs
-        }), 500
+        return (
+            jsonify(
+                {
+                    "response": f"Server Error: {str(e)}",
+                    "tool_logs": request_context.tool_logs,
+                }
+            ),
+            500,
+        )
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
