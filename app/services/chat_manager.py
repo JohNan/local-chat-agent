@@ -26,14 +26,20 @@ def load_chat_history():
             last_parts = history[-1]["parts"]
             if any("function_call" in part for part in last_parts):
                 history.pop()
-                logger.warning("Detected incomplete function call in history. Removed last message to prevent API error.")
+                logger.warning(
+                    "Detected incomplete function call in history. "
+                    "Removed last message to prevent API error."
+                )
 
         # Sanitization: Remove orphaned function responses at start
         if history and history[0].get("parts"):
             first_parts = history[0]["parts"]
             if any("function_response" in part for part in first_parts):
                 history.pop(0)
-                logger.warning("Detected orphaned function response in history. Removed first message to prevent API error.")
+                logger.warning(
+                    "Detected orphaned function response in history. "
+                    "Removed first message to prevent API error."
+                )
 
         return history
     except OSError as e:
