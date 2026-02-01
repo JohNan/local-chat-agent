@@ -90,9 +90,9 @@ def api_reset():
     """Resets chat history."""
     try:
         chat_manager.reset_history()
-        return jsonify({"success": True})
+        return jsonify({"status": "success"})
     except Exception as e:  # pylint: disable=broad-exception-caught
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 
 @bp.route("/api/deploy_to_jules", methods=["POST"])
