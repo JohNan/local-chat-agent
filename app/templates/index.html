@@ -14,6 +14,7 @@
             --text-color: #d4d4d4;
             --input-bg: #3c3c3c;
             --border-color: #454545;
+            --icon-color: #cccccc;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -24,41 +25,119 @@
             flex-direction: column;
             height: 100vh;
         }
+        /* Header */
+        #header {
+            padding: 10px 20px;
+            background-color: var(--chat-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-title {
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .icon-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--icon-color);
+            padding: 5px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-btn:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .icon-btn svg {
+            stroke: currentColor;
+        }
+
+        /* Chat Area */
         #chat-container {
             flex: 1;
             overflow-y: auto;
             padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 20px;
         }
-        .message {
-            max-width: 80%;
+        .message-row {
+            display: flex;
+            gap: 12px;
+            max-width: 85%;
+        }
+        .message-row.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        .message-row.ai {
+            align-self: flex-start;
+        }
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--chat-bg);
+            border: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .avatar svg {
+            width: 20px;
+            height: 20px;
+            stroke: var(--icon-color);
+        }
+        .message-bubble {
             padding: 10px 15px;
             border-radius: 8px;
             line-height: 1.5;
+            position: relative;
+            min-width: 0; /* Fix flex overflow */
+            word-wrap: break-word;
         }
-        .user-message {
-            align-self: flex-end;
+        .user .message-bubble {
             background-color: var(--user-msg-bg);
+            color: white;
         }
-        .ai-message {
-            align-self: flex-start;
+        .ai .message-bubble {
             background-color: var(--ai-msg-bg);
+            color: var(--text-color);
         }
         .error-message {
             color: #ff6b6b;
             border: 1px solid #ff6b6b;
         }
+
+        /* Tools */
         .tool-usage {
-            font-size: 0.85em;
+            font-size: 0.9em;
             color: #aaa;
-            font-style: italic;
+            margin-left: 44px; /* Align with text start (32 avatar + 12 gap) */
+            display: flex;
+            align-items: center;
+            gap: 8px;
             margin-bottom: 5px;
-            border-left: 2px solid #007acc;
-            padding-left: 8px;
-            align-self: flex-start;
         }
+        .tool-usage svg {
+            width: 16px;
+            height: 16px;
+            stroke: #007acc;
+        }
+
+        /* Input Area */
         #input-area {
             padding: 20px;
             background-color: var(--chat-bg);
@@ -75,7 +154,7 @@
             color: var(--text-color);
             outline: none;
         }
-        button {
+        button.primary-btn {
             padding: 10px 20px;
             background-color: var(--user-msg-bg);
             color: white;
@@ -83,8 +162,12 @@
             border-radius: 4px;
             cursor: pointer;
         }
-        button:hover {
+        button.primary-btn:hover {
             opacity: 0.9;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
         pre {
             background-color: #1e1e1e;
@@ -95,24 +178,65 @@
         code {
             font-family: 'Consolas', 'Monaco', monospace;
         }
+        /* Deploy Button in Chat */
+        .deploy-btn {
+            background-color: #2da44e;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            display: inline-block;
+        }
+        .deploy-btn:hover {
+            background-color: #2c974b;
+        }
     </style>
 </head>
 <body>
-    <div id="header" style="padding: 10px 20px; background-color: var(--chat-bg); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-weight: bold;">Gemini Agent</span>
-        <div>
-            <span style="margin-right: 15px;">📂 <span id="repo-status">Loading...</span></span>
-            <button onclick="gitPull()" style="padding: 5px 10px; font-size: 0.9em;">⬇️ Git Pull</button>
+    <div id="header">
+        <div class="header-title">
+            <!-- Bot Icon Inline -->
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+            </svg>
+            <span>Gemini Agent</span>
+        </div>
+        <div class="header-controls">
+            <span style="font-size: 0.9em; color: #aaa;">
+                📂 <span id="repo-status">Loading...</span>
+            </span>
+            <button onclick="gitPull()" class="icon-btn" title="Git Pull">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+            </button>
+            <button onclick="clearHistory()" class="icon-btn" title="Clear History">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+            </button>
         </div>
     </div>
 
     <div id="chat-container"></div>
     <div id="input-area">
         <input type="text" id="user-input" placeholder="Ask about your code..." onkeypress="if(event.key==='Enter') sendMessage()">
-        <button onclick="sendMessage()">Send</button>
+        <button class="primary-btn" onclick="sendMessage()">Send</button>
     </div>
 
     <script>
+        // Icons
+        const ICONS = {
+            bot: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>`,
+            user: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
+            tool: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>`
+        };
+
         const chatContainer = document.getElementById('chat-container');
         const userInput = document.getElementById('user-input');
 
@@ -163,36 +287,44 @@
         }
 
         function createMessageElement(role, text) {
-            const div = document.createElement('div');
-            if (role === 'model' || role === 'ai') {
-                div.className = 'message ai-message';
-            } else {
-                div.className = 'message user-message';
+            const row = document.createElement('div');
+            const isAi = (role === 'model' || role === 'ai');
+            row.className = `message-row ${isAi ? 'ai' : 'user'}`;
+
+            // Avatar
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.innerHTML = isAi ? ICONS.bot : ICONS.user;
+            row.appendChild(avatar);
+
+            // Bubble
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            bubble.innerHTML = marked.parse(text || "");
+
+            if (isAi && text && text.includes("## Jules Prompt")) {
+                addDeployButton(bubble);
             }
 
-            div.innerHTML = marked.parse(text || "");
-
-            if ((role === 'model' || role === 'ai') && text && text.includes("## Jules Prompt")) {
-                addDeployButton(div);
-            }
-            return div;
+            row.appendChild(bubble);
+            return row;
         }
 
-        function addDeployButton(messageDiv) {
-             if (messageDiv.querySelector('button')) return;
+        function addDeployButton(messageBubble) {
+             if (messageBubble.querySelector('button')) return;
              const deployBtn = document.createElement('button');
+             deployBtn.className = 'deploy-btn';
              deployBtn.innerHTML = "🚀 Start Jules Task";
-             deployBtn.style.marginTop = "10px";
              deployBtn.onclick = function() { deploy(this); };
-             messageDiv.appendChild(deployBtn);
+             messageBubble.appendChild(deployBtn);
         }
 
         async function sendMessage() {
             const text = userInput.value.trim();
             if (!text) return;
 
-            const userMsgDiv = createMessageElement('user', text);
-            chatContainer.appendChild(userMsgDiv);
+            const userRow = createMessageElement('user', text);
+            chatContainer.appendChild(userRow);
             chatContainer.scrollTop = chatContainer.scrollHeight;
             userInput.value = '';
 
@@ -210,8 +342,10 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
 
-                let aiMessageDiv = createMessageElement('model', '');
-                chatContainer.appendChild(aiMessageDiv);
+                // Create AI message row
+                const aiRow = createMessageElement('model', '');
+                const aiBubble = aiRow.querySelector('.message-bubble');
+                chatContainer.appendChild(aiRow);
 
                 let currentAiText = "";
                 let buffer = "";
@@ -237,14 +371,19 @@
                         if (event === 'message') {
                             try {
                                 const textChunk = JSON.parse(data);
-                                currentAiText += textChunk;
-                                aiMessageDiv.innerHTML = marked.parse(currentAiText);
+                                // Check for "Executing tools..." status from backend
+                                if (textChunk.includes("Executing tools...")) {
+                                    appendToolLog("Executing tools...");
+                                } else {
+                                    currentAiText += textChunk;
+                                    aiBubble.innerHTML = marked.parse(currentAiText);
+                                }
                             } catch (e) { console.error('Error parsing JSON:', e); }
                         } else if (event === 'tool') {
                             appendToolLog(data);
                         } else if (event === 'error') {
-                            aiMessageDiv.classList.add('error-message');
-                            aiMessageDiv.innerText += "\\nError: " + data;
+                            aiBubble.classList.add('error-message');
+                            aiBubble.innerText += "\\nError: " + data;
                         }
                     }
                     scrollToBottomIfNear();
@@ -253,14 +392,14 @@
                 currentOffset++;
 
                 if (currentAiText.includes("## Jules Prompt")) {
-                    addDeployButton(aiMessageDiv);
+                    addDeployButton(aiBubble);
                 }
 
             } catch (error) {
                 console.error('Error:', error);
-                const errDiv = createMessageElement('model', `Error: ${error.message}`);
-                errDiv.classList.add('error-message');
-                chatContainer.appendChild(errDiv);
+                const errRow = createMessageElement('model', `Error: ${error.message}`);
+                errRow.querySelector('.message-bubble').classList.add('error-message');
+                chatContainer.appendChild(errRow);
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             }
         }
@@ -268,8 +407,16 @@
         function appendToolLog(text) {
              const div = document.createElement('div');
             div.className = `tool-usage`;
-            div.innerText = text;
-            chatContainer.appendChild(div);
+            div.innerHTML = ICONS.tool + ' ' + text;
+
+            // Insert before the last AI message (which is currently streaming)
+            const aiRows = document.querySelectorAll('.message-row.ai');
+            const lastAiRow = aiRows[aiRows.length - 1];
+            if (lastAiRow && lastAiRow.parentElement === chatContainer) {
+                 chatContainer.insertBefore(div, lastAiRow);
+            } else {
+                 chatContainer.appendChild(div);
+            }
             scrollToBottomIfNear();
         }
 
@@ -283,8 +430,8 @@
         }
 
         async function deploy(btn) {
-            const messageDiv = btn.parentElement;
-            let promptText = messageDiv.innerText;
+            const messageBubble = btn.parentElement;
+            let promptText = messageBubble.innerText;
             promptText = promptText.replace(btn.innerText, '').trim();
 
             btn.innerText = "⏳ Sending...";
@@ -328,9 +475,8 @@
         }
 
         async function gitPull() {
-             const btn = document.querySelector('button[onclick="gitPull()"]');
-             const originalText = btn.innerText;
-             btn.innerText = "⏳ Pulling...";
+             const btn = document.querySelector('button[title="Git Pull"]');
+             if(!btn) return;
              btn.disabled = true;
 
              try {
@@ -340,10 +486,28 @@
              } catch(e) {
                 alert("Error: " + e.message);
              } finally {
-                btn.innerText = originalText;
                 btn.disabled = false;
                 updateStatus();
              }
+        }
+
+        async function clearHistory() {
+            if (!confirm("Are you sure you want to clear the chat history?")) return;
+
+            try {
+                const res = await fetch('/api/reset', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    chatContainer.innerHTML = '';
+                    currentOffset = 0;
+                    window.location.reload();
+                } else {
+                    alert("Failed to clear history: " + (data.error || "Unknown error"));
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Error clearing history.");
+            }
         }
 
         chatContainer.addEventListener('scroll', () => {

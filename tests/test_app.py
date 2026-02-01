@@ -142,5 +142,5 @@ def test_reset(client, mocker):
     data = response.get_json()
 
     assert response.status_code == 200
-    assert data["success"] is True
+    assert data["status"] == "success"
     mock_remove.assert_called_with(chat_manager.CHAT_HISTORY_FILE)
