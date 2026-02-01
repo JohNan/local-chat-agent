@@ -6,3 +6,5 @@ venv/
 .idea/
 .vscode/
 docker-compose.yml
+chat_history.json
+config/
