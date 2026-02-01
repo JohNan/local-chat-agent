@@ -152,8 +152,8 @@ def _generate_stream(chat_session, user_msg):
                 if chunk.text:
                     full_response_text += chunk.text
                     yield f"event: message\ndata: {json.dumps(chunk.text)}\n\n"
-            except Exception:  # pylint: disable=broad-exception-caught
-                pass
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error("[PHASE 1] Error processing chunk text: %s", e)
 
             # If chunk.parts contains a function_call: Collect it.
             # Crucial: Do NOT execute the tool inside this loop.
@@ -162,8 +162,8 @@ def _generate_stream(chat_session, user_msg):
                     for part in chunk.parts:
                         if part.function_call:
                             tool_calls.append(part.function_call)
-            except Exception:  # pylint: disable=broad-exception-caught
-                pass
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error("[PHASE 1] Error processing chunk parts: %s", e)
 
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Phase 1 Error: %s", traceback.format_exc())
@@ -204,11 +204,40 @@ def _generate_stream(chat_session, user_msg):
 
             for chunk in stream2:
                 try:
-                    if chunk.text:
-                        full_response_text += chunk.text
-                        yield f"event: message\ndata: {json.dumps(chunk.text)}\n\n"
-                except Exception:  # pylint: disable=broad-exception-caught
-                    pass
+                    text_content = ""
+
+                    # Strategy 1: Direct text
+                    if hasattr(chunk, "text") and chunk.text:
+                        text_content = chunk.text
+
+                    # Strategy 2: Parts extraction (Fallback)
+                    elif hasattr(chunk, "parts"):
+                        text_content = "".join([p.text for p in chunk.parts if p.text])
+
+                    # Strategy 3: Candidates extraction (Deep Fallback)
+                    elif hasattr(chunk, "candidates") and chunk.candidates:
+                        try:
+                            # Try to extract text from the first candidate's first part
+                            if (
+                                chunk.candidates[0].content
+                                and chunk.candidates[0].content.parts
+                            ):
+                                text_content = chunk.candidates[0].content.parts[0].text
+                        except (IndexError, AttributeError) as e:
+                            logger.error("[PHASE 3] Candidate extraction failed: %s", e)
+
+                    if text_content:
+                        logger.debug(
+                            "[PHASE 3 CHUNK] Yielding: %s...", text_content[:20]
+                        )
+                        full_response_text += text_content
+                        yield f"event: message\ndata: {json.dumps(text_content)}\n\n"
+                    else:
+                        logger.warning("[PHASE 3] Empty text chunk received: %s", chunk)
+
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    logger.error("[PHASE 3 ERROR] Failed to process chunk: %s", e)
+                    # Do not yield error to UI, just log it and continue
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Phase 2/3 Error: %s", traceback.format_exc())
