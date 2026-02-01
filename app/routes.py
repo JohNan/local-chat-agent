@@ -135,113 +135,73 @@ def _format_history(history):
 
 def _generate_stream(chat_session, user_msg):
     """
-    Generates the chat stream and handles tool execution.
+    Generates the chat stream and handles tool execution with recursion.
     """
     # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-nested-blocks
     full_response_text = ""
-    tool_calls = []
+    current_msg = user_msg
+    turn = 0
 
-    # --- Phase 1: User Stream ---
-    logger.debug("[PHASE 1 START] Sending user message to SDK")
-    try:
-        # Strict Sequential Logic: Phase 1
-        stream = chat_session.send_message_stream(user_msg)
-        for chunk in stream:
-            # If chunk.text exists: Yield it as a JSON-dumped SSE event.
-            try:
-                if chunk.text:
-                    full_response_text += chunk.text
-                    yield f"event: message\ndata: {json.dumps(chunk.text)}\n\n"
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.error("[PHASE 1] Error processing chunk text: %s", e)
+    while turn < 5:
+        turn += 1
+        tool_calls = []
+        logger.debug("[TURN %d] Sending message to SDK", turn)
 
-            # If chunk.parts contains a function_call: Collect it.
-            # Crucial: Do NOT execute the tool inside this loop.
-            try:
-                if hasattr(chunk, "parts"):
-                    for part in chunk.parts:
-                        if part.function_call:
-                            tool_calls.append(part.function_call)
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.error("[PHASE 1] Error processing chunk parts: %s", e)
-
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("Phase 1 Error: %s", traceback.format_exc())
-        yield f"event: error\ndata: {json.dumps(str(e))}\n\n"
-        return
-
-    # --- Phase 2: Tool Execution ---
-    if tool_calls:
-        logger.debug("[PHASE 2 START] Executing tools...")
-        # Yield status message
-        yield f"event: message\ndata: {json.dumps('🛠 Executing tools...')}\n\n"
-
-        response_parts = []
         try:
-            for fc in tool_calls:
-                logger.info("Executing tool: %s", fc.name)
+            stream = chat_session.send_message_stream(current_msg)
 
-                tool_func = TOOL_MAP.get(fc.name)
-                result = None
-
-                if tool_func:
-                    try:
-                        result = tool_func(**fc.args)
-                    except Exception as e:  # pylint: disable=broad-exception-caught
-                        result = f"Error executing {fc.name}: {e}"
-                else:
-                    result = f"Error: Tool {fc.name} not found."
-
-                response_parts.append(
-                    types.Part.from_function_response(
-                        name=fc.name, response={"result": result}
-                    )
-                )
-
-            # --- Phase 3: Tool Stream ---
-            logger.debug("[PHASE 3 START] Sending tool outputs...")
-            stream2 = chat_session.send_message_stream(response_parts)
-
-            for chunk in stream2:
+            for chunk in stream:
+                # Text processing
                 try:
-                    text_content = ""
-
-                    # Strategy 1: Direct text
-                    if hasattr(chunk, "text") and chunk.text:
-                        text_content = chunk.text
-
-                    # Strategy 2: Parts extraction (Fallback)
-                    elif hasattr(chunk, "parts"):
-                        text_content = "".join([p.text for p in chunk.parts if p.text])
-
-                    # Strategy 3: Candidates extraction (Deep Fallback)
-                    elif hasattr(chunk, "candidates") and chunk.candidates:
-                        try:
-                            # Try to extract text from the first candidate's first part
-                            if (
-                                chunk.candidates[0].content
-                                and chunk.candidates[0].content.parts
-                            ):
-                                text_content = chunk.candidates[0].content.parts[0].text
-                        except (IndexError, AttributeError) as e:
-                            logger.error("[PHASE 3] Candidate extraction failed: %s", e)
-
-                    if text_content:
-                        logger.debug(
-                            "[PHASE 3 CHUNK] Yielding: %s...", text_content[:20]
-                        )
-                        full_response_text += text_content
-                        yield f"event: message\ndata: {json.dumps(text_content)}\n\n"
-                    else:
-                        logger.warning("[PHASE 3] Empty text chunk received: %s", chunk)
-
+                    if chunk.text:
+                        full_response_text += chunk.text
+                        yield f"event: message\ndata: {json.dumps(chunk.text)}\n\n"
                 except Exception as e:  # pylint: disable=broad-exception-caught
-                    logger.error("[PHASE 3 ERROR] Failed to process chunk: %s", e)
-                    # Do not yield error to UI, just log it and continue
+                    logger.error("[TURN %d] Error processing chunk text: %s", turn, e)
+
+                # Tool call processing
+                try:
+                    if hasattr(chunk, "parts"):
+                        for part in chunk.parts:
+                            if part.function_call:
+                                tool_calls.append(part.function_call)
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    logger.error("[TURN %d] Error processing chunk parts: %s", turn, e)
 
         except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error("Phase 2/3 Error: %s", traceback.format_exc())
+            logger.error("Turn %d Error: %s", turn, traceback.format_exc())
             yield f"event: error\ndata: {json.dumps(str(e))}\n\n"
+            return
+
+        # Decision Point
+        if not tool_calls:
+            break
+
+        # Execute Tools
+        logger.debug("[TURN %d] Executing tools...", turn)
+        yield f"event: tool\ndata: 🛠 Processing {len(tool_calls)} actions...\n\n"
+
+        response_parts = []
+        for fc in tool_calls:
+            logger.info("Executing tool: %s", fc.name)
+            tool_func = TOOL_MAP.get(fc.name)
+            result = None
+            if tool_func:
+                try:
+                    result = tool_func(**fc.args)
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    result = f"Error executing {fc.name}: {e}"
+            else:
+                result = f"Error: Tool {fc.name} not found."
+
+            response_parts.append(
+                types.Part.from_function_response(
+                    name=fc.name, response={"result": result}
+                )
+            )
+
+        # Update State
+        current_msg = response_parts
 
     # Save model response
     if full_response_text:
