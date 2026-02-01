@@ -21,6 +21,7 @@ app = flask.Flask(__name__)
 # --- Configuration ---
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 JULES_API_KEY = os.environ.get("JULES_API_KEY")
+CHAT_HISTORY_FILE = os.environ.get("CHAT_HISTORY_FILE", "chat_history.json")
 
 # Default to /codebase inside Docker, but fallback to current directory for local testing
 CODEBASE_ROOT = "/codebase" if os.path.exists("/codebase") else "."
@@ -194,8 +195,6 @@ TOOL_MAP = {"list_files": list_files, "read_file": read_file}
 
 # --- Persistence ---
 
-CHAT_HISTORY_FILE = "chat_history.json"
-
 
 def load_chat_history():
     if not os.path.exists(CHAT_HISTORY_FILE):
@@ -210,6 +209,9 @@ def load_chat_history():
 
 def save_chat_history(history):
     try:
+        directory = os.path.dirname(CHAT_HISTORY_FILE)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
         with open(CHAT_HISTORY_FILE, "w", encoding="utf-8") as f:
             json.dump(history, f, indent=2)
     except Exception as e:
