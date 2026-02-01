@@ -2,3 +2,5 @@ flask
 google-genai
 markdown
 requests
+pytest
+pytest-mock

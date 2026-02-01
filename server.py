@@ -6,6 +6,8 @@ import subprocess
 import functools
 import traceback
 import requests
+import logging
+import sys
 from google import genai
 from google.genai import types
 from flask import (
@@ -16,6 +18,14 @@ from flask import (
     Response,
 )
 
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    stream=sys.stdout
+)
+logger = logging.getLogger(__name__)
+
 app = flask.Flask(__name__)
 
 # --- Configuration ---
@@ -24,7 +34,7 @@ JULES_API_KEY = os.environ.get("JULES_API_KEY")
 CHAT_HISTORY_FILE = os.environ.get("CHAT_HISTORY_FILE", "chat_history.json")
 
 # Default to /codebase inside Docker, but fallback to current directory for local testing
-CODEBASE_ROOT = "/codebase" if os.path.exists("/codebase") else "."
+CODEBASE_ROOT = "/codebase"
 
 
 @functools.lru_cache(maxsize=1)
@@ -59,7 +69,7 @@ def get_jules_source():
                     if github_match:
                         return f"sources/github/{github_match.group(1)}/{github_match.group(2)}"
     except Exception as e:
-        print(f"Warning: Failed to parse git config: {e}")
+        logger.warning(f"Failed to parse git config: {e}")
 
     return None
 
@@ -105,24 +115,37 @@ def api_status():
     return jsonify(get_git_info())
 
 
+def perform_git_pull():
+    logger.info("Starting git pull...")
+    try:
+        result = subprocess.run(
+            ["git", "pull"],
+            cwd=CODEBASE_ROOT,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        logger.debug(f"Git stdout: {result.stdout}")
+        return {"success": True, "output": result.stdout}
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Git stderr: {e.stderr}")
+        return {"success": False, "output": e.stderr or e.stdout}
+    except Exception as e:
+        logger.error(f"Git pull failed: {e}")
+        return {"success": False, "output": str(e)}
+
+
 @app.route("/api/git_pull", methods=["POST"])
 def api_git_pull():
-    try:
-        output = subprocess.check_output(
-            ["git", "pull"], cwd=CODEBASE_ROOT, stderr=subprocess.STDOUT
-        )
-        return jsonify({"success": True, "output": output.decode("utf-8")})
-    except subprocess.CalledProcessError as e:
-        return jsonify({"success": False, "output": e.output.decode("utf-8")})
-    except Exception as e:
-        return jsonify({"success": False, "output": str(e)})
+    result = perform_git_pull()
+    return jsonify(result)
 
 
-print(f"DEBUG: API Key present: {bool(GOOGLE_API_KEY)}")
-print(f"DEBUG: Active Jules Source: {get_jules_source()}")
+logger.info(f"DEBUG: API Key present: {bool(GOOGLE_API_KEY)}")
+logger.info(f"DEBUG: Active Jules Source: {get_jules_source()}")
 
 if not GOOGLE_API_KEY:
-    print("Warning: GOOGLE_API_KEY environment variable not set.")
+    logger.warning("Warning: GOOGLE_API_KEY environment variable not set.")
 
 client = genai.Client(api_key=GOOGLE_API_KEY)
 
@@ -134,6 +157,7 @@ def list_files(directory: str = ".") -> list[str]:
     Lists all files in the given directory (recursive), ignoring specific directories.
     Returns a list of relative file paths.
     """
+    logger.debug(f"Scanning files in: {CODEBASE_ROOT}")
     files_list = []
 
     # Sanitize directory input to be relative to root
@@ -159,6 +183,7 @@ def list_files(directory: str = ".") -> list[str]:
             rel_path = os.path.relpath(full_path, CODEBASE_ROOT)
             files_list.append(rel_path)
 
+    logger.debug(f"Found {len(files_list)} files.")
     return files_list
 
 
@@ -203,7 +228,7 @@ def load_chat_history():
         with open(CHAT_HISTORY_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        print(f"Error loading chat history: {e}")
+        logger.error(f"Error loading chat history: {e}")
         return []
 
 
@@ -215,7 +240,7 @@ def save_chat_history(history):
         with open(CHAT_HISTORY_FILE, "w", encoding="utf-8") as f:
             json.dump(history, f, indent=2)
     except Exception as e:
-        print(f"Error saving chat history: {e}")
+        logger.error(f"Error saving chat history: {e}")
 
 
 def save_message(role, text):
@@ -642,7 +667,7 @@ def generate_response(session, message):
                 yield f"event: message\ndata: {json.dumps(part.text)}\n\n"
 
     except Exception as e:
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         yield f"event: error\ndata: {json.dumps(str(e))}\n\n"
 
 
@@ -792,7 +817,7 @@ def deploy_to_jules():
         return jsonify({"success": True, "result": result})
 
     except Exception as e:
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         return jsonify({"success": False, "error": str(e)}), 500
 
 
