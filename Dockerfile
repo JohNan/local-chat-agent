@@ -13,8 +13,8 @@ RUN git config --global --add safe.directory /codebase \
     && git config --global user.email "agent@gemini.local" \
     && git config --global user.name "Gemini Agent"
 
-COPY server.py .
+COPY app/ ./app/
 
 EXPOSE 5000
 
-CMD ["python", "server.py"]
+CMD ["python", "-m", "app.main"]
