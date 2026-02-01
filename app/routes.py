@@ -1,3 +1,7 @@
+"""
+Flask routes and API endpoints for the application.
+"""
+
 import os
 import json
 import logging
@@ -28,31 +32,35 @@ if not GOOGLE_API_KEY:
 
 # Initialize client (lazy or global)
 try:
-    client = genai.Client(api_key=GOOGLE_API_KEY)
-except Exception as e:
-    logger.error(f"Failed to initialize Gemini client: {e}")
-    client = None
+    CLIENT = genai.Client(api_key=GOOGLE_API_KEY)
+except Exception as e:  # pylint: disable=broad-exception-caught
+    logger.error("Failed to initialize Gemini client: %s", e)
+    CLIENT = None
 
 
 @bp.route("/")
 def index():
+    """Renders the main page."""
     return render_template("index.html")
 
 
 @bp.route("/api/status", methods=["GET"])
 def api_status():
+    """Returns repository status."""
     info = git_ops.get_repo_info()
     return jsonify({"project": info["project"], "branch": info["branch"]})
 
 
 @bp.route("/api/git_pull", methods=["POST"])
 def api_git_pull():
+    """Performs a git pull."""
     result = git_ops.perform_git_pull()
     return jsonify(result)
 
 
 @bp.route("/api/history", methods=["GET"])
 def api_history():
+    """Retrieves paginated chat history."""
     try:
         limit = int(request.args.get("limit", 20))
         offset = int(request.args.get("offset", 0))
@@ -65,15 +73,17 @@ def api_history():
 
 @bp.route("/api/reset", methods=["POST"])
 def api_reset():
+    """Resets chat history."""
     try:
         chat_manager.reset_history()
         return jsonify({"success": True})
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         return jsonify({"success": False, "error": str(e)}), 500
 
 
 @bp.route("/api/deploy_to_jules", methods=["POST"])
-def deploy_to_jules():
+def deploy_to_jules_route():
+    """Endpoint to deploy session to Jules."""
     try:
         data = request.json
         prompt_text = data.get("prompt")
@@ -86,12 +96,16 @@ def deploy_to_jules():
 
         return jsonify({"success": True, "result": result})
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error(traceback.format_exc())
         return jsonify({"success": False, "error": str(e)}), 500
 
 
 def generate_response(session, message):
+    """
+    Generates a response from the Gemini session, handling tool calls.
+    Yields SSE events.
+    """
     try:
         response_stream = session.send_message_stream(message)
 
@@ -118,7 +132,7 @@ def generate_response(session, message):
                 if tool_func:
                     try:
                         result = tool_func(**fc.args)
-                    except Exception as e:
+                    except Exception as e:  # pylint: disable=broad-exception-caught
                         result = f"Error executing {fc.name}: {e}"
                 else:
                     result = f"Error: Tool {fc.name} not found."
@@ -133,17 +147,18 @@ def generate_response(session, message):
                 yield from generate_response(session, fn_response_part)
                 return
 
-            elif part.text:
+            if part.text:
                 yield f"event: message\ndata: {json.dumps(part.text)}\n\n"
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error(traceback.format_exc())
         yield f"event: error\ndata: {json.dumps(str(e))}\n\n"
 
 
 @bp.route("/chat", methods=["POST"])
 def chat():
-    if not client:
+    """Handles chat messages."""
+    if not CLIENT:
         return jsonify({"error": "Gemini client not initialized"}), 500
 
     data = request.json
@@ -169,18 +184,25 @@ def chat():
                 parts.append(types.Part(text=p))
         formatted_history.append({"role": h["role"], "parts": parts})
 
-    chat_session = client.chats.create(
+    system_instr = (
+        "You are the Technical Lead and Prompt Architect. "
+        "You have **READ-ONLY** access to the user's codebase.\n\n"
+        "**CRITICAL RULES:**\n"
+        "1. **Explore First:** When the user asks a question, "
+        "you must **IMMEDIATELY** use `list_files` and `read_file` to investigate. "
+        "**NEVER** ask the user for file paths or code snippets. Find them yourself.\n"
+        "2. **Read-Only:** You cannot edit, write, or delete files. "
+        "If code changes are required, you must describe them or generate a 'Jules Prompt'.\n"
+        '3. **Jules Prompt:** When the user asks to "write a prompt", "deploy", '
+        'or "create instructions", you must generate a structured block starting with '
+        "`## Jules Prompt` containing the specific context and acceptance criteria."
+    )
+
+    chat_session = CLIENT.chats.create(
         model="gemini-2.0-flash",
         config=types.GenerateContentConfig(
             tools=[git_ops.list_files, git_ops.read_file],
-            system_instruction=(
-                """You are the Technical Lead and Prompt Architect. You have **READ-ONLY** access to the user's codebase.
-
-**CRITICAL RULES:**
-1. **Explore First:** When the user asks a question, you must **IMMEDIATELY** use `list_files` and `read_file` to investigate. **NEVER** ask the user for file paths or code snippets. Find them yourself.
-2. **Read-Only:** You cannot edit, write, or delete files. If code changes are required, you must describe them or generate a 'Jules Prompt'.
-3. **Jules Prompt:** When the user asks to "write a prompt", "deploy", or "create instructions", you must generate a structured block starting with `## Jules Prompt` containing the specific context and acceptance criteria."""
-            ),
+            system_instruction=system_instr,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(
                 disable=True
             ),
@@ -201,7 +223,7 @@ def chat():
                         if line.startswith("data: "):
                             text_part = json.loads(line[6:])
                             full_response_text += text_part
-                except Exception:
+                except json.JSONDecodeError:
                     pass
 
         # Save model response

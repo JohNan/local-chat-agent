@@ -1,3 +1,7 @@
+"""
+Service module for Git operations.
+"""
+
 import os
 import re
 import subprocess
@@ -9,55 +13,69 @@ logger = logging.getLogger(__name__)
 CODEBASE_ROOT = os.environ.get("CODEBASE_ROOT", "/codebase")
 
 
+def _get_remote_url():
+    """Attempts to retrieve the git remote origin URL."""
+    remote_url = ""
+    # 1. Try git remote get-url origin
+    try:
+        remote_url_bytes = subprocess.check_output(
+            ["git", "remote", "get-url", "origin"],
+            cwd=CODEBASE_ROOT,
+            stderr=subprocess.DEVNULL,
+        )
+        remote_url = remote_url_bytes.decode("utf-8").strip()
+    except subprocess.CalledProcessError:
+        pass
+    except FileNotFoundError:
+        pass
+
+    # 2. Fallback to .git/config
+    if not remote_url:
+        git_config_path = os.path.join(CODEBASE_ROOT, ".git", "config")
+        if os.path.exists(git_config_path):
+            try:
+                with open(git_config_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                remote_block_match = re.search(
+                    r'\[remote "origin"\](.*?)(?=\[|$)', content, re.DOTALL
+                )
+                if remote_block_match:
+                    block_content = remote_block_match.group(1)
+                    url_match = re.search(r"url\s*=\s*(\S+)", block_content)
+                    if url_match:
+                        remote_url = url_match.group(1)
+            except OSError as e:
+                logger.warning("Failed to parse git config: %s", e)
+
+    return remote_url
+
+
+def _get_current_branch():
+    """Attempts to retrieve the current git branch."""
+    branch = "main"  # Default
+    try:
+        branch_bytes = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=CODEBASE_ROOT,
+            stderr=subprocess.DEVNULL,
+        )
+        branch = branch_bytes.decode("utf-8").strip()
+    except subprocess.CalledProcessError:
+        pass
+    except FileNotFoundError:
+        pass
+    return branch
+
+
 def get_repo_info():
     """
     Retrieves Git repository information including project name, branch, and Source ID.
     """
     try:
-        remote_url = ""
-        # 1. Try git remote get-url origin
-        try:
-            remote_url_bytes = subprocess.check_output(
-                ["git", "remote", "get-url", "origin"],
-                cwd=CODEBASE_ROOT,
-                stderr=subprocess.DEVNULL,
-            )
-            remote_url = remote_url_bytes.decode("utf-8").strip()
-        except Exception:
-            pass
-
-        # 2. Fallback to .git/config
-        if not remote_url:
-            git_config_path = os.path.join(CODEBASE_ROOT, ".git", "config")
-            if os.path.exists(git_config_path):
-                try:
-                    with open(git_config_path, "r", encoding="utf-8") as f:
-                        content = f.read()
-                    remote_block_match = re.search(
-                        r'\[remote "origin"\](.*?)(?=\[|$)', content, re.DOTALL
-                    )
-                    if remote_block_match:
-                        block_content = remote_block_match.group(1)
-                        url_match = re.search(r"url\s*=\s*(\S+)", block_content)
-                        if url_match:
-                            remote_url = url_match.group(1)
-                except Exception as e:
-                    logger.warning(f"Failed to parse git config: {e}")
+        remote_url = _get_remote_url()
+        branch = _get_current_branch()
 
         project = "Unknown"
-        branch = "main"  # Default
-
-        # Get current branch
-        try:
-            branch_bytes = subprocess.check_output(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                cwd=CODEBASE_ROOT,
-                stderr=subprocess.DEVNULL,
-            )
-            branch = branch_bytes.decode("utf-8").strip()
-        except Exception:
-            pass
-
         source_id = ""
 
         if remote_url:
@@ -81,12 +99,15 @@ def get_repo_info():
             "source_id": source_id,
         }
 
-    except Exception as e:
-        logger.error(f"Error getting repo info: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error getting repo info: %s", e)
         return {"project": "No Git Repo", "branch": "-", "source_id": ""}
 
 
 def perform_git_pull():
+    """
+    Executes 'git pull' in the codebase root.
+    """
     logger.info("Starting git pull...")
     try:
         result = subprocess.run(
@@ -96,13 +117,13 @@ def perform_git_pull():
             text=True,
             check=True,
         )
-        logger.debug(f"Git stdout: {result.stdout}")
+        logger.debug("Git stdout: %s", result.stdout)
         return {"success": True, "output": result.stdout}
     except subprocess.CalledProcessError as e:
-        logger.error(f"Git stderr: {e.stderr}")
+        logger.error("Git stderr: %s", e.stderr)
         return {"success": False, "output": e.stderr or e.stdout}
-    except Exception as e:
-        logger.error(f"Git pull failed: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Git pull failed: %s", e)
         return {"success": False, "output": str(e)}
 
 
@@ -111,7 +132,7 @@ def list_files(directory: str = ".") -> list[str]:
     Lists all files in the given directory (recursive), ignoring specific directories.
     Returns a list of relative file paths.
     """
-    logger.debug(f"Scanning files in: {CODEBASE_ROOT}")
+    logger.debug("Scanning files in: %s", CODEBASE_ROOT)
     files_list = []
 
     # Sanitize directory input to be relative to root
@@ -137,7 +158,7 @@ def list_files(directory: str = ".") -> list[str]:
             rel_path = os.path.relpath(full_path, CODEBASE_ROOT)
             files_list.append(rel_path)
 
-    logger.debug(f"Found {len(files_list)} files.")
+    logger.debug("Found %d files.", len(files_list))
     return files_list
 
 
@@ -166,5 +187,5 @@ def read_file(filepath: str) -> str:
     try:
         with open(full_path, "r", encoding="utf-8") as f:
             return f.read()
-    except Exception as e:
+    except OSError as e:
         return f"Error reading file: {str(e)}"
