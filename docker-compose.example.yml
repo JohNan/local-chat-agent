@@ -7,7 +7,9 @@ services:
       - "5000:5000"
     volumes:
       - ./:/codebase
+      - ./config:/config
       - ${SSH_AUTH_SOCK}:/ssh-agent
     environment:
       - GOOGLE_API_KEY
       - SSH_AUTH_SOCK=/ssh-agent
+      - CONFIG_DIR=/config
