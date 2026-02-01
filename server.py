@@ -2,6 +2,7 @@ import os
 import re
 import json
 import flask
+import subprocess
 import functools
 import traceback
 import requests
@@ -51,6 +52,57 @@ def get_jules_source():
         print(f"Warning: Failed to parse git config: {e}")
 
     return None
+
+def get_git_info():
+    try:
+        # Get remote URL
+        remote_url_bytes = subprocess.check_output(
+            ["git", "remote", "get-url", "origin"],
+            cwd=CODEBASE_ROOT, stderr=subprocess.DEVNULL
+        )
+        remote_url = remote_url_bytes.decode("utf-8").strip()
+
+        # Parse user/repo
+        project = "Unknown"
+        if "github.com" in remote_url:
+            match = re.search(r'github\.com[:/]([\w.-]+)/([\w.-]+)', remote_url)
+            if match:
+                project = f"{match.group(1)}/{match.group(2)}"
+                if project.endswith(".git"):
+                    project = project[:-4]
+        else:
+            project = remote_url.split("/")[-1] # Fallback
+            if project.endswith(".git"):
+                project = project[:-4]
+
+        # Get current branch
+        branch_bytes = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=CODEBASE_ROOT, stderr=subprocess.DEVNULL
+        )
+        branch = branch_bytes.decode("utf-8").strip()
+
+        return {"project": project, "branch": branch}
+    except Exception:
+        return {"project": "No Git Repo", "branch": "-"}
+
+@app.route("/api/status", methods=["GET"])
+def api_status():
+    return jsonify(get_git_info())
+
+@app.route("/api/git_pull", methods=["POST"])
+def api_git_pull():
+    try:
+        output = subprocess.check_output(
+            ["git", "pull"],
+            cwd=CODEBASE_ROOT,
+            stderr=subprocess.STDOUT
+        )
+        return jsonify({"success": True, "output": output.decode("utf-8")})
+    except subprocess.CalledProcessError as e:
+        return jsonify({"success": False, "output": e.output.decode("utf-8")})
+    except Exception as e:
+        return jsonify({"success": False, "output": str(e)})
 
 print(f"DEBUG: API Key present: {bool(GOOGLE_API_KEY)}")
 print(f"DEBUG: Active Jules Source: {get_jules_source()}")
@@ -230,6 +282,14 @@ HTML_TEMPLATE = """
     </style>
 </head>
 <body>
+    <div id="header" style="padding: 10px 20px; background-color: var(--chat-bg); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: bold;">Gemini Agent</span>
+        <div>
+            <span style="margin-right: 15px;">📂 <span id="repo-status">Loading...</span></span>
+            <button onclick="gitPull()" style="padding: 5px 10px; font-size: 0.9em;">⬇️ Git Pull</button>
+        </div>
+    </div>
+
     <div id="chat-container"></div>
     <div id="input-area">
         <input type="text" id="user-input" placeholder="Ask about your code..." onkeypress="if(event.key==='Enter') sendMessage()">
@@ -397,6 +457,39 @@ HTML_TEMPLATE = """
                 btn.disabled = false;
             }
         }
+
+        async function updateStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                document.getElementById('repo-status').innerText = `${data.project} (${data.branch})`;
+            } catch(e) {
+                console.error(e);
+                document.getElementById('repo-status').innerText = "Error";
+            }
+        }
+
+        async function gitPull() {
+             const btn = document.querySelector('button[onclick="gitPull()"]');
+             const originalText = btn.innerText;
+             btn.innerText = "⏳ Pulling...";
+             btn.disabled = true;
+
+             try {
+                const res = await fetch('/api/git_pull', {method: 'POST'});
+                const data = await res.json();
+                alert(data.output);
+             } catch(e) {
+                alert("Error: " + e.message);
+             } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+                updateStatus(); // Refresh status just in case
+             }
+        }
+
+        // Call on load
+        updateStatus();
     </script>
 </body>
 </html>
