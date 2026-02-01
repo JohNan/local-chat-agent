@@ -209,7 +209,7 @@
             </span>
             <button onclick="gitPull()" class="icon-btn" title="Git Pull">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2v-4"></path>
                     <polyline points="7 10 12 15 17 10"></polyline>
                     <line x1="12" y1="15" x2="12" y2="3"></line>
                 </svg>
@@ -311,12 +311,83 @@
         }
 
         function addDeployButton(messageBubble) {
-             if (messageBubble.querySelector('button')) return;
+             if (messageBubble.querySelector('button.deploy-btn')) return;
              const deployBtn = document.createElement('button');
              deployBtn.className = 'deploy-btn';
              deployBtn.innerHTML = "🚀 Start Jules Task";
              deployBtn.onclick = function() { deploy(this); };
              messageBubble.appendChild(deployBtn);
+        }
+
+        function sendRequest(text) {
+            const streamUrl = '/chat?message=' + encodeURIComponent(text);
+            const source = new EventSource(streamUrl);
+
+            // Create AI Bubble
+            const aiRow = createMessageElement('model', '');
+            chatContainer.appendChild(aiRow);
+            const aiBubble = aiRow.querySelector('.message-bubble');
+            let currentAiText = "";
+
+            // Remove any existing status indicator
+            removeStatusIndicator();
+            scrollToBottom();
+
+            source.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    currentAiText += data;
+                    aiBubble.innerHTML = marked.parse(currentAiText);
+
+                    // Check for Jules Prompt marker
+                    if (currentAiText.includes("## Jules Prompt")) {
+                        addDeployButton(aiBubble);
+                    }
+
+                    // We received text, so probably tool is done if it was running (or concurrent)
+                    removeStatusIndicator();
+                    scrollToBottom();
+
+                } catch (e) {
+                    console.error("Error parsing message JSON:", e);
+                }
+            };
+
+            source.addEventListener("tool", function(event) {
+                 showStatusIndicator(event.data || "Executing tools...");
+            });
+
+            source.addEventListener("error", function(event) {
+                // If it's a connection error, logs it.
+                // We'll close the source.
+                console.error("EventSource error:", event);
+                source.close();
+                removeStatusIndicator();
+            });
+
+            source.addEventListener("done", function(event) {
+                source.close();
+                removeStatusIndicator();
+            });
+        }
+
+        function showStatusIndicator(text) {
+            removeStatusIndicator();
+            const div = document.createElement('div');
+            div.id = 'temp-status-indicator';
+            div.className = 'tool-usage';
+            div.innerHTML = ICONS.tool + ' ' + text;
+            chatContainer.appendChild(div);
+            scrollToBottom();
+        }
+
+        function removeStatusIndicator() {
+            const el = document.getElementById('temp-status-indicator');
+            if (el) el.remove();
+        }
+
+        function scrollToBottom() {
+             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
         async function sendMessage() {
@@ -325,113 +396,18 @@
 
             const userRow = createMessageElement('user', text);
             chatContainer.appendChild(userRow);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            scrollToBottom();
             userInput.value = '';
 
             currentOffset++;
 
-            try {
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
-                });
-
-                if (!response.ok) throw new Error(response.statusText);
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-
-                // Create AI message row
-                const aiRow = createMessageElement('model', '');
-                const aiBubble = aiRow.querySelector('.message-bubble');
-                chatContainer.appendChild(aiRow);
-
-                let currentAiText = "";
-                let buffer = "";
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    buffer += decoder.decode(value, { stream: true });
-                    const parts = buffer.split('\\n\\n');
-                    buffer = parts.pop();
-
-                    for (const part of parts) {
-                        const lines = part.split('\\n');
-                        let event = null;
-                        let data = '';
-
-                        for (const line of lines) {
-                            if (line.startsWith('event: ')) event = line.substring(7).trim();
-                            else if (line.startsWith('data: ')) data = line.substring(6);
-                        }
-
-                        if (event === 'message') {
-                            try {
-                                const textChunk = JSON.parse(data);
-                                // Check for "Executing tools..." status from backend
-                                if (textChunk.includes("Executing tools...")) {
-                                    appendToolLog("Executing tools...");
-                                } else {
-                                    currentAiText += textChunk;
-                                    aiBubble.innerHTML = marked.parse(currentAiText);
-                                }
-                            } catch (e) { console.error('Error parsing JSON:', e); }
-                        } else if (event === 'tool') {
-                            appendToolLog(data);
-                        } else if (event === 'error') {
-                            aiBubble.classList.add('error-message');
-                            aiBubble.innerText += "\\nError: " + data;
-                        }
-                    }
-                    scrollToBottomIfNear();
-                }
-
-                currentOffset++;
-
-                if (currentAiText.includes("## Jules Prompt")) {
-                    addDeployButton(aiBubble);
-                }
-
-            } catch (error) {
-                console.error('Error:', error);
-                const errRow = createMessageElement('model', `Error: ${error.message}`);
-                errRow.querySelector('.message-bubble').classList.add('error-message');
-                chatContainer.appendChild(errRow);
-                chatContainer.scrollTop = chatContainer.scrollHeight;
-            }
-        }
-
-        function appendToolLog(text) {
-             const div = document.createElement('div');
-            div.className = `tool-usage`;
-            div.innerHTML = ICONS.tool + ' ' + text;
-
-            // Insert before the last AI message (which is currently streaming)
-            const aiRows = document.querySelectorAll('.message-row.ai');
-            const lastAiRow = aiRows[aiRows.length - 1];
-            if (lastAiRow && lastAiRow.parentElement === chatContainer) {
-                 chatContainer.insertBefore(div, lastAiRow);
-            } else {
-                 chatContainer.appendChild(div);
-            }
-            scrollToBottomIfNear();
-        }
-
-        function scrollToBottomIfNear() {
-            const threshold = 150;
-            const position = chatContainer.scrollTop + chatContainer.clientHeight;
-            const height = chatContainer.scrollHeight;
-            if (height - position < threshold) {
-                chatContainer.scrollTop = height;
-            }
+            sendRequest(text);
         }
 
         async function deploy(btn) {
             const messageBubble = btn.parentElement;
             let promptText = messageBubble.innerText;
+            // Remove the button text itself from the prompt if it's part of innerText
             promptText = promptText.replace(btn.innerText, '').trim();
 
             btn.innerText = "⏳ Sending...";
