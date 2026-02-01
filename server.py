@@ -8,7 +8,13 @@ import traceback
 import requests
 from google import genai
 from google.genai import types
-from flask import request, jsonify, render_template_string, stream_with_context, Response
+from flask import (
+    request,
+    jsonify,
+    render_template_string,
+    stream_with_context,
+    Response,
+)
 
 app = flask.Flask(__name__)
 
@@ -18,6 +24,7 @@ JULES_API_KEY = os.environ.get("JULES_API_KEY")
 
 # Default to /codebase inside Docker, but fallback to current directory for local testing
 CODEBASE_ROOT = "/codebase" if os.path.exists("/codebase") else "."
+
 
 @functools.lru_cache(maxsize=1)
 def get_jules_source():
@@ -34,10 +41,12 @@ def get_jules_source():
                 content = f.read()
 
             # Simple regex to find the url in [remote "origin"] block
-            remote_block_match = re.search(r'\[remote "origin"\](.*?)(?=\[|$)', content, re.DOTALL)
+            remote_block_match = re.search(
+                r'\[remote "origin"\](.*?)(?=\[|$)', content, re.DOTALL
+            )
             if remote_block_match:
                 block_content = remote_block_match.group(1)
-                url_match = re.search(r'url\s*=\s*(\S+)', block_content)
+                url_match = re.search(r"url\s*=\s*(\S+)", block_content)
                 if url_match:
                     url = url_match.group(1)
 
@@ -45,7 +54,7 @@ def get_jules_source():
                         url = url[:-4]
 
                     # Parse user/repo from github url
-                    github_match = re.search(r'github\.com[:/]([\w.-]+)/([\w.-]+)', url)
+                    github_match = re.search(r"github\.com[:/]([\w.-]+)/([\w.-]+)", url)
                     if github_match:
                         return f"sources/github/{github_match.group(1)}/{github_match.group(2)}"
     except Exception as e:
@@ -53,32 +62,35 @@ def get_jules_source():
 
     return None
 
+
 def get_git_info():
     try:
         # Get remote URL
         remote_url_bytes = subprocess.check_output(
             ["git", "remote", "get-url", "origin"],
-            cwd=CODEBASE_ROOT, stderr=subprocess.DEVNULL
+            cwd=CODEBASE_ROOT,
+            stderr=subprocess.DEVNULL,
         )
         remote_url = remote_url_bytes.decode("utf-8").strip()
 
         # Parse user/repo
         project = "Unknown"
         if "github.com" in remote_url:
-            match = re.search(r'github\.com[:/]([\w.-]+)/([\w.-]+)', remote_url)
+            match = re.search(r"github\.com[:/]([\w.-]+)/([\w.-]+)", remote_url)
             if match:
                 project = f"{match.group(1)}/{match.group(2)}"
                 if project.endswith(".git"):
                     project = project[:-4]
         else:
-            project = remote_url.split("/")[-1] # Fallback
+            project = remote_url.split("/")[-1]  # Fallback
             if project.endswith(".git"):
                 project = project[:-4]
 
         # Get current branch
         branch_bytes = subprocess.check_output(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=CODEBASE_ROOT, stderr=subprocess.DEVNULL
+            cwd=CODEBASE_ROOT,
+            stderr=subprocess.DEVNULL,
         )
         branch = branch_bytes.decode("utf-8").strip()
 
@@ -86,23 +98,24 @@ def get_git_info():
     except Exception:
         return {"project": "No Git Repo", "branch": "-"}
 
+
 @app.route("/api/status", methods=["GET"])
 def api_status():
     return jsonify(get_git_info())
+
 
 @app.route("/api/git_pull", methods=["POST"])
 def api_git_pull():
     try:
         output = subprocess.check_output(
-            ["git", "pull"],
-            cwd=CODEBASE_ROOT,
-            stderr=subprocess.STDOUT
+            ["git", "pull"], cwd=CODEBASE_ROOT, stderr=subprocess.STDOUT
         )
         return jsonify({"success": True, "output": output.decode("utf-8")})
     except subprocess.CalledProcessError as e:
         return jsonify({"success": False, "output": e.output.decode("utf-8")})
     except Exception as e:
         return jsonify({"success": False, "output": str(e)})
+
 
 print(f"DEBUG: API Key present: {bool(GOOGLE_API_KEY)}")
 print(f"DEBUG: Active Jules Source: {get_jules_source()}")
@@ -113,6 +126,7 @@ if not GOOGLE_API_KEY:
 client = genai.Client(api_key=GOOGLE_API_KEY)
 
 # --- Tools ---
+
 
 def list_files(directory: str = ".") -> list[str]:
     """
@@ -146,6 +160,7 @@ def list_files(directory: str = ".") -> list[str]:
 
     return files_list
 
+
 def read_file(filepath: str) -> str:
     """
     Reads and returns the text content of a file.
@@ -174,10 +189,39 @@ def read_file(filepath: str) -> str:
     except Exception as e:
         return f"Error reading file: {str(e)}"
 
-TOOL_MAP = {
-    'list_files': list_files,
-    'read_file': read_file
-}
+
+TOOL_MAP = {"list_files": list_files, "read_file": read_file}
+
+# --- Persistence ---
+
+CHAT_HISTORY_FILE = "chat_history.json"
+
+
+def load_chat_history():
+    if not os.path.exists(CHAT_HISTORY_FILE):
+        return []
+    try:
+        with open(CHAT_HISTORY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading chat history: {e}")
+        return []
+
+
+def save_chat_history(history):
+    try:
+        with open(CHAT_HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=2)
+    except Exception as e:
+        print(f"Error saving chat history: {e}")
+
+
+def save_message(role, text):
+    history = load_chat_history()
+    # Ensure structure matches Google GenAI (list of dicts with 'parts')
+    history.append({"role": role, "parts": [{"text": text}]})
+    save_chat_history(history)
+
 
 # --- Chat Interface ---
 
@@ -300,33 +344,103 @@ HTML_TEMPLATE = """
         const chatContainer = document.getElementById('chat-container');
         const userInput = document.getElementById('user-input');
 
-        let chatHistory = [];
+        let currentOffset = 0;
+        const limit = 20;
+        let isLoadingHistory = false;
+        let hasMoreHistory = true;
+
+        async function loadHistory(isScrollUp = false) {
+            if (isLoadingHistory || (!hasMoreHistory && isScrollUp)) return;
+            isLoadingHistory = true;
+
+            const oldHeight = chatContainer.scrollHeight;
+
+            try {
+                const res = await fetch(`/api/history?limit=${limit}&offset=${currentOffset}`);
+                const data = await res.json();
+
+                if (data.messages && data.messages.length > 0) {
+                    const fragment = document.createDocumentFragment();
+
+                    data.messages.forEach(msg => {
+                        const parts = msg.parts || [{text: ""}];
+                        const text = parts[0].text || "";
+                        const div = createMessageElement(msg.role, text);
+                        fragment.appendChild(div);
+                    });
+
+                    if (isScrollUp) {
+                        chatContainer.insertBefore(fragment, chatContainer.firstChild);
+                        const newHeight = chatContainer.scrollHeight;
+                        chatContainer.scrollTop = newHeight - oldHeight;
+                    } else {
+                        chatContainer.appendChild(fragment);
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    }
+
+                    currentOffset += data.messages.length;
+                    hasMoreHistory = data.has_more;
+                } else {
+                    hasMoreHistory = false;
+                }
+            } catch (e) {
+                console.error("Failed to load history:", e);
+            } finally {
+                isLoadingHistory = false;
+            }
+        }
+
+        function createMessageElement(role, text) {
+            const div = document.createElement('div');
+            if (role === 'model' || role === 'ai') {
+                div.className = 'message ai-message';
+            } else {
+                div.className = 'message user-message';
+            }
+
+            div.innerHTML = marked.parse(text || "");
+
+            if ((role === 'model' || role === 'ai') && text && text.includes("## Jules Prompt")) {
+                addDeployButton(div);
+            }
+            return div;
+        }
+
+        function addDeployButton(messageDiv) {
+             if (messageDiv.querySelector('button')) return;
+             const deployBtn = document.createElement('button');
+             deployBtn.innerHTML = "🚀 Start Jules Task";
+             deployBtn.style.marginTop = "10px";
+             deployBtn.onclick = function() { deploy(this); };
+             messageDiv.appendChild(deployBtn);
+        }
 
         async function sendMessage() {
             const text = userInput.value.trim();
             if (!text) return;
 
-            appendMessage('user', text);
+            const userMsgDiv = createMessageElement('user', text);
+            chatContainer.appendChild(userMsgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
             userInput.value = '';
 
-            // Add to history
-            chatHistory.push({role: 'user', parts: [{text: text}]});
+            currentOffset++;
 
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text, history: chatHistory })
+                    body: JSON.stringify({ message: text })
                 });
 
-                if (!response.ok) {
-                    throw new Error(response.statusText);
-                }
+                if (!response.ok) throw new Error(response.statusText);
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
 
-                let aiMessageDiv = null;
+                let aiMessageDiv = createMessageElement('model', '');
+                chatContainer.appendChild(aiMessageDiv);
+
                 let currentAiText = "";
                 let buffer = "";
 
@@ -336,7 +450,7 @@ HTML_TEMPLATE = """
 
                     buffer += decoder.decode(value, { stream: true });
                     const parts = buffer.split('\\n\\n');
-                    buffer = parts.pop(); // Keep incomplete part
+                    buffer = parts.pop();
 
                     for (const part of parts) {
                         const lines = part.split('\\n');
@@ -344,69 +458,39 @@ HTML_TEMPLATE = """
                         let data = '';
 
                         for (const line of lines) {
-                            if (line.startsWith('event: ')) {
-                                event = line.substring(7).trim();
-                            } else if (line.startsWith('data: ')) {
-                                data = line.substring(6);
-                            }
+                            if (line.startsWith('event: ')) event = line.substring(7).trim();
+                            else if (line.startsWith('data: ')) data = line.substring(6);
                         }
 
                         if (event === 'message') {
-                            if (!aiMessageDiv) {
-                                aiMessageDiv = appendMessage('ai', '');
-                            }
                             try {
                                 const textChunk = JSON.parse(data);
                                 currentAiText += textChunk;
                                 aiMessageDiv.innerHTML = marked.parse(currentAiText);
-                            } catch (e) {
-                                console.error('Error parsing JSON:', e);
-                            }
+                            } catch (e) { console.error('Error parsing JSON:', e); }
                         } else if (event === 'tool') {
                             appendToolLog(data);
                         } else if (event === 'error') {
-                            appendMessage('ai error-message', data);
+                            aiMessageDiv.classList.add('error-message');
+                            aiMessageDiv.innerText += "\\nError: " + data;
                         }
                     }
-                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                    scrollToBottomIfNear();
                 }
 
-                chatHistory.push({role: 'model', parts: [{text: currentAiText}]});
+                currentOffset++;
 
-                // Check for Jules Prompt marker
                 if (currentAiText.includes("## Jules Prompt")) {
-                    const deployBtn = document.createElement('button');
-                    deployBtn.innerHTML = "🚀 Start Jules Task";
-                    deployBtn.style.marginTop = "10px";
-                    deployBtn.onclick = function() { deploy(this); };
-
-                    if (aiMessageDiv) {
-                        aiMessageDiv.appendChild(deployBtn);
-                        chatContainer.scrollTop = chatContainer.scrollHeight;
-                    }
+                    addDeployButton(aiMessageDiv);
                 }
 
             } catch (error) {
                 console.error('Error:', error);
-                appendMessage('ai error-message', `Error: ${error.message}`);
+                const errDiv = createMessageElement('model', `Error: ${error.message}`);
+                errDiv.classList.add('error-message');
+                chatContainer.appendChild(errDiv);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
             }
-        }
-
-        function appendMessage(sender, text) {
-            const div = document.createElement('div');
-            // If sender has multiple classes (e.g. 'ai error-message'), split and add
-            div.className = `message ${sender.replace(' ', ' ')}`;
-            if (sender.includes('error-message')) {
-                div.classList.add('error-message');
-                div.classList.add('ai-message');
-            } else {
-                div.className = `message ${sender}-message`;
-            }
-
-            div.innerHTML = marked.parse(text);
-            chatContainer.appendChild(div);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-            return div;
         }
 
         function appendToolLog(text) {
@@ -414,19 +498,21 @@ HTML_TEMPLATE = """
             div.className = `tool-usage`;
             div.innerText = text;
             chatContainer.appendChild(div);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            scrollToBottomIfNear();
+        }
+
+        function scrollToBottomIfNear() {
+            const threshold = 150;
+            const position = chatContainer.scrollTop + chatContainer.clientHeight;
+            const height = chatContainer.scrollHeight;
+            if (height - position < threshold) {
+                chatContainer.scrollTop = height;
+            }
         }
 
         async function deploy(btn) {
-            // Find the prompt text. It should be in the message div containing this button.
-            // We assume the prompt is inside a code block or the whole message.
-            // Let's grab the text content of the parent message div.
             const messageDiv = btn.parentElement;
             let promptText = messageDiv.innerText;
-
-            // Clean up the text: remove the button text itself and maybe the "## Jules Prompt" header if needed.
-            // But sending the whole thing is probably fine, Jules is smart.
-            // However, cleaning it a bit is better.
             promptText = promptText.replace(btn.innerText, '').trim();
 
             btn.innerText = "⏳ Sending...";
@@ -444,7 +530,7 @@ HTML_TEMPLATE = """
                 if (data.success) {
                     const sessionName = data.result.name || "Unknown Session";
                     btn.innerText = `✅ Started! (${sessionName})`;
-                    btn.onclick = null; // Disable further clicks
+                    btn.onclick = null;
                 } else {
                     btn.innerText = "❌ Error";
                     alert("Error deploying: " + data.error);
@@ -484,12 +570,19 @@ HTML_TEMPLATE = """
              } finally {
                 btn.innerText = originalText;
                 btn.disabled = false;
-                updateStatus(); // Refresh status just in case
+                updateStatus();
              }
         }
 
+        chatContainer.addEventListener('scroll', () => {
+             if (chatContainer.scrollTop === 0) {
+                 loadHistory(true);
+             }
+        });
+
         // Call on load
         updateStatus();
+        loadHistory(false);
     </script>
 </body>
 </html>
@@ -499,6 +592,7 @@ HTML_TEMPLATE = """
 @app.route("/")
 def index():
     return render_template_string(HTML_TEMPLATE)
+
 
 def generate_response(session, message):
     try:
@@ -512,7 +606,11 @@ def generate_response(session, message):
 
             if part.function_call:
                 fc = part.function_call
-                args_repr = ", ".join(f"{k}={v!r}" for k,v in fc.args.items()) if fc.args else ""
+                args_repr = (
+                    ", ".join(f"{k}={v!r}" for k, v in fc.args.items())
+                    if fc.args
+                    else ""
+                )
 
                 # Yield tool log
                 yield f"event: tool\ndata: 🛠 {fc.name}({args_repr})\n\n"
@@ -531,8 +629,7 @@ def generate_response(session, message):
                 # Continue conversation with tool result
                 fn_response_part = types.Part(
                     function_response=types.FunctionResponse(
-                        name=fc.name,
-                        response={"result": result}
+                        name=fc.name, response={"result": result}
                     )
                 )
 
@@ -547,25 +644,70 @@ def generate_response(session, message):
         yield f"event: error\ndata: {json.dumps(str(e))}\n\n"
 
 
+@app.route("/api/history", methods=["GET"])
+def api_history():
+    try:
+        limit = int(request.args.get("limit", 20))
+        offset = int(request.args.get("offset", 0))
+    except ValueError:
+        return jsonify({"error": "Invalid limit or offset"}), 400
+
+    history = load_chat_history()
+    total = len(history)
+
+    # Slice from the end (most recent) backwards
+    # offset=0 => end of list
+    end_idx = total - offset
+    start_idx = end_idx - limit
+
+    # Clamp indices
+    if end_idx > total:
+        end_idx = total
+    if end_idx < 0:
+        end_idx = 0
+    if start_idx < 0:
+        start_idx = 0
+
+    messages = history[start_idx:end_idx] if start_idx < end_idx else []
+
+    return jsonify({"messages": messages, "has_more": start_idx > 0, "total": total})
+
+
+@app.route("/api/reset", methods=["POST"])
+def api_reset():
+    if os.path.exists(CHAT_HISTORY_FILE):
+        try:
+            os.remove(CHAT_HISTORY_FILE)
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+    return jsonify({"success": True})
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.json
     user_msg = data.get("message")
-    history = data.get("history", [])
+
+    # Save user message first
+    save_message("user", user_msg)
+
+    # Load history including the message we just saved
+    full_history = load_chat_history()
+
+    # We need to exclude the very last message (current user msg)
+    # when initializing history, because send_message(user_msg) will add it again.
+    # Note: If multiple requests come in parallel, this might be race-condition prone,
+    # but for a single-user local tool it is acceptable.
+    history_for_gemini = full_history[:-1] if full_history else []
 
     formatted_history = []
-    # Basic history reconstruction.
-    # Note: Complex history with previous function calls is not fully handled here
-    # as we rely on the client sending simplified text history or the server being stateless.
-    # For a robust production app, we'd need to reconstruct types.Part properly including FunctionCall/Response.
-    for h in history:
+    for h in history_for_gemini:
         parts = []
-        for p in h["parts"]:
-            if isinstance(p, dict) and 'text' in p:
-                parts.append(types.Part(text=p['text']))
+        for p in h.get("parts", []):
+            if isinstance(p, dict) and "text" in p:
+                parts.append(types.Part(text=p["text"]))
             elif isinstance(p, str):
                 parts.append(types.Part(text=p))
-            # Ignore others for now as we don't send them back yet
         formatted_history.append({"role": h["role"], "parts": parts})
 
     chat_session = client.chats.create(
@@ -588,9 +730,26 @@ def chat():
     )
 
     def generate():
-        yield from generate_response(chat_session, user_msg)
+        full_response_text = ""
+        for chunk in generate_response(chat_session, user_msg):
+            yield chunk
+            # Accumulate text for saving history
+            if chunk.startswith("event: message"):
+                try:
+                    # chunk is "event: message\ndata: "..."\n\n"
+                    lines = chunk.strip().split("\n")
+                    for line in lines:
+                        if line.startswith("data: "):
+                            text_part = json.loads(line[6:])
+                            full_response_text += text_part
+                except Exception:
+                    pass
 
-    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+        # Save model response
+        if full_response_text:
+            save_message("model", full_response_text)
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
 
 def send_task_to_jules(prompt_text):
@@ -600,20 +759,14 @@ def send_task_to_jules(prompt_text):
 
     source_id = get_jules_source()
     if not source_id:
-        raise ValueError("Could not detect Git repository. Please set JULES_SOURCE in .env")
+        raise ValueError(
+            "Could not detect Git repository. Please set JULES_SOURCE in .env"
+        )
 
     url = "https://jules.googleapis.com/v1alpha/sessions"
-    headers = {
-        "X-Goog-Api-Key": api_key,
-        "Content-Type": "application/json"
-    }
+    headers = {"X-Goog-Api-Key": api_key, "Content-Type": "application/json"}
 
-    data = {
-        "prompt": prompt_text,
-        "sourceContext": {
-            "source": source_id
-        }
-    }
+    data = {"prompt": prompt_text, "sourceContext": {"source": source_id}}
 
     response = requests.post(url, headers=headers, json=data)
 
@@ -634,10 +787,7 @@ def deploy_to_jules():
 
         result = send_task_to_jules(prompt_text)
 
-        return jsonify({
-            "success": True,
-            "result": result
-        })
+        return jsonify({"success": True, "result": result})
 
     except Exception as e:
         traceback.print_exc()
