@@ -9,12 +9,14 @@ sys.path.append(os.getcwd())
 
 from app import create_app
 
+
 @pytest.fixture
 def client():
     app = create_app()
-    app.config['TESTING'] = True
+    app.config["TESTING"] = True
     with app.test_client() as client:
         yield client
+
 
 def test_chat_get_stream_basic(client):
     # Mock the Gemini Client
@@ -45,6 +47,7 @@ def test_chat_get_stream_basic(client):
         # Check for done event
         assert "event: done" in data
         assert "data: [DONE]" in data
+
 
 def test_chat_tool_execution(client):
     with patch("app.routes.CLIENT") as mock_client:
