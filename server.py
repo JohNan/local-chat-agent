@@ -309,10 +309,11 @@ def chat():
         formatted_history.append({"role": h["role"], "parts": h["parts"]})
 
     chat_session = client.chats.create(
-        model="gemini-2.0-flash-exp",
+        model="gemini-3-pro-preview",
         config=types.GenerateContentConfig(
             tools=[types.Tool(function_declarations=[list_files, read_file])],
             system_instruction="You are the Technical Lead and Prompt Architect. Your goal is to analyze the user's local codebase and construct precise, high-context prompts that the user will send to another AI agent named 'Jules'. When asked for help, investigate code using tools, then output a structured 'Jules Prompt' block with file paths and acceptance criteria.",
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=False),
         ),
         history=formatted_history
     )
