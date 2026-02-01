@@ -306,16 +306,28 @@ def chat():
 
     formatted_history = []
     for h in history:
-        formatted_history.append({"role": h["role"], "parts": h["parts"]})
+        parts = []
+        for p in h["parts"]:
+            if isinstance(p, str):
+                parts.append(types.Part(text=p))
+            else:
+                parts.append(p)
+        formatted_history.append({"role": h["role"], "parts": parts})
 
     chat_session = client.chats.create(
         model="gemini-3-pro-preview",
         config=types.GenerateContentConfig(
-            tools=[types.Tool(function_declarations=[list_files, read_file])],
-            system_instruction="You are the Technical Lead and Prompt Architect. Your goal is to analyze the user's local codebase and construct precise, high-context prompts that the user will send to another AI agent named 'Jules'. When asked for help, investigate code using tools, then output a structured 'Jules Prompt' block with file paths and acceptance criteria.",
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=False),
+            tools=[list_files, read_file],
+            system_instruction=(
+                "You are a Technical Lead. "
+                "1. **Default Mode (Consultant):** When the user asks questions, use your tools to read code, explain logic, and discuss architectural changes conversationally. Do NOT output a formal prompt in this mode. Just help the user understand and plan. "
+                "2. **Action Mode (Architect):** ONLY when the user explicitly says a trigger phrase like 'Create a prompt for Jules', 'Write instructions', or 'Ready to code', then you must summarize the previous discussion and generate the structured '## Jules Prompt' block with strict acceptance criteria and file contexts."
+            ),
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                disable=False
+            ),
         ),
-        history=formatted_history
+        history=formatted_history,
     )
 
     try:
