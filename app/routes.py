@@ -144,7 +144,7 @@ def _generate_stream(chat_session, user_msg):
     # --- Phase 1: Initial User Prompt ---
     try:
         # User requested: chat.send_message(..., stream=True)
-        response_stream = chat_session.send_message(user_msg, stream=True)
+        response_stream = chat_session.send_message_stream(user_msg)
         for chunk in response_stream:
             if not chunk.candidates:
                 continue
@@ -198,9 +198,7 @@ def _generate_stream(chat_session, user_msg):
 
             # --- Phase 3: Send Tool Outputs ---
             # Call chat.send_message(tool_outputs, stream=True)
-            tool_response_stream = chat_session.send_message(
-                response_parts, stream=True
-            )
+            tool_response_stream = chat_session.send_message_stream(response_parts)
 
             # Loop through this NEW stream
             for chunk in tool_response_stream:
