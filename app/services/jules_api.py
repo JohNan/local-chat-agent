@@ -1,11 +1,30 @@
+"""
+Service module for interacting with the Jules API.
+"""
+
+import logging
 import os
 import requests
-import logging
 
 logger = logging.getLogger(__name__)
 
 
 def deploy_to_jules(prompt_text, repo_info):
+    """
+    Deploys a session to Jules API with the provided prompt and repository context.
+
+    Args:
+        prompt_text (str): The prompt to send to Jules.
+        repo_info (dict): Dictionary containing repository information (source_id, branch).
+
+    Returns:
+        dict: The JSON response from the API.
+
+    Raises:
+        ValueError: If API keys or source ID are missing.
+        RuntimeError: If the Jules API returns an error.
+        requests.RequestException: If the HTTP request fails.
+    """
     api_key = os.environ.get("JULES_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         raise ValueError("JULES_API_KEY or GOOGLE_API_KEY not set")
@@ -27,18 +46,20 @@ def deploy_to_jules(prompt_text, repo_info):
         },
     }
 
-    logger.debug(f"Deploying to Jules with payload: {payload}")
+    logger.debug("Deploying to Jules with payload: %s", payload)
 
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
 
         if response.status_code != 200:
-            logger.error(f"Jules API Error: {response.status_code} - {response.text}")
-            raise Exception(
+            logger.error(
+                "Jules API Error: %s - %s", response.status_code, response.text
+            )
+            raise RuntimeError(
                 f"Jules API Error: {response.status_code} - {response.text}"
             )
 
         return response.json()
     except requests.RequestException as e:
-        logger.error(f"Request failed: {e}")
+        logger.error("Request failed: %s", e)
         raise
