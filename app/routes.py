@@ -137,28 +137,47 @@ def _generate_stream(chat_session, user_msg):
     """
     Generates the chat stream and handles tool execution.
     """
-    # pylint: disable=too-many-locals, too-many-branches, too-many-statements
+    # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-nested-blocks
     full_response_text = ""
     tool_calls = []
 
     # --- Phase 1: Initial User Prompt ---
+    logger.info("[PHASE 1 START] Sending user message to SDK")
     try:
-        # User requested: chat.send_message(..., stream=True)
         response_stream = chat_session.send_message_stream(user_msg)
         for chunk in response_stream:
-            if not chunk.candidates:
-                continue
+            # 1. Check for Function Calls (Phase 1 only)
+            try:
+                # User requested pattern: check if chunk has 'parts'
+                if hasattr(chunk, "parts"):
+                    for part in chunk.parts:
+                        if part.function_call:
+                            logger.info(
+                                "[PHASE 1] Detected Tool Call: %s",
+                                part.function_call.name,
+                            )
+                            tool_calls.append(part.function_call)
+                # Fallback to standard candidate access if needed
+                elif chunk.candidates:
+                    for part in chunk.candidates[0].content.parts:
+                        if part.function_call:
+                            logger.info(
+                                "[PHASE 1] Detected Tool Call (candidates): %s",
+                                part.function_call.name,
+                            )
+                            tool_calls.append(part.function_call)
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
 
-            for part in chunk.candidates[0].content.parts:
-                if part.text:
-                    text = part.text
-                    full_response_text += text
-                    yield f"event: message\ndata: {json.dumps(text)}\n\n"
-
-                if part.function_call:
-                    tool_calls.append(part.function_call)
-
-        logger.debug("Stream finished. Tool calls collected: %d", len(tool_calls))
+            # 2. Check for Text Content (Both Phases)
+            try:
+                text_content = chunk.text
+                if text_content:
+                    logger.debug("[PHASE 1 CHUNK] Yielding: %s...", text_content[:30])
+                    full_response_text += text_content
+                    yield f"event: message\ndata: {json.dumps(text_content)}\n\n"
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
 
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error(traceback.format_exc())
@@ -167,11 +186,10 @@ def _generate_stream(chat_session, user_msg):
 
     # --- Phase 2: Tool Execution ---
     if tool_calls:
-        logger.debug("Executing tools...")
         response_parts = []
-
         try:
             for fc in tool_calls:
+                logger.info("[TOOL EXEC] Executing %s", fc.name)
                 args_repr = (
                     ", ".join(f"{k}={v!r}" for k, v in fc.args.items())
                     if fc.args
@@ -189,7 +207,10 @@ def _generate_stream(chat_session, user_msg):
                 else:
                     result = f"Error: Tool {fc.name} not found."
 
-                # Construct part using types.Part.from_function_response
+                logger.debug(
+                    "[TOOL EXEC] Output for %s: %s...", fc.name, str(result)[:50]
+                )
+
                 response_parts.append(
                     types.Part.from_function_response(
                         name=fc.name, response={"result": result}
@@ -197,18 +218,21 @@ def _generate_stream(chat_session, user_msg):
                 )
 
             # --- Phase 3: Send Tool Outputs ---
-            # Call chat.send_message(tool_outputs, stream=True)
+            logger.info("[PHASE 2 START] Sending tool outputs to SDK")
             tool_response_stream = chat_session.send_message_stream(response_parts)
 
-            # Loop through this NEW stream
             for chunk in tool_response_stream:
-                if not chunk.candidates:
-                    continue
-                for part in chunk.candidates[0].content.parts:
-                    if part.text:
-                        text = part.text
-                        full_response_text += text
-                        yield f"event: message\ndata: {json.dumps(text)}\n\n"
+                # Safe Chunk Access Pattern
+                try:
+                    text_content = chunk.text
+                    if text_content:
+                        logger.debug(
+                            "[PHASE 2 CHUNK] Yielding: %s...", text_content[:30]
+                        )
+                        full_response_text += text_content
+                        yield f"event: message\ndata: {json.dumps(text_content)}\n\n"
+                except Exception:  # pylint: disable=broad-exception-caught
+                    pass
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(traceback.format_exc())
