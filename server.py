@@ -1,6 +1,7 @@
 import os
 import flask
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from flask import request, jsonify, render_template_string
 import threading
 import functools
@@ -9,10 +10,12 @@ app = flask.Flask(__name__)
 
 # --- Configuration ---
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+print(f"DEBUG: API Key present: {bool(GOOGLE_API_KEY)}")
+
 if not GOOGLE_API_KEY:
     print("Warning: GOOGLE_API_KEY environment variable not set.")
 
-genai.configure(api_key=GOOGLE_API_KEY)
+client = genai.Client(api_key=GOOGLE_API_KEY)
 
 # Default to /codebase inside Docker, but fallback to current directory for local testing
 CODEBASE_ROOT = "/codebase" if os.path.exists("/codebase") else "."
@@ -105,8 +108,6 @@ def read_file(filepath: str) -> str:
     except Exception as e:
         return f"Error reading file: {str(e)}"
 
-
-tools = [list_files, read_file]
 
 # --- Chat Interface ---
 
@@ -307,14 +308,14 @@ def chat():
     for h in history:
         formatted_history.append({"role": h["role"], "parts": h["parts"]})
 
-    model = genai.GenerativeModel(
-        model_name="gemini-3-pro-preview",
-        tools=tools,
-        system_instruction="You are the Technical Lead and Prompt Architect. Your goal is to analyze the user's local codebase and construct precise, high-context prompts that the user will send to another AI agent named 'Jules'. When asked for help, investigate code using tools, then output a structured 'Jules Prompt' block with file paths and acceptance criteria.",
-    )
-
-    chat_session = model.start_chat(
-        history=formatted_history, enable_automatic_function_calling=True
+    chat_session = client.chats.create(
+        model="gemini-3-pro-preview",
+        config=types.GenerateContentConfig(
+            tools=[types.Tool(function_declarations=[list_files, read_file])],
+            system_instruction="You are the Technical Lead and Prompt Architect. Your goal is to analyze the user's local codebase and construct precise, high-context prompts that the user will send to another AI agent named 'Jules'. When asked for help, investigate code using tools, then output a structured 'Jules Prompt' block with file paths and acceptance criteria.",
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=False),
+        ),
+        history=formatted_history
     )
 
     try:
