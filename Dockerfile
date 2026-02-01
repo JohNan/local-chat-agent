@@ -8,6 +8,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Install Git and SSH client
 RUN apt-get update && apt-get install -y git openssh-client && rm -rf /var/lib/apt/lists/*
 
+# Add GitHub to known_hosts to avoid SSH host key verification errors
+RUN mkdir -p /root/.ssh && ssh-keyscan github.com >> /root/.ssh/known_hosts && chmod 600 /root/.ssh/known_hosts
+
 # Configure Git for container usage
 RUN git config --global --add safe.directory /codebase \
     && git config --global user.email "agent@gemini.local" \
