@@ -171,9 +171,7 @@ def _generate_stream(chat_session, user_msg):
         response_parts = []
         for fc in tool_calls:
             args_repr = (
-                ", ".join(f"{k}={v!r}" for k, v in fc.args.items())
-                if fc.args
-                else ""
+                ", ".join(f"{k}={v!r}" for k, v in fc.args.items()) if fc.args else ""
             )
             yield f"event: tool\ndata: 🛠 {fc.name}({args_repr})\n\n"
 
@@ -187,9 +185,11 @@ def _generate_stream(chat_session, user_msg):
             else:
                 result = f"Error: Tool {fc.name} not found."
 
-            response_parts.append(types.Part.from_function_response(
-                name=fc.name, response={"result": result}
-            ))
+            response_parts.append(
+                types.Part.from_function_response(
+                    name=fc.name, response={"result": result}
+                )
+            )
 
         # Send tool outputs
         try:
@@ -242,5 +242,5 @@ def chat():
 
     return Response(
         stream_with_context(_generate_stream(chat_session, user_msg)),
-        mimetype="text/event-stream"
+        mimetype="text/event-stream",
     )
