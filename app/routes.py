@@ -141,9 +141,10 @@ def _generate_stream(chat_session, user_msg):
     full_response_text = ""
     tool_calls = []
 
-    # Step 1: Stream & Collect
+    # --- Phase 1: Initial User Prompt ---
     try:
-        response_stream = chat_session.send_message_stream(user_msg)
+        # User requested: chat.send_message(..., stream=True)
+        response_stream = chat_session.send_message(user_msg, stream=True)
         for chunk in response_stream:
             if not chunk.candidates:
                 continue
@@ -164,36 +165,44 @@ def _generate_stream(chat_session, user_msg):
         yield f"event: error\ndata: {json.dumps(str(e))}\n\n"
         return
 
-    # Step 2: Execute & Respond
+    # --- Phase 2: Tool Execution ---
     if tool_calls:
         logger.debug("Executing tools...")
-
         response_parts = []
-        for fc in tool_calls:
-            args_repr = (
-                ", ".join(f"{k}={v!r}" for k, v in fc.args.items()) if fc.args else ""
-            )
-            yield f"event: tool\ndata: 🛠 {fc.name}({args_repr})\n\n"
 
-            tool_func = TOOL_MAP.get(fc.name)
-            result = None
-            if tool_func:
-                try:
-                    result = tool_func(**fc.args)
-                except Exception as e:  # pylint: disable=broad-exception-caught
-                    result = f"Error executing {fc.name}: {e}"
-            else:
-                result = f"Error: Tool {fc.name} not found."
-
-            response_parts.append(
-                types.Part.from_function_response(
-                    name=fc.name, response={"result": result}
-                )
-            )
-
-        # Send tool outputs
         try:
-            tool_response_stream = chat_session.send_message_stream(response_parts)
+            for fc in tool_calls:
+                args_repr = (
+                    ", ".join(f"{k}={v!r}" for k, v in fc.args.items())
+                    if fc.args
+                    else ""
+                )
+                yield f"event: tool\ndata: 🛠 {fc.name}({args_repr})\n\n"
+
+                tool_func = TOOL_MAP.get(fc.name)
+                result = None
+                if tool_func:
+                    try:
+                        result = tool_func(**fc.args)
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        result = f"Error executing {fc.name}: {e}"
+                else:
+                    result = f"Error: Tool {fc.name} not found."
+
+                # Construct part using types.Part.from_function_response
+                response_parts.append(
+                    types.Part.from_function_response(
+                        name=fc.name, response={"result": result}
+                    )
+                )
+
+            # --- Phase 3: Send Tool Outputs ---
+            # Call chat.send_message(tool_outputs, stream=True)
+            tool_response_stream = chat_session.send_message(
+                response_parts, stream=True
+            )
+
+            # Loop through this NEW stream
             for chunk in tool_response_stream:
                 if not chunk.candidates:
                     continue
