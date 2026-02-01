@@ -1,6 +1,8 @@
 import os
+import re
 import json
 import flask
+import functools
 import traceback
 import requests
 from google import genai
@@ -12,17 +14,51 @@ app = flask.Flask(__name__)
 # --- Configuration ---
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 JULES_API_KEY = os.environ.get("JULES_API_KEY")
-JULES_SOURCE = os.environ.get("JULES_SOURCE", "sources/github/PLACEHOLDER_USER/PLACEHOLDER_REPO")
+
+# Default to /codebase inside Docker, but fallback to current directory for local testing
+CODEBASE_ROOT = "/codebase" if os.path.exists("/codebase") else "."
+
+@functools.lru_cache(maxsize=1)
+def get_jules_source():
+    # 1. Environment Variable
+    env_source = os.environ.get("JULES_SOURCE")
+    if env_source:
+        return env_source
+
+    # 2. Git Config Parsing
+    try:
+        git_config_path = os.path.join(CODEBASE_ROOT, ".git", "config")
+        if os.path.exists(git_config_path):
+            with open(git_config_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Simple regex to find the url in [remote "origin"] block
+            remote_block_match = re.search(r'\[remote "origin"\](.*?)(?=\[|$)', content, re.DOTALL)
+            if remote_block_match:
+                block_content = remote_block_match.group(1)
+                url_match = re.search(r'url\s*=\s*(\S+)', block_content)
+                if url_match:
+                    url = url_match.group(1)
+
+                    if url.endswith(".git"):
+                        url = url[:-4]
+
+                    # Parse user/repo from github url
+                    github_match = re.search(r'github\.com[:/]([\w.-]+)/([\w.-]+)', url)
+                    if github_match:
+                        return f"sources/github/{github_match.group(1)}/{github_match.group(2)}"
+    except Exception as e:
+        print(f"Warning: Failed to parse git config: {e}")
+
+    return None
 
 print(f"DEBUG: API Key present: {bool(GOOGLE_API_KEY)}")
+print(f"DEBUG: Active Jules Source: {get_jules_source()}")
 
 if not GOOGLE_API_KEY:
     print("Warning: GOOGLE_API_KEY environment variable not set.")
 
 client = genai.Client(api_key=GOOGLE_API_KEY)
-
-# Default to /codebase inside Docker, but fallback to current directory for local testing
-CODEBASE_ROOT = "/codebase" if os.path.exists("/codebase") else "."
 
 # --- Tools ---
 
@@ -466,6 +502,10 @@ def send_task_to_jules(prompt_text):
     if not api_key:
         raise ValueError("JULES_API_KEY or GOOGLE_API_KEY not set")
 
+    source_id = get_jules_source()
+    if not source_id:
+        raise ValueError("Could not detect Git repository. Please set JULES_SOURCE in .env")
+
     url = "https://jules.googleapis.com/v1alpha/sessions"
     headers = {
         "X-Goog-Api-Key": api_key,
@@ -475,7 +515,7 @@ def send_task_to_jules(prompt_text):
     data = {
         "prompt": prompt_text,
         "sourceContext": {
-            "source": JULES_SOURCE
+            "source": source_id
         }
     }
 
