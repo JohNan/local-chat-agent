@@ -199,7 +199,7 @@ def chat():
     )
 
     chat_session = CLIENT.chats.create(
-        model="gemini-2.0-flash",
+        model="gemini-3-pro-preview",
         config=types.GenerateContentConfig(
             tools=[git_ops.list_files, git_ops.read_file],
             system_instruction=system_instr,
