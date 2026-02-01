@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Build Docker image
+        run: docker build -t gemini-agent .
+
+      - name: Run Tests
+        run: docker run --rm -v ${{ github.workspace }}:/codebase -w /codebase gemini-agent pytest
+
+      - name: Run Black
+        run: docker run --rm -v ${{ github.workspace }}:/codebase -w /codebase gemini-agent black --check .
+
+      - name: Run Pylint
+        run: docker run --rm -v ${{ github.workspace }}:/codebase -w /codebase gemini-agent pylint app/
