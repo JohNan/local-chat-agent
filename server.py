@@ -2,6 +2,7 @@ import os
 import json
 import flask
 import traceback
+import requests
 from google import genai
 from google.genai import types
 from flask import request, jsonify, render_template_string, stream_with_context, Response
@@ -10,6 +11,9 @@ app = flask.Flask(__name__)
 
 # --- Configuration ---
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+JULES_API_KEY = os.environ.get("JULES_API_KEY")
+JULES_SOURCE = os.environ.get("JULES_SOURCE", "sources/github/PLACEHOLDER_USER/PLACEHOLDER_REPO")
+
 print(f"DEBUG: API Key present: {bool(GOOGLE_API_KEY)}")
 
 if not GOOGLE_API_KEY:
@@ -273,6 +277,19 @@ HTML_TEMPLATE = """
 
                 chatHistory.push({role: 'model', parts: [{text: currentAiText}]});
 
+                // Check for Jules Prompt marker
+                if (currentAiText.includes("## Jules Prompt")) {
+                    const deployBtn = document.createElement('button');
+                    deployBtn.innerHTML = "🚀 Start Jules Task";
+                    deployBtn.style.marginTop = "10px";
+                    deployBtn.onclick = function() { deploy(this); };
+
+                    if (aiMessageDiv) {
+                        aiMessageDiv.appendChild(deployBtn);
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    }
+                }
+
             } catch (error) {
                 console.error('Error:', error);
                 appendMessage('ai error-message', `Error: ${error.message}`);
@@ -302,6 +319,47 @@ HTML_TEMPLATE = """
             div.innerText = text;
             chatContainer.appendChild(div);
             chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function deploy(btn) {
+            // Find the prompt text. It should be in the message div containing this button.
+            // We assume the prompt is inside a code block or the whole message.
+            // Let's grab the text content of the parent message div.
+            const messageDiv = btn.parentElement;
+            let promptText = messageDiv.innerText;
+
+            // Clean up the text: remove the button text itself and maybe the "## Jules Prompt" header if needed.
+            // But sending the whole thing is probably fine, Jules is smart.
+            // However, cleaning it a bit is better.
+            promptText = promptText.replace(btn.innerText, '').trim();
+
+            btn.innerText = "⏳ Sending...";
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/deploy_to_jules', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: promptText })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const sessionName = data.result.name || "Unknown Session";
+                    btn.innerText = `✅ Started! (${sessionName})`;
+                    btn.onclick = null; // Disable further clicks
+                } else {
+                    btn.innerText = "❌ Error";
+                    alert("Error deploying: " + data.error);
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                console.error(e);
+                btn.innerText = "❌ Error";
+                alert("Error deploying: " + e.message);
+                btn.disabled = false;
+            }
         }
     </script>
 </body>
@@ -401,6 +459,53 @@ def chat():
         yield from generate_response(chat_session, user_msg)
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+
+def send_task_to_jules(prompt_text):
+    api_key = JULES_API_KEY or GOOGLE_API_KEY
+    if not api_key:
+        raise ValueError("JULES_API_KEY or GOOGLE_API_KEY not set")
+
+    url = "https://jules.googleapis.com/v1alpha/sessions"
+    headers = {
+        "X-Goog-Api-Key": api_key,
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "prompt": prompt_text,
+        "sourceContext": {
+            "source": JULES_SOURCE
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code != 200:
+        raise Exception(f"Jules API Error: {response.status_code} - {response.text}")
+
+    return response.json()
+
+
+@app.route("/api/deploy_to_jules", methods=["POST"])
+def deploy_to_jules():
+    try:
+        data = request.json
+        prompt_text = data.get("prompt")
+
+        if not prompt_text:
+            return jsonify({"success": False, "error": "No prompt provided"}), 400
+
+        result = send_task_to_jules(prompt_text)
+
+        return jsonify({
+            "success": True,
+            "result": result
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":
