@@ -1,10 +1,10 @@
 import os
+import json
 import flask
+import traceback
 from google import genai
 from google.genai import types
-from flask import request, jsonify, render_template_string
-import threading
-import functools
+from flask import request, jsonify, render_template_string, stream_with_context, Response
 
 app = flask.Flask(__name__)
 
@@ -20,32 +20,8 @@ client = genai.Client(api_key=GOOGLE_API_KEY)
 # Default to /codebase inside Docker, but fallback to current directory for local testing
 CODEBASE_ROOT = "/codebase" if os.path.exists("/codebase") else "."
 
-# --- Thread Local for Logs ---
-request_context = threading.local()
-
-
-def log_tool_usage(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        # Construct a log message
-        arg_str = ", ".join(
-            [repr(a) for a in args] + [f"{k}={v!r}" for k, v in kwargs.items()]
-        )
-        log_msg = f"🛠 {func.__name__}({arg_str})"
-
-        # Append to thread local logs if initialized
-        if hasattr(request_context, "tool_logs"):
-            request_context.tool_logs.append(log_msg)
-
-        return func(*args, **kwargs)
-
-    return wrapper
-
-
 # --- Tools ---
 
-
-@log_tool_usage
 def list_files(directory: str = ".") -> list[str]:
     """
     Lists all files in the given directory (recursive), ignoring specific directories.
@@ -78,8 +54,6 @@ def list_files(directory: str = ".") -> list[str]:
 
     return files_list
 
-
-@log_tool_usage
 def read_file(filepath: str) -> str:
     """
     Reads and returns the text content of a file.
@@ -108,6 +82,10 @@ def read_file(filepath: str) -> str:
     except Exception as e:
         return f"Error reading file: {str(e)}"
 
+TOOL_MAP = {
+    'list_files': list_files,
+    'read_file': read_file
+}
 
 # --- Chat Interface ---
 
@@ -231,6 +209,9 @@ HTML_TEMPLATE = """
             appendMessage('user', text);
             userInput.value = '';
 
+            // Add to history
+            chatHistory.push({role: 'user', parts: [{text: text}]});
+
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
@@ -238,22 +219,59 @@ HTML_TEMPLATE = """
                     body: JSON.stringify({ message: text, history: chatHistory })
                 });
 
-                const data = await response.json();
-
-                if (data.tool_logs && data.tool_logs.length > 0) {
-                   data.tool_logs.forEach(log => {
-                       appendToolLog(log);
-                   });
-                }
-
                 if (!response.ok) {
-                    throw new Error(data.response || response.statusText);
+                    throw new Error(response.statusText);
                 }
 
-                appendMessage('ai', data.response);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
 
-                chatHistory.push({role: 'user', parts: [text]});
-                chatHistory.push({role: 'model', parts: [data.response]});
+                let aiMessageDiv = null;
+                let currentAiText = "";
+                let buffer = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const parts = buffer.split('\\n\\n');
+                    buffer = parts.pop(); // Keep incomplete part
+
+                    for (const part of parts) {
+                        const lines = part.split('\\n');
+                        let event = null;
+                        let data = '';
+
+                        for (const line of lines) {
+                            if (line.startsWith('event: ')) {
+                                event = line.substring(7).trim();
+                            } else if (line.startsWith('data: ')) {
+                                data = line.substring(6);
+                            }
+                        }
+
+                        if (event === 'message') {
+                            if (!aiMessageDiv) {
+                                aiMessageDiv = appendMessage('ai', '');
+                            }
+                            try {
+                                const textChunk = JSON.parse(data);
+                                currentAiText += textChunk;
+                                aiMessageDiv.innerHTML = marked.parse(currentAiText);
+                            } catch (e) {
+                                console.error('Error parsing JSON:', e);
+                            }
+                        } else if (event === 'tool') {
+                            appendToolLog(data);
+                        } else if (event === 'error') {
+                            appendMessage('ai error-message', data);
+                        }
+                    }
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+
+                chatHistory.push({role: 'model', parts: [{text: currentAiText}]});
 
             } catch (error) {
                 console.error('Error:', error);
@@ -275,6 +293,7 @@ HTML_TEMPLATE = """
             div.innerHTML = marked.parse(text);
             chatContainer.appendChild(div);
             chatContainer.scrollTop = chatContainer.scrollHeight;
+            return div;
         }
 
         function appendToolLog(text) {
@@ -294,28 +313,76 @@ HTML_TEMPLATE = """
 def index():
     return render_template_string(HTML_TEMPLATE)
 
+def generate_response(session, message):
+    try:
+        response_stream = session.send_message_stream(message)
+
+        for chunk in response_stream:
+            if not chunk.candidates:
+                continue
+
+            part = chunk.candidates[0].content.parts[0]
+
+            if part.function_call:
+                fc = part.function_call
+                args_repr = ", ".join(f"{k}={v!r}" for k,v in fc.args.items()) if fc.args else ""
+
+                # Yield tool log
+                yield f"event: tool\ndata: 🛠 {fc.name}({args_repr})\n\n"
+
+                # Execute tool
+                tool_func = TOOL_MAP.get(fc.name)
+                result = None
+                if tool_func:
+                    try:
+                        result = tool_func(**fc.args)
+                    except Exception as e:
+                        result = f"Error executing {fc.name}: {e}"
+                else:
+                    result = f"Error: Tool {fc.name} not found."
+
+                # Continue conversation with tool result
+                fn_response_part = types.Part(
+                    function_response=types.FunctionResponse(
+                        name=fc.name,
+                        response={"result": result}
+                    )
+                )
+
+                yield from generate_response(session, fn_response_part)
+                return
+
+            elif part.text:
+                yield f"event: message\ndata: {json.dumps(part.text)}\n\n"
+
+    except Exception as e:
+        traceback.print_exc()
+        yield f"event: error\ndata: {json.dumps(str(e))}\n\n"
+
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    # Initialize tool logs for this request
-    request_context.tool_logs = []
-
     data = request.json
     user_msg = data.get("message")
     history = data.get("history", [])
 
     formatted_history = []
+    # Basic history reconstruction.
+    # Note: Complex history with previous function calls is not fully handled here
+    # as we rely on the client sending simplified text history or the server being stateless.
+    # For a robust production app, we'd need to reconstruct types.Part properly including FunctionCall/Response.
     for h in history:
         parts = []
         for p in h["parts"]:
-            if isinstance(p, str):
+            if isinstance(p, dict) and 'text' in p:
+                parts.append(types.Part(text=p['text']))
+            elif isinstance(p, str):
                 parts.append(types.Part(text=p))
-            else:
-                parts.append(p)
+            # Ignore others for now as we don't send them back yet
         formatted_history.append({"role": h["role"], "parts": parts})
 
     chat_session = client.chats.create(
-        model="gemini-3-pro-preview",
+        model="gemini-2.0-flash",
         config=types.GenerateContentConfig(
             tools=[list_files, read_file],
             system_instruction=(
@@ -324,27 +391,16 @@ def chat():
                 "2. **Action Mode (Architect):** ONLY when the user explicitly says a trigger phrase like 'Create a prompt for Jules', 'Write instructions', or 'Ready to code', then you must summarize the previous discussion and generate the structured '## Jules Prompt' block with strict acceptance criteria and file contexts."
             ),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(
-                disable=False
+                disable=True
             ),
         ),
         history=formatted_history,
     )
 
-    try:
-        response = chat_session.send_message(user_msg)
-        return jsonify(
-            {"response": response.text, "tool_logs": request_context.tool_logs}
-        )
-    except Exception as e:
-        return (
-            jsonify(
-                {
-                    "response": f"Server Error: {str(e)}",
-                    "tool_logs": request_context.tool_logs,
-                }
-            ),
-            500,
-        )
+    def generate():
+        yield from generate_response(chat_session, user_msg)
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 
 if __name__ == "__main__":
