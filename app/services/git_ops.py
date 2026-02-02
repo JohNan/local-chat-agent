@@ -144,6 +144,11 @@ def list_files(directory: str = ".") -> list[str]:
     if not os.path.exists(base_path):
         return [f"Error: Directory {directory} does not exist."]
 
+    # Pre-calculate offset for relative pathing
+    offset = len(CODEBASE_ROOT)
+    if not CODEBASE_ROOT.endswith(os.sep):
+        offset += 1
+
     for root, dirs, files in os.walk(base_path):
         # Ignore directories
         dirs[:] = [
@@ -155,7 +160,7 @@ def list_files(directory: str = ".") -> list[str]:
         for file in files:
             full_path = os.path.join(root, file)
             # Get relative path from CODEBASE_ROOT
-            rel_path = os.path.relpath(full_path, CODEBASE_ROOT)
+            rel_path = full_path[offset:]
             files_list.append(rel_path)
 
     logger.debug("Found %d files.", len(files_list))
