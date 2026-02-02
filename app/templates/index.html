@@ -300,6 +300,7 @@
             // Bubble
             const bubble = document.createElement('div');
             bubble.className = 'message-bubble';
+            bubble.dataset.raw = text || "";
             bubble.innerHTML = marked.parse(text || "");
 
             if (isAi && text && text.includes("## Jules Prompt")) {
@@ -337,6 +338,7 @@
                 try {
                     const data = JSON.parse(event.data);
                     currentAiText += data;
+                    aiBubble.dataset.raw = currentAiText;
                     aiBubble.innerHTML = marked.parse(currentAiText);
 
                     // Check for Jules Prompt marker
@@ -406,9 +408,14 @@
 
         async function deploy(btn) {
             const messageBubble = btn.parentElement;
-            let promptText = messageBubble.innerText;
-            // Remove the button text itself from the prompt if it's part of innerText
-            promptText = promptText.replace(btn.innerText, '').trim();
+            let rawText = messageBubble.dataset.raw || "";
+            let promptText = rawText;
+
+            const marker = "## Jules Prompt";
+            const markerIndex = rawText.indexOf(marker);
+            if (markerIndex !== -1) {
+                promptText = rawText.substring(markerIndex);
+            }
 
             btn.innerText = "⏳ Sending...";
             btn.disabled = true;
