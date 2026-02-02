@@ -107,7 +107,15 @@ function App() {
                             console.error("Failed to parse message data:", data, e);
                         }
                     } else if (eventType === 'tool') {
-                        setToolStatus(data || "Executing tools...");
+                        try {
+                            // Now we expect a JSON string, just like 'message' events
+                            const parsedStatus = JSON.parse(data);
+                            setToolStatus(parsedStatus);
+                        } catch (e) {
+                            console.warn("Tool status parse error:", e);
+                            // Fallback if something goes wrong, but show the error
+                            setToolStatus("Executing tools...");
+                        }
                     } else if (eventType === 'done' || eventType === 'error') {
                         if (eventType === 'error') console.error("Stream error:", data);
                         setToolStatus(null);
