@@ -2,3 +2,5 @@ venv
 .git
 __pycache__
 .env
+frontend/node_modules
+app/static/dist
