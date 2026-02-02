@@ -1,23 +1,38 @@
-FROM python:3.11-slim
+# Stage 1: Build Frontend
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/frontend
 
+# Copy dependency definitions first to leverage Docker cache
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+# Copy source and build
+COPY frontend/ ./
+RUN npm run build
+
+# Stage 2: Python Runtime
+FROM python:3.11-slim
 WORKDIR /app
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y git openssh-client && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Git and SSH client
-RUN apt-get update && apt-get install -y git openssh-client && rm -rf /var/lib/apt/lists/*
-
-# Add GitHub to known_hosts to avoid SSH host key verification errors
+# Configure SSH/Git (Keep existing configuration)
 RUN mkdir -p /root/.ssh && ssh-keyscan github.com >> /root/.ssh/known_hosts && chmod 600 /root/.ssh/known_hosts
-
-# Configure Git for container usage
 RUN git config --global --add safe.directory /codebase \
     && git config --global user.email "agent@gemini.local" \
     && git config --global user.name "Gemini Agent"
 
+# Copy Backend Code
 COPY app/ ./app/
 
-EXPOSE 5000
+# Copy Built Frontend Assets from Stage 1
+# Vite output matches: /app/frontend -> ../app/static/dist -> /app/app/static/dist
+COPY --from=frontend-builder /app/app/static/dist ./app/static/dist
 
+EXPOSE 5000
 CMD ["python", "-m", "app.main"]
