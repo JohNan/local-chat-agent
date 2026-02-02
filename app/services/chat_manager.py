@@ -5,6 +5,7 @@ Service module for managing chat history.
 import os
 import json
 import logging
+
 try:
     import fcntl
 except ImportError:

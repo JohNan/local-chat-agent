@@ -1,4 +1,3 @@
-
 import time
 import json
 import os
@@ -13,6 +12,7 @@ from app.services import chat_manager
 HISTORY_FILE = "benchmark_history.json"
 os.environ["CHAT_HISTORY_FILE"] = HISTORY_FILE
 
+
 def setup_history(n=1000):
     if os.path.exists(HISTORY_FILE):
         os.remove(HISTORY_FILE)
@@ -24,12 +24,14 @@ def setup_history(n=1000):
     with open(HISTORY_FILE, "w") as f:
         json.dump(history, f)
 
+
 def benchmark_save_message(iterations=100):
     start_time = time.time()
     for i in range(iterations):
         chat_manager.save_message("user", f"New Message {i}")
     end_time = time.time()
     return end_time - start_time
+
 
 def main():
     print("Preparing benchmark...")
@@ -47,6 +49,7 @@ def main():
     # Cleanup
     if os.path.exists(HISTORY_FILE):
         os.remove(HISTORY_FILE)
+
 
 if __name__ == "__main__":
     main()
