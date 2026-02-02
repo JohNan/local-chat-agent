@@ -179,7 +179,19 @@ def _generate_stream(chat_session, user_msg):
 
         # Execute Tools
         logger.debug("[TURN %d] Executing tools...", turn)
-        yield f"event: tool\ndata: 🛠 Processing {len(tool_calls)} actions...\n\n"
+        tool_descriptions = []
+        for fc in tool_calls:
+            if fc.name == "read_file":
+                tool_descriptions.append(f"Reading file '{fc.args.get('filepath')}'")
+            elif fc.name == "list_files":
+                tool_descriptions.append(
+                    f"Listing directory '{fc.args.get('directory')}'"
+                )
+            else:
+                tool_descriptions.append(f"Running {fc.name}")
+
+        joined_descriptions = ", ".join(tool_descriptions)
+        yield f"event: tool\ndata: 🛠 {joined_descriptions}...\n\n"
 
         response_parts = []
         for fc in tool_calls:

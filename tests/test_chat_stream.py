@@ -60,7 +60,7 @@ def test_chat_tool_execution(client):
         chunk1.text = ""
         fc = MagicMock()
         fc.name = "list_files"
-        fc.args = {"path": "."}
+        fc.args = {"directory": "."}
         part1 = MagicMock()
         part1.function_call = fc
         chunk1.parts = [part1]
@@ -82,7 +82,7 @@ def test_chat_tool_execution(client):
 
             # Check for tool event
             assert "event: tool" in data
-            assert "Processing 1 actions" in data
+            assert "Listing directory '.'" in data
 
             # Check for final message
             assert "event: message" in data
