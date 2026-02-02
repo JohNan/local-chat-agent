@@ -193,7 +193,9 @@ def _generate_stream(chat_session, user_msg):
                 tool_descriptions.append(f"Running {fc.name}")
 
         joined_descriptions = ", ".join(tool_descriptions)
-        yield f"event: tool\ndata: 🛠 {joined_descriptions}...\n\n"
+        # STRICT JSON ENCODING prevents newlines from breaking SSE
+        tool_status_msg = f"🛠 {joined_descriptions}..."
+        yield f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n"
 
         response_parts = []
         for fc in tool_calls:
