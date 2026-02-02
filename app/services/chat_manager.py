@@ -69,6 +69,64 @@ def save_chat_history(history):
         logger.error("Error saving chat history: %s", e)
 
 
+def _append_optimized(new_message):
+    """Helper to append message using file seeking."""
+    # pylint: disable=too-many-locals
+    if not (os.path.exists(CHAT_HISTORY_FILE) and os.path.getsize(CHAT_HISTORY_FILE) > 0):
+        return False
+
+    with open(CHAT_HISTORY_FILE, "r+b") as f:
+        if fcntl:
+            fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            f.seek(0, os.SEEK_END)
+            end_pos = f.tell()
+
+            # Scan backwards for ']'
+            scan_size = min(end_pos, 1024)
+            f.seek(-scan_size, os.SEEK_END)
+            tail = f.read(scan_size)
+            last_bracket_idx = tail.rfind(b"]")
+
+            if last_bracket_idx == -1:
+                return False
+
+            truncate_pos = end_pos - scan_size + last_bracket_idx
+
+            # Check if array is empty
+            is_empty_array = False
+            found_char = False
+
+            # Scan backwards from ']' in the already read 'tail'
+            search_idx = last_bracket_idx - 1
+            while search_idx >= 0:
+                char = tail[search_idx : search_idx + 1]
+                if char.strip():
+                    found_char = True
+                    if char == b"[":
+                        is_empty_array = True
+                    break
+                search_idx -= 1
+
+            # If not found in tail, scan further back if needed
+            if not found_char and truncate_pos > 0:
+                # Fallback to full rewrite if we can't easily determine structure
+                return False
+
+            f.seek(truncate_pos)
+            if not is_empty_array:
+                f.write(b",\n")
+
+            # Append new message
+            f.write(json.dumps(new_message, indent=2).encode("utf-8"))
+            f.write(b"\n]")
+            f.truncate()
+            return True
+        finally:
+            if fcntl:
+                fcntl.flock(f, fcntl.LOCK_UN)
+
+
 def save_message(role, text):
     """
     Appends a message to the chat history and saves it.
@@ -82,58 +140,8 @@ def save_message(role, text):
         if directory and not os.path.exists(directory):
             os.makedirs(directory, exist_ok=True)
 
-        if os.path.exists(CHAT_HISTORY_FILE) and os.path.getsize(CHAT_HISTORY_FILE) > 0:
-            with open(CHAT_HISTORY_FILE, "r+b") as f:
-                if fcntl:
-                    fcntl.flock(f, fcntl.LOCK_EX)
-                try:
-                    f.seek(0, os.SEEK_END)
-                    end_pos = f.tell()
-
-                    # Scan backwards for ']'
-                    scan_size = min(end_pos, 1024)
-                    f.seek(-scan_size, os.SEEK_END)
-                    tail = f.read(scan_size)
-                    last_bracket_idx = tail.rfind(b"]")
-
-                    if last_bracket_idx != -1:
-                        truncate_pos = end_pos - scan_size + last_bracket_idx
-
-                        # Check if array is empty
-                        is_empty_array = False
-                        found_char = False
-
-                        # Scan backwards from ']' in the already read 'tail'
-                        search_idx = last_bracket_idx - 1
-                        while search_idx >= 0:
-                            char = tail[search_idx : search_idx + 1]
-                            if char.strip():
-                                found_char = True
-                                if char == b"[":
-                                    is_empty_array = True
-                                break
-                            search_idx -= 1
-
-                        # If not found in tail, scan further back if needed
-                        if not found_char and truncate_pos > 0:
-                            # Fallback to full rewrite if we can't easily determine structure
-                            # (e.g. > 1KB of whitespace)
-                            raise OSError(
-                                "Ambiguous JSON structure for append optimization"
-                            )
-
-                        f.seek(truncate_pos)
-                        if not is_empty_array:
-                            f.write(b",\n")
-
-                        # Append new message
-                        f.write(json.dumps(new_message, indent=2).encode("utf-8"))
-                        f.write(b"\n]")
-                        f.truncate()
-                        return
-                finally:
-                    if fcntl:
-                        fcntl.flock(f, fcntl.LOCK_UN)
+        if _append_optimized(new_message):
+            return
 
     except OSError as e:
         logger.warning("Optimized append failed, falling back to full rewrite: %s", e)
