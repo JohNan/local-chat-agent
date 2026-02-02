@@ -10,9 +10,9 @@ from flask import (
     Blueprint,
     request,
     jsonify,
-    render_template,
     stream_with_context,
     Response,
+    send_from_directory,
 )
 from google import genai
 from google.genai import types
@@ -55,7 +55,7 @@ except Exception as e:  # pylint: disable=broad-exception-caught
 @bp.route("/")
 def index():
     """Renders the main page."""
-    return render_template("index.html")
+    return send_from_directory(os.path.join(bp.root_path, "static/dist"), "index.html")
 
 
 @bp.route("/api/status", methods=["GET"])
