@@ -1,8 +1,8 @@
-flask
-google-genai
-markdown
-requests
-pytest
-pytest-mock
-black
-pylint
+flask==3.1.2
+google-genai==1.61.0
+markdown==3.10.1
+requests==2.32.5
+pytest==9.0.2
+pytest-mock==3.15.1
+black==26.1.0
+pylint==4.0.4
