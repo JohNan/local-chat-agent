@@ -72,7 +72,9 @@ def save_chat_history(history):
 def _append_optimized(new_message):
     """Helper to append message using file seeking."""
     # pylint: disable=too-many-locals
-    if not (os.path.exists(CHAT_HISTORY_FILE) and os.path.getsize(CHAT_HISTORY_FILE) > 0):
+    if not (
+        os.path.exists(CHAT_HISTORY_FILE) and os.path.getsize(CHAT_HISTORY_FILE) > 0
+    ):
         return False
 
     with open(CHAT_HISTORY_FILE, "r+b") as f:
