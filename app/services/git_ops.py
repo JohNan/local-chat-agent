@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import logging
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,7 @@ def _get_current_branch():
     return branch
 
 
+@lru_cache(maxsize=1)
 def get_repo_info():
     """
     Retrieves Git repository information including project name, branch, and Source ID.
