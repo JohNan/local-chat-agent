@@ -38,7 +38,9 @@ SYSTEM_INSTRUCTION = (
     "If code changes are required, you must describe them or generate a 'Jules Prompt'.\n"
     '3. **Jules Prompt:** When the user asks to "write a prompt", "deploy", '
     'or "create instructions", you must generate a structured block starting with '
-    "`## Jules Prompt` containing the specific context and acceptance criteria."
+    "`## Jules Prompt` containing the specific context and acceptance criteria.\n\n"
+    "Note: `read_file` automatically truncates large files. If you need to read the rest, "
+    "use the `start_line` parameter."
 )
 
 if not GOOGLE_API_KEY:
@@ -195,7 +197,7 @@ def _generate_stream(chat_session, user_msg):
 
         response_parts = []
         for fc in tool_calls:
-            logger.info("Executing tool: %s", fc.name)
+            logger.info("Executing tool: %s args=%s", fc.name, fc.args)
             tool_func = TOOL_MAP.get(fc.name)
             result = None
             if tool_func:
