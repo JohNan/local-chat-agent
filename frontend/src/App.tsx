@@ -41,15 +41,11 @@ function App() {
         }
     }, [offset, hasMore, loadingHistory]);
 
-    const sendMessage = (text: string) => {
+    const sendMessage = async (text: string) => {
         // Add user message
         const userMsg: Message = { role: 'user', text, parts: [{text}] };
         setMessages(prev => [...prev, userMsg]);
         setOffset(prev => prev + 1);
-
-        // Start stream
-        const streamUrl = '/chat?message=' + encodeURIComponent(text);
-        const source = new EventSource(streamUrl);
 
         // Add placeholder for AI message
         const aiMsg: Message = { role: 'model', text: "", parts: [{text: ""}] };
@@ -57,42 +53,72 @@ function App() {
 
         let currentText = "";
 
-        source.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                currentText += data;
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
 
-                setMessages(prev => {
-                    const newMsgs = [...prev];
-                    const lastIndex = newMsgs.length - 1;
-                    const last = newMsgs[lastIndex];
-                    if (last && (last.role === 'model' || last.role === 'ai')) {
-                         newMsgs[lastIndex] = { ...last, text: currentText, parts: [{text: currentText}] };
+            if (!response.body) throw new Error("No response body");
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let buffer = "";
+
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop() || ""; // Keep incomplete chunk
+
+                for (const part of parts) {
+                    if (!part.trim()) continue;
+                    const lines = part.split('\n');
+                    let eventType = "";
+                    let data = "";
+
+                    for (const line of lines) {
+                        if (line.startsWith('event: ')) {
+                            eventType = line.slice(7).trim();
+                        } else if (line.startsWith('data: ')) {
+                            data = line.slice(6); // Keep raw data string
+                        }
                     }
-                    return newMsgs;
-                });
-                setToolStatus(null);
-            } catch (e) {
-                console.error(e);
+
+                    if (eventType === 'message') {
+                        try {
+                             // data is like "Hello", so JSON.parse removes quotes
+                            const parsedText = JSON.parse(data);
+                            currentText += parsedText;
+                            setMessages(prev => {
+                                const newMsgs = [...prev];
+                                const lastIndex = newMsgs.length - 1;
+                                const last = newMsgs[lastIndex];
+                                if (last && (last.role === 'model' || last.role === 'ai')) {
+                                    newMsgs[lastIndex] = { ...last, text: currentText, parts: [{text: currentText}] };
+                                }
+                                return newMsgs;
+                            });
+                            setToolStatus(null);
+                        } catch (e) {
+                            console.error("Failed to parse message data:", data, e);
+                        }
+                    } else if (eventType === 'tool') {
+                        setToolStatus(data || "Executing tools...");
+                    } else if (eventType === 'done' || eventType === 'error') {
+                        if (eventType === 'error') console.error("Stream error:", data);
+                        setToolStatus(null);
+                        return; // Exit loop
+                    }
+                }
             }
-        };
-
-        source.addEventListener("tool", (event) => {
-            setToolStatus(event.data || "Executing tools...");
-        });
-
-        source.addEventListener("done", () => {
-            source.close();
+        } catch (error) {
+            console.error("Fetch failed:", error);
             setToolStatus(null);
-        });
-
-        source.addEventListener("error", (e) => {
-            if (source.readyState !== 2) {
-                 console.error("EventSource failed:", e);
-            }
-            source.close();
-            setToolStatus(null);
-        });
+        }
     };
 
     // Initial load
