@@ -5,6 +5,10 @@ Service module for managing chat history.
 import os
 import json
 import logging
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +72,74 @@ def save_message(role, text):
     """
     Appends a message to the chat history and saves it.
     """
+    new_message = {"role": role, "parts": [{"text": text}]}
+
+    # Try optimized append
+    try:
+        # Ensure directory exists
+        directory = os.path.dirname(CHAT_HISTORY_FILE)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
+
+        if os.path.exists(CHAT_HISTORY_FILE) and os.path.getsize(CHAT_HISTORY_FILE) > 0:
+            with open(CHAT_HISTORY_FILE, "r+b") as f:
+                if fcntl:
+                    fcntl.flock(f, fcntl.LOCK_EX)
+                try:
+                    f.seek(0, os.SEEK_END)
+                    end_pos = f.tell()
+
+                    # Scan backwards for ']'
+                    scan_size = min(end_pos, 1024)
+                    f.seek(-scan_size, os.SEEK_END)
+                    tail = f.read(scan_size)
+                    last_bracket_idx = tail.rfind(b"]")
+
+                    if last_bracket_idx != -1:
+                        truncate_pos = end_pos - scan_size + last_bracket_idx
+
+                        # Check if array is empty
+                        is_empty_array = False
+                        found_char = False
+
+                        # Scan backwards from ']' in the already read 'tail'
+                        search_idx = last_bracket_idx - 1
+                        while search_idx >= 0:
+                            char = tail[search_idx : search_idx + 1]
+                            if char.strip():
+                                found_char = True
+                                if char == b"[":
+                                    is_empty_array = True
+                                break
+                            search_idx -= 1
+
+                        # If not found in tail, scan further back if needed
+                        if not found_char and truncate_pos > 0:
+                            # Fallback to full rewrite if we can't easily determine structure
+                            # (e.g. > 1KB of whitespace)
+                            raise OSError(
+                                "Ambiguous JSON structure for append optimization"
+                            )
+
+                        f.seek(truncate_pos)
+                        if not is_empty_array:
+                            f.write(b",\n")
+
+                        # Append new message
+                        f.write(json.dumps(new_message, indent=2).encode("utf-8"))
+                        f.write(b"\n]")
+                        f.truncate()
+                        return
+                finally:
+                    if fcntl:
+                        fcntl.flock(f, fcntl.LOCK_UN)
+
+    except OSError as e:
+        logger.warning("Optimized append failed, falling back to full rewrite: %s", e)
+
+    # Fallback to full rewrite
     history = load_chat_history()
-    # Ensure structure matches Google GenAI (list of dicts with 'parts')
-    history.append({"role": role, "parts": [{"text": text}]})
+    history.append(new_message)
     save_chat_history(history)
 
 
