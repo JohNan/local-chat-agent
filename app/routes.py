@@ -207,15 +207,20 @@ def _generate_stream(chat_session, user_msg):
     if full_response_text:
         chat_manager.save_message("model", full_response_text)
 
+    yield "event: done\ndata: [DONE]\n\n"
 
-@bp.route("/chat", methods=["POST"])
+
+@bp.route("/chat", methods=["GET", "POST"])
 def chat():
     """Handles chat messages."""
     if not CLIENT:
         return jsonify({"error": "Gemini client not initialized"}), 500
 
-    data = request.json
-    user_msg = data.get("message")
+    if request.method == "POST":
+        data = request.json
+        user_msg = data.get("message")
+    else:
+        user_msg = request.args.get("message")
 
     # Save user message first
     chat_manager.save_message("user", user_msg)
