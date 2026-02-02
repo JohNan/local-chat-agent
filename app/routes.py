@@ -140,7 +140,7 @@ def _generate_stream(chat_session, user_msg):
     Generates the chat stream and handles tool execution with recursion.
     """
     # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-nested-blocks
-    full_response_text = ""
+    full_response_parts = []
     current_msg = user_msg
     turn = 0
 
@@ -156,7 +156,7 @@ def _generate_stream(chat_session, user_msg):
                 # Text processing
                 try:
                     if chunk.text:
-                        full_response_text += chunk.text
+                        full_response_parts.append(chunk.text)
                         yield f"event: message\ndata: {json.dumps(chunk.text)}\n\n"
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     logger.error("[TURN %d] Error processing chunk text: %s", turn, e)
@@ -216,6 +216,8 @@ def _generate_stream(chat_session, user_msg):
 
         # Update State
         current_msg = response_parts
+
+    full_response_text = "".join(full_response_parts)
 
     # Save model response
     if full_response_text:
