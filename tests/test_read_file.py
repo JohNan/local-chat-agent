@@ -7,11 +7,13 @@ sys.path.append(os.getcwd())
 
 from app.services import git_ops
 
+
 @pytest.fixture
 def mock_codebase(tmp_path, mocker):
     """Sets up a temporary codebase root."""
     mocker.patch("app.services.git_ops.CODEBASE_ROOT", str(tmp_path))
     return tmp_path
+
 
 def test_read_file_normal(mock_codebase):
     # Create a file with 10 lines
@@ -29,6 +31,7 @@ def test_read_file_normal(mock_codebase):
     # If I call it with new args, it will TypeError.
     # If I call it without args, it works but won't truncate if I make it large.
     pass
+
 
 def test_read_file_large_truncation(mock_codebase):
     # Create a file with 2500 lines
@@ -48,14 +51,16 @@ def test_read_file_large_truncation(mock_codebase):
         # Check for truncation message
         # Note: The truncation message is appended.
         if len(lines_read) > 2000:
-             # Current behavior (fail test)
-             pass
+            # Current behavior (fail test)
+            pass
     except TypeError:
         # Expected if I passed arguments that don't exist yet
         pass
 
+
 # Actually, I should write the test to verify the FINAL desired state.
 # When I run it now, it will fail. That's fine.
+
 
 def test_read_file_truncation_default(mock_codebase):
     lines = [f"Line {i}" for i in range(1, 2501)]
@@ -76,6 +81,7 @@ def test_read_file_truncation_default(mock_codebase):
     assert "File truncated" in content
     assert "Showing lines 1-2000" in content
 
+
 def test_read_file_pagination(mock_codebase):
     lines = [f"Line {i}" for i in range(1, 101)]
     test_file = mock_codebase / "pagination.txt"
@@ -90,7 +96,8 @@ def test_read_file_pagination(mock_codebase):
     assert "Line 21" not in content
 
     split_lines = content.splitlines()
-    assert len(split_lines) == 11 # 10 to 20 inclusive is 11 lines
+    assert len(split_lines) == 11  # 10 to 20 inclusive is 11 lines
+
 
 def test_read_file_start_line_only(mock_codebase):
     lines = [f"Line {i}" for i in range(1, 101)]
@@ -104,6 +111,7 @@ def test_read_file_start_line_only(mock_codebase):
     assert "Line 90" in content
     assert "Line 100" in content
 
+
 def test_read_file_out_of_bounds(mock_codebase):
     lines = ["Line 1", "Line 2"]
     test_file = mock_codebase / "small.txt"
@@ -113,6 +121,7 @@ def test_read_file_out_of_bounds(mock_codebase):
     content = git_ops.read_file("small.txt", start_line=10)
     # Should probably be empty or handle gracefully
     assert content.strip() == ""
+
 
 def test_read_file_not_found(mock_codebase):
     content = git_ops.read_file("nonexistent.txt")
