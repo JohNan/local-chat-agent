@@ -1,41 +1,42 @@
-import pytest
+"""
+Integration tests for the FastAPI application.
+"""
+
 import sys
 import os
-import json
 import subprocess
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
+import pytest
+from fastapi.testclient import TestClient
 
 # Ensure we can import app from the root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app import create_app
-from app.services import git_ops, chat_manager
+from app.services import git_ops, chat_manager  # pylint: disable=wrong-import-position
 
 
-@pytest.fixture
-def app():
-    app = create_app()
-    app.config["TESTING"] = True
-    return app
+@pytest.fixture(name="client")
+def fixture_client():
+    """Fixture to provide a TestClient instance."""
+    from app.main import app  # pylint: disable=import-outside-toplevel
+
+    return TestClient(app)
 
 
-@pytest.fixture
-def client(app):
-    with app.test_client() as client:
-        yield client
-
-
-@pytest.fixture
-def mock_run(mocker):
+@pytest.fixture(name="mock_run")
+def fixture_mock_run(mocker):
+    """Fixture to mock subprocess.run."""
     return mocker.patch("app.services.git_ops.subprocess.run")
 
 
-@pytest.fixture
-def mock_check_output(mocker):
+@pytest.fixture(name="mock_check_output")
+def fixture_mock_check_output(mocker):
+    """Fixture to mock subprocess.check_output."""
     return mocker.patch("app.services.git_ops.subprocess.check_output")
 
 
 def test_list_files(mocker):
+    """Test the list_files function."""
     # Mock CODEBASE_ROOT
     mock_codebase = "/mock/codebase"
     mocker.patch("app.services.git_ops.CODEBASE_ROOT", mock_codebase)
@@ -80,6 +81,7 @@ def test_list_files(mocker):
 
 
 def test_git_status(client, mock_check_output):
+    """Test the /api/status endpoint."""
     # Mock get-url and branch
     mock_check_output.side_effect = [
         b"https://github.com/user/repo.git\n",  # remote url
@@ -87,7 +89,7 @@ def test_git_status(client, mock_check_output):
     ]
 
     response = client.get("/api/status")
-    data = response.get_json()
+    data = response.json()
 
     assert response.status_code == 200
     assert data["project"] == "user/repo"
@@ -95,6 +97,7 @@ def test_git_status(client, mock_check_output):
 
 
 def test_git_pull_success(client, mock_run):
+    """Test successful git pull."""
     # Mock perform_git_pull subprocess.run
     mock_result = MagicMock()
     mock_result.stdout = "Already up to date."
@@ -102,7 +105,7 @@ def test_git_pull_success(client, mock_run):
     mock_run.return_value = mock_result
 
     response = client.post("/api/git_pull")
-    data = response.get_json()
+    data = response.json()
 
     assert response.status_code == 200
     assert data["success"] is True
@@ -119,27 +122,27 @@ def test_git_pull_success(client, mock_run):
 
 
 def test_git_pull_failure(client, mock_run):
+    """Test failed git pull."""
     # Mock subprocess.run raising CalledProcessError
-    # Note: stderr argument was added in Python 3.10+ to CalledProcessError constructor?
-    # Actually it's (returncode, cmd, output=None, stderr=None)
     error = subprocess.CalledProcessError(
         1, ["git", "pull"], output="", stderr="Merge conflict"
     )
     mock_run.side_effect = error
 
     response = client.post("/api/git_pull")
-    data = response.get_json()
+    data = response.json()
 
     assert data["success"] is False
     assert "Merge conflict" in data["output"]
 
 
 def test_reset(client, mocker):
+    """Test the /api/reset endpoint."""
     mocker.patch("os.path.exists", return_value=True)
     mock_remove = mocker.patch("os.remove")
 
     response = client.post("/api/reset")
-    data = response.get_json()
+    data = response.json()
 
     assert response.status_code == 200
     assert data["status"] == "success"
