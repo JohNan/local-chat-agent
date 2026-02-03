@@ -114,10 +114,9 @@ def test_chat_tool_execution(client):
         # We can't easily use side_effect on an async def function directly if we want different return values
         # So we create a mock that returns the side effects
 
-        mock_chat.send_message_stream = AsyncMock(side_effect=[
-            AsyncIterator([chunk1]),
-            AsyncIterator([chunk2])
-        ])
+        mock_chat.send_message_stream = AsyncMock(
+            side_effect=[AsyncIterator([chunk1]), AsyncIterator([chunk2])]
+        )
 
         # Mock the tool function itself to avoid actual git ops
         with patch("app.services.git_ops.list_files", return_value=["file1.txt"]):
