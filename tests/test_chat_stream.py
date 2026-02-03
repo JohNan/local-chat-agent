@@ -4,7 +4,8 @@ Tests for the chat streaming functionality.
 
 import sys
 import os
-from unittest.mock import MagicMock, patch
+import asyncio
+from unittest.mock import MagicMock, patch, AsyncMock
 import pytest
 from fastapi.testclient import TestClient
 
@@ -21,12 +22,35 @@ def fixture_client():
     return TestClient(app)
 
 
+class AsyncIterator:
+    """Helper to create an async iterator from a list."""
+
+    def __init__(self, items):
+        self.items = items
+
+    def __aiter__(self):
+        self.iter = iter(self.items)
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self.iter)
+        except StopIteration:
+            raise StopAsyncIteration
+
+
 def test_chat_get_stream_basic(client):
     """Test basic chat streaming with GET request."""
     # Mock the Gemini Client
     with patch("app.main.CLIENT") as mock_client:
+        # Mock CLIENT.aio.chats.create to be an async function returning mock_chat
         mock_chat = MagicMock()
-        mock_client.chats.create.return_value = mock_chat
+
+        # mock_client.aio.chats.create needs to be awaitable and return mock_chat
+        async def mock_create_chat(*args, **kwargs):
+            return mock_chat
+
+        mock_client.aio.chats.create = mock_create_chat
 
         # Mock chunk
         mock_chunk = MagicMock()
@@ -34,7 +58,11 @@ def test_chat_get_stream_basic(client):
         mock_chunk.parts = []
 
         # Mock the stream iterator
-        mock_chat.send_message_stream.return_value = iter([mock_chunk])
+        # send_message_stream must be awaitable and return an async iterator
+        async def mock_send_message_stream(*args, **kwargs):
+            return AsyncIterator([mock_chunk])
+
+        mock_chat.send_message_stream = mock_send_message_stream
 
         # Test GET request
         response = client.get("/chat?message=Hi")
@@ -58,7 +86,11 @@ def test_chat_tool_execution(client):
     """Test chat streaming with tool execution."""
     with patch("app.main.CLIENT") as mock_client:
         mock_chat = MagicMock()
-        mock_client.chats.create.return_value = mock_chat
+
+        async def mock_create_chat(*args, **kwargs):
+            return mock_chat
+
+        mock_client.aio.chats.create = mock_create_chat
 
         # Setup mock chunks for 2 turns
         # Turn 1: Tool Call
@@ -77,7 +109,14 @@ def test_chat_tool_execution(client):
         chunk2.parts = []
 
         # Mock the stream iterator for two calls
-        mock_chat.send_message_stream.side_effect = [iter([chunk1]), iter([chunk2])]
+        # We need side_effect behavior for async function
+
+        # We can't easily use side_effect on an async def function directly if we want different return values
+        # So we create a mock that returns the side effects
+
+        mock_chat.send_message_stream = AsyncMock(
+            side_effect=[AsyncIterator([chunk1]), AsyncIterator([chunk2])]
+        )
 
         # Mock the tool function itself to avoid actual git ops
         with patch("app.services.git_ops.list_files", return_value=["file1.txt"]):
@@ -90,9 +129,6 @@ def test_chat_tool_execution(client):
             # Check for tool event
             assert "event: tool" in data
             # Check for strict JSON encoded tool message
-            # The tool message is: 🛠 Listing directory '.'...
-            # JSON encoded: "🛠 Listing directory '.'..."
-            # In the stream: data: "..."
             assert "Listing directory '.'..." in data
 
             # Check for final message

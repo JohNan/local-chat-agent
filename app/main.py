@@ -106,26 +106,6 @@ def _format_history(history):
     return formatted_history
 
 
-def safe_next(iterator):
-    """Helper to call next() on an iterator safely."""
-    try:
-        return next(iterator), False
-    except StopIteration:
-        return None, True
-
-
-async def iterate_in_thread(iterator):
-    """
-    Iterates over a blocking iterator in a separate thread.
-    """
-    while True:
-        # asyncio.to_thread runs the synchronous next() call in a thread
-        item, is_done = await asyncio.to_thread(safe_next, iterator)
-        if is_done:
-            break
-        yield item
-
-
 async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
     """
     Background worker that runs the agent loop and pushes events to the queue.
@@ -144,11 +124,10 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
             turn_text_parts = []
 
             try:
-                # chat_session.send_message_stream is synchronous and blocking.
-                # We offload iteration to a thread to prevent blocking the event loop.
-                stream = chat_session.send_message_stream(current_msg)
+                # Use native async method for streaming
+                stream = await chat_session.send_message_stream(current_msg)
 
-                async for chunk in iterate_in_thread(stream):
+                async for chunk in stream:
                     # Text processing
                     try:
                         if chunk.text:
@@ -341,7 +320,8 @@ async def chat(request: ChatRequest):
     full_history = chat_manager.load_chat_history()
     formatted_history = _format_history(full_history)
 
-    chat_session = CLIENT.chats.create(
+    # Use native async client
+    chat_session = await CLIENT.aio.chats.create(
         model="gemini-3-pro-preview",
         config=types.GenerateContentConfig(
             tools=[git_ops.list_files, git_ops.read_file],
@@ -374,7 +354,8 @@ async def chat_get(message: str = Query(...)):
     full_history = chat_manager.load_chat_history()
     formatted_history = _format_history(full_history)
 
-    chat_session = CLIENT.chats.create(
+    # Use native async client
+    chat_session = await CLIENT.aio.chats.create(
         model="gemini-3-pro-preview",
         config=types.GenerateContentConfig(
             tools=[git_ops.list_files, git_ops.read_file],
