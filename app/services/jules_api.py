@@ -4,12 +4,13 @@ Service module for interacting with the Jules API.
 
 import logging
 import os
+import asyncio
 import requests
 
 logger = logging.getLogger(__name__)
 
 
-def deploy_to_jules(prompt_text, repo_info):
+async def deploy_to_jules(prompt_text, repo_info):
     """
     Deploys a session to Jules API with the provided prompt and repository context.
 
@@ -49,7 +50,10 @@ def deploy_to_jules(prompt_text, repo_info):
     logger.debug("Deploying to Jules with payload: %s", payload)
 
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        # Offload blocking request to thread
+        response = await asyncio.to_thread(
+            requests.post, url, headers=headers, json=payload, timeout=30
+        )
 
         if response.status_code != 200:
             logger.error(
