@@ -11,14 +11,18 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.services import git_ops, chat_manager
 
+
 @pytest.fixture
 def client():
     from app.main import app
+
     return TestClient(app)
+
 
 @pytest.fixture
 def mock_run(mocker):
     return mocker.patch("app.services.git_ops.subprocess.run")
+
 
 @pytest.fixture
 def mock_check_output(mocker):

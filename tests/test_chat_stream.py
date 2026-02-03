@@ -11,6 +11,7 @@ sys.path.append(os.getcwd())
 # Import app directly from main
 from app.main import app
 
+
 @pytest.fixture
 def client():
     return TestClient(app)
@@ -86,7 +87,7 @@ def test_chat_tool_execution(client):
             # The tool message is: 🛠 Listing directory '.'...
             # JSON encoded: "🛠 Listing directory '.'..."
             # In the stream: data: "..."
-            assert 'Listing directory \'.\'' in data
+            assert "Listing directory '.'" in data
 
             # Check for final message
             assert "event: message" in data
