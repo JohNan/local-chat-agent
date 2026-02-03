@@ -1,23 +1,28 @@
+"""
+Tests for the chat streaming functionality.
+"""
+
 import sys
 import os
-import json
-import pytest
 from unittest.mock import MagicMock, patch
+import pytest
 from fastapi.testclient import TestClient
 
 # Ensure app is importable
 sys.path.append(os.getcwd())
 
 # Import app directly from main
-from app.main import app
+from app.main import app  # pylint: disable=wrong-import-position
 
 
-@pytest.fixture
-def client():
+@pytest.fixture(name="client")
+def fixture_client():
+    """Fixture to provide a TestClient instance."""
     return TestClient(app)
 
 
 def test_chat_get_stream_basic(client):
+    """Test basic chat streaming with GET request."""
     # Mock the Gemini Client
     with patch("app.main.CLIENT") as mock_client:
         mock_chat = MagicMock()
@@ -50,6 +55,7 @@ def test_chat_get_stream_basic(client):
 
 
 def test_chat_tool_execution(client):
+    """Test chat streaming with tool execution."""
     with patch("app.main.CLIENT") as mock_client:
         mock_chat = MagicMock()
         mock_client.chats.create.return_value = mock_chat
@@ -87,7 +93,7 @@ def test_chat_tool_execution(client):
             # The tool message is: 🛠 Listing directory '.'...
             # JSON encoded: "🛠 Listing directory '.'..."
             # In the stream: data: "..."
-            assert "Listing directory '.'" in data
+            assert "Listing directory '.'..." in data
 
             # Check for final message
             assert "event: message" in data
