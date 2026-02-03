@@ -80,8 +80,16 @@ def test_list_files(mocker):
     assert len(git_files) == 0
 
 
-def test_git_status(client, mock_check_output):
+def test_git_status(client, mock_check_output, mocker):
     """Test the /api/status endpoint."""
+    # Ensure caches are cleared so we don't get stale data
+    git_ops.get_repo_info.cache_clear()
+    git_ops._get_remote_url.cache_clear()
+
+    # Mock CODEBASE_ROOT to non-existent path so _get_remote_url
+    # fails file lookup and falls back to subprocess
+    mocker.patch("app.services.git_ops.CODEBASE_ROOT", "/non/existent/path")
+
     # Mock get-url and branch
     mock_check_output.side_effect = [
         b"https://github.com/user/repo.git\n",  # remote url
