@@ -282,7 +282,7 @@ def api_reset():
 
 
 @app.post("/api/deploy_to_jules")
-def deploy_to_jules_route(request: DeployRequest):
+async def deploy_to_jules_route(request: DeployRequest):
     """Endpoint to deploy session to Jules."""
     try:
         prompt_text = request.prompt
@@ -293,7 +293,7 @@ def deploy_to_jules_route(request: DeployRequest):
             )
 
         repo_info = git_ops.get_repo_info()
-        result = jules_api.deploy_to_jules(prompt_text, repo_info)
+        result = await jules_api.deploy_to_jules(prompt_text, repo_info)
         return {"success": True, "result": result}
 
     except Exception as e:  # pylint: disable=broad-exception-caught
