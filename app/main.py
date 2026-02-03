@@ -377,9 +377,13 @@ async def chat_get(message: str = Query(...)):
 
 
 # Mount static folder
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
+
 app.mount(
     "/static",
-    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")),
+    StaticFiles(directory=static_dir),
     name="static",
 )
 
