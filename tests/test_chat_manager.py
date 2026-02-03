@@ -30,7 +30,15 @@ def test_load_history_normal(mocker):
 
     history = chat_manager.load_chat_history()
     assert len(history) == 2
-    assert history == normal_history
+
+    # Check content matches and IDs are present
+    assert history[0]["role"] == normal_history[0]["role"]
+    assert history[0]["parts"] == normal_history[0]["parts"]
+    assert "id" in history[0]
+
+    assert history[1]["role"] == normal_history[1]["role"]
+    assert history[1]["parts"] == normal_history[1]["parts"]
+    assert "id" in history[1]
 
 
 def test_load_history_dangling_function_call(mocker):

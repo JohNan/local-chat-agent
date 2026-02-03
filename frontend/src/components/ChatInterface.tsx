@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import React, { useEffect, useRef, useLayoutEffect } from 'react';
 import { Terminal } from 'lucide-react';
 import type { Message } from '../types';
 import { MessageBubble } from './MessageBubble';
@@ -12,14 +12,14 @@ interface ChatInterfaceProps {
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHistory, toolStatus, isLoadingHistory }) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [prevMsgCount, setPrevMsgCount] = useState(0);
+    const prevMsgCountRef = useRef(0);
 
     useLayoutEffect(() => {
         if (!containerRef.current) return;
 
         const container = containerRef.current;
         const newCount = messages.length;
-        const diff = newCount - prevMsgCount;
+        const diff = newCount - prevMsgCountRef.current;
 
         if (diff > 0) {
             // New messages added
@@ -41,8 +41,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHi
             }
         }
 
-        setPrevMsgCount(newCount);
-    }, [messages, isLoadingHistory, prevMsgCount]);
+        prevMsgCountRef.current = newCount;
+    }, [messages, isLoadingHistory]);
 
     // Force scroll to bottom on tool status change (active streaming)
     useEffect(() => {
@@ -59,8 +59,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHi
 
     return (
         <div className="chat-container" ref={containerRef} onScroll={handleScroll}>
-            {messages.map((msg, idx) => (
-                <MessageBubble key={idx} message={msg} />
+            {messages.map((msg) => (
+                <MessageBubble key={msg.id} message={msg} />
             ))}
             {toolStatus && (
                 <div className="tool-usage">
