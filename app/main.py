@@ -321,7 +321,7 @@ async def chat(request: ChatRequest):
     formatted_history = _format_history(full_history)
 
     # Use native async client
-    chat_session = await CLIENT.aio.chats.create(
+    chat_session = CLIENT.aio.chats.create(
         model="gemini-3-pro-preview",
         config=types.GenerateContentConfig(
             tools=[git_ops.list_files, git_ops.read_file],
@@ -355,7 +355,7 @@ async def chat_get(message: str = Query(...)):
     formatted_history = _format_history(full_history)
 
     # Use native async client
-    chat_session = await CLIENT.aio.chats.create(
+    chat_session = CLIENT.aio.chats.create(
         model="gemini-3-pro-preview",
         config=types.GenerateContentConfig(
             tools=[git_ops.list_files, git_ops.read_file],
