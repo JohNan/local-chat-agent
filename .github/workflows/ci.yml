@@ -25,4 +25,4 @@ jobs:
         run: docker run --rm -v ${{ github.workspace }}:/codebase -w /codebase gemini-agent black --check .
 
       - name: Run Pylint
-        run: docker run --rm -v ${{ github.workspace }}:/codebase -w /codebase gemini-agent pylint app/
+        run: docker run --rm -v ${{ github.workspace }}:/codebase -w /codebase -e PYTHONPATH=. gemini-agent pylint app/
