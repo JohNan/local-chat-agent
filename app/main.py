@@ -7,6 +7,7 @@ import json
 import logging
 import traceback
 import sys
+import asyncio
 
 from fastapi import FastAPI, Query
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
@@ -105,12 +106,32 @@ def _format_history(history):
     return formatted_history
 
 
-def _generate_stream(chat_session, user_msg):
+def safe_next(iterator):
+    """Helper to call next() on an iterator safely."""
+    try:
+        return next(iterator), False
+    except StopIteration:
+        return None, True
+
+
+async def iterate_in_thread(iterator):
     """
-    Generates the chat stream and handles tool execution with recursion.
+    Iterates over a blocking iterator in a separate thread.
+    """
+    while True:
+        # asyncio.to_thread runs the synchronous next() call in a thread
+        item, is_done = await asyncio.to_thread(safe_next, iterator)
+        if is_done:
+            break
+        yield item
+
+
+async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
+    """
+    Background worker that runs the agent loop and pushes events to the queue.
+    Decoupled from the HTTP response to ensure completion even if client disconnects.
     """
     # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-nested-blocks
-    full_response_parts = []
     current_msg = user_msg
     turn = 0
 
@@ -120,15 +141,21 @@ def _generate_stream(chat_session, user_msg):
             tool_calls = []
             logger.debug("[TURN %d] Sending message to SDK", turn)
 
+            turn_text_parts = []
+
             try:
+                # chat_session.send_message_stream is synchronous and blocking.
+                # We offload iteration to a thread to prevent blocking the event loop.
                 stream = chat_session.send_message_stream(current_msg)
 
-                for chunk in stream:
+                async for chunk in iterate_in_thread(stream):
                     # Text processing
                     try:
                         if chunk.text:
-                            full_response_parts.append(chunk.text)
-                            yield f"event: message\ndata: {json.dumps(chunk.text)}\n\n"
+                            turn_text_parts.append(chunk.text)
+                            await queue.put(
+                                f"event: message\ndata: {json.dumps(chunk.text)}\n\n"
+                            )
                     except Exception as e:  # pylint: disable=broad-exception-caught
                         logger.error(
                             "[TURN %d] Error processing chunk text: %s", turn, e
@@ -145,9 +172,15 @@ def _generate_stream(chat_session, user_msg):
                             "[TURN %d] Error processing chunk parts: %s", turn, e
                         )
 
+                # End of stream for this turn.
+                # Immediate Persistence: Save the text generated in this turn.
+                full_turn_text = "".join(turn_text_parts)
+                if full_turn_text:
+                    chat_manager.save_message("model", full_turn_text)
+
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Turn %d Error: %s", turn, traceback.format_exc())
-                yield f"event: error\ndata: {json.dumps(str(e))}\n\n"
+                await queue.put(f"event: error\ndata: {json.dumps(str(e))}\n\n")
                 return
 
             # Decision Point
@@ -172,7 +205,7 @@ def _generate_stream(chat_session, user_msg):
             joined_descriptions = ", ".join(tool_descriptions)
             # STRICT JSON ENCODING prevents newlines from breaking SSE
             tool_status_msg = f"🛠 {joined_descriptions}..."
-            yield f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n"
+            await queue.put(f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n")
 
             response_parts = []
             for fc in tool_calls:
@@ -181,11 +214,17 @@ def _generate_stream(chat_session, user_msg):
                 result = None
                 if tool_func:
                     try:
-                        result = tool_func(**fc.args)
+                        # Tools are synchronous and blocking (e.g. file I/O).
+                        # Run them in a thread.
+                        result = await asyncio.to_thread(tool_func, **fc.args)
                     except Exception as e:  # pylint: disable=broad-exception-caught
                         result = f"Error executing {fc.name}: {e}"
                 else:
                     result = f"Error: Tool {fc.name} not found."
+
+                # Immediate Persistence: Save tool output
+                # Using 'function' role to denote tool output, preserving it in history
+                chat_manager.save_message("function", str(result))
 
                 response_parts.append(
                     types.Part.from_function_response(
@@ -196,16 +235,34 @@ def _generate_stream(chat_session, user_msg):
             # Update State
             current_msg = response_parts
 
-        full_response_text = "".join(full_response_parts)
+        await queue.put("event: done\ndata: [DONE]\n\n")
 
-        # Save model response
-        if full_response_text:
-            chat_manager.save_message("model", full_response_text)
-
-        yield "event: done\ndata: [DONE]\n\n"
-
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Worker Error: %s", traceback.format_exc())
+        await queue.put(f"event: error\ndata: {json.dumps(str(e))}\n\n")
     finally:
-        logger.info("Client disconnected or stream finished.")
+        # Signal end of queue
+        await queue.put(None)
+        logger.info("Background worker finished.")
+
+
+async def stream_generator(queue: asyncio.Queue):
+    """
+    Reads from the queue and yields to the client.
+    Handles client disconnects gracefully.
+    """
+    try:
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            yield item
+    except GeneratorExit:
+        logger.warning(
+            "Client disconnected from stream. Worker continues in background."
+        )
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Stream generator error: %s", e)
 
 
 # --- Routes ---
@@ -268,7 +325,7 @@ def deploy_to_jules_route(request: DeployRequest):
 
 
 @app.post("/chat")
-def chat(request: ChatRequest):
+async def chat(request: ChatRequest):
     """Handles chat messages (POST)."""
     if not CLIENT:
         return JSONResponse(
@@ -296,14 +353,17 @@ def chat(request: ChatRequest):
         history=formatted_history,
     )
 
+    queue = asyncio.Queue()
+    asyncio.create_task(run_agent_task(queue, chat_session, user_msg))
+
     return StreamingResponse(
-        _generate_stream(chat_session, user_msg),
+        stream_generator(queue),
         media_type="text/event-stream",
     )
 
 
 @app.get("/chat")
-def chat_get(message: str = Query(...)):
+async def chat_get(message: str = Query(...)):
     """Handles chat messages (GET) for compatibility."""
     if not CLIENT:
         return JSONResponse(
@@ -326,8 +386,11 @@ def chat_get(message: str = Query(...)):
         history=formatted_history,
     )
 
+    queue = asyncio.Queue()
+    asyncio.create_task(run_agent_task(queue, chat_session, message))
+
     return StreamingResponse(
-        _generate_stream(chat_session, message),
+        stream_generator(queue),
         media_type="text/event-stream",
     )
 
