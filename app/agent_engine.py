@@ -1,0 +1,153 @@
+"""
+Agent Engine module.
+Handles the agent loop and tool execution.
+"""
+
+import json
+import logging
+import traceback
+import asyncio
+
+from google.genai import types
+
+from app.services import git_ops, chat_manager
+
+logger = logging.getLogger(__name__)
+
+# Helper for tool map
+TOOL_MAP = {"list_files": git_ops.list_files, "read_file": git_ops.read_file}
+
+SYSTEM_INSTRUCTION = (
+    "You are the Technical Lead and Prompt Architect. "
+    "You have **READ-ONLY** access to the user's codebase.\n\n"
+    "**CRITICAL RULES:**\n"
+    "1. **Explore First:** When the user asks a question, "
+    "you must **IMMEDIATELY** use `list_files` and `read_file` to investigate. "
+    "**NEVER** ask the user for file paths or code snippets. Find them yourself.\n"
+    "2. **Read-Only:** You cannot edit, write, or delete files. "
+    "If code changes are required, you must describe them or generate a 'Jules Prompt'.\n"
+    '3. **Jules Prompt:** When the user asks to "write a prompt", "deploy", '
+    'or "create instructions", you must generate a structured block starting with '
+    "`## Jules Prompt` containing the specific context and acceptance criteria.\n\n"
+    "Note: `read_file` automatically truncates large files. If you need to read the rest, "
+    "use the `start_line` parameter."
+)
+
+
+async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
+    """
+    Background worker that runs the agent loop and pushes events to the queue.
+    Decoupled from the HTTP response to ensure completion even if client disconnects.
+    """
+    # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-nested-blocks
+    current_msg = user_msg
+    turn = 0
+
+    try:
+        while turn < 30:
+            turn += 1
+            tool_calls = []
+            logger.debug("[TURN %d] Sending message to SDK", turn)
+
+            turn_text_parts = []
+
+            try:
+                # Use native async method for streaming
+                stream = await chat_session.send_message_stream(current_msg)
+
+                async for chunk in stream:
+                    # Text processing
+                    try:
+                        if chunk.text:
+                            turn_text_parts.append(chunk.text)
+                            await queue.put(
+                                f"event: message\ndata: {json.dumps(chunk.text)}\n\n"
+                            )
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        logger.error(
+                            "[TURN %d] Error processing chunk text: %s", turn, e
+                        )
+
+                    # Tool call processing
+                    try:
+                        if hasattr(chunk, "parts"):
+                            for part in chunk.parts:
+                                if part.function_call:
+                                    tool_calls.append(part.function_call)
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        logger.error(
+                            "[TURN %d] Error processing chunk parts: %s", turn, e
+                        )
+
+                # End of stream for this turn.
+                # Immediate Persistence: Save the text generated in this turn.
+                full_turn_text = "".join(turn_text_parts)
+                if full_turn_text:
+                    chat_manager.save_message("model", full_turn_text)
+
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error("Turn %d Error: %s", turn, traceback.format_exc())
+                await queue.put(f"event: error\ndata: {json.dumps(str(e))}\n\n")
+                return
+
+            # Decision Point
+            if not tool_calls:
+                break
+
+            # Execute Tools
+            logger.debug("[TURN %d] Executing tools...", turn)
+            tool_descriptions = []
+            for fc in tool_calls:
+                if fc.name == "read_file":
+                    tool_descriptions.append(
+                        f"Reading file '{fc.args.get('filepath')}'"
+                    )
+                elif fc.name == "list_files":
+                    tool_descriptions.append(
+                        f"Listing directory '{fc.args.get('directory')}'"
+                    )
+                else:
+                    tool_descriptions.append(f"Running {fc.name}")
+
+            joined_descriptions = ", ".join(tool_descriptions)
+            # STRICT JSON ENCODING prevents newlines from breaking SSE
+            tool_status_msg = f"🛠 {joined_descriptions}..."
+            await queue.put(f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n")
+
+            response_parts = []
+            for fc in tool_calls:
+                logger.info("Executing tool: %s args=%s", fc.name, fc.args)
+                tool_func = TOOL_MAP.get(fc.name)
+                result = None
+                if tool_func:
+                    try:
+                        # Tools are synchronous and blocking (e.g. file I/O).
+                        # Run them in a thread.
+                        result = await asyncio.to_thread(tool_func, **fc.args)
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        result = f"Error executing {fc.name}: {e}"
+                else:
+                    result = f"Error: Tool {fc.name} not found."
+
+                # Immediate Persistence: Save tool output
+                # Using 'function' role to denote tool output, preserving it in history
+                chat_manager.save_message("function", str(result))
+
+                response_parts.append(
+                    types.Part.from_function_response(
+                        name=fc.name, response={"result": result}
+                    )
+                )
+
+            # Update State
+            current_msg = response_parts
+
+        await queue.put("event: done\ndata: [DONE]\n\n")
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Worker Error: %s", traceback.format_exc())
+        await queue.put(f"event: error\ndata: {json.dumps(str(e))}\n\n")
+    finally:
+        # Signal end of queue
+        await queue.put(None)
+        logger.info("Background worker finished.")
