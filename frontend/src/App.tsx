@@ -73,13 +73,30 @@ function App() {
             const decoder = new TextDecoder("utf-8");
             let buffer = "";
 
+            let lastUpdate = 0;
+            const THROTTLE_MS = 16; // ~60fps
+
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) break;
+                if (done) {
+                    // Final update to ensure we didn't miss anything
+                    setMessages(prev => {
+                        const newMsgs = [...prev];
+                        const lastIndex = newMsgs.length - 1;
+                        const last = newMsgs[lastIndex];
+                        if (last && (last.role === 'model' || last.role === 'ai')) {
+                            newMsgs[lastIndex] = { ...last, text: currentText, parts: [{ text: currentText }] };
+                        }
+                        return newMsgs;
+                    });
+                    break;
+                }
 
                 buffer += decoder.decode(value, { stream: true });
                 const parts = buffer.split('\n\n');
                 buffer = parts.pop() || ""; // Keep incomplete chunk
+
+                let hasNewText = false;
 
                 for (const part of parts) {
                     if (!part.trim()) continue;
@@ -100,16 +117,7 @@ function App() {
                              // data is like "Hello", so JSON.parse removes quotes
                             const parsedText = JSON.parse(data);
                             currentText += parsedText;
-                            setMessages(prev => {
-                                const newMsgs = [...prev];
-                                const lastIndex = newMsgs.length - 1;
-                                const last = newMsgs[lastIndex];
-                                if (last && (last.role === 'model' || last.role === 'ai')) {
-                                    newMsgs[lastIndex] = { ...last, text: currentText, parts: [{text: currentText}] };
-                                }
-                                return newMsgs;
-                            });
-                            setToolStatus(null);
+                            hasNewText = true;
                         } catch (e) {
                             console.error("Failed to parse message data:", data, e);
                         }
@@ -126,7 +134,34 @@ function App() {
                     } else if (eventType === 'done' || eventType === 'error') {
                         if (eventType === 'error') console.error("Stream error:", data);
                         setToolStatus(null);
+                        // Final update to ensure we didn't miss anything
+                        setMessages(prev => {
+                            const newMsgs = [...prev];
+                            const lastIndex = newMsgs.length - 1;
+                            const last = newMsgs[lastIndex];
+                            if (last && (last.role === 'model' || last.role === 'ai')) {
+                                newMsgs[lastIndex] = { ...last, text: currentText, parts: [{ text: currentText }] };
+                            }
+                            return newMsgs;
+                        });
                         return; // Exit loop
+                    }
+                }
+
+                if (hasNewText) {
+                    const now = Date.now();
+                    if (now - lastUpdate > THROTTLE_MS) {
+                        setMessages(prev => {
+                            const newMsgs = [...prev];
+                            const lastIndex = newMsgs.length - 1;
+                            const last = newMsgs[lastIndex];
+                            if (last && (last.role === 'model' || last.role === 'ai')) {
+                                newMsgs[lastIndex] = { ...last, text: currentText, parts: [{ text: currentText }] };
+                            }
+                            return newMsgs;
+                        });
+                        setToolStatus(null);
+                        lastUpdate = now;
                     }
                 }
             }
