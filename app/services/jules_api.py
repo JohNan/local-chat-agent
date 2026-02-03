@@ -4,8 +4,7 @@ Service module for interacting with the Jules API.
 
 import logging
 import os
-import asyncio
-import requests
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ async def deploy_to_jules(prompt_text, repo_info):
     Raises:
         ValueError: If API keys or source ID are missing.
         RuntimeError: If the Jules API returns an error.
-        requests.RequestException: If the HTTP request fails.
+        httpx.HTTPError: If the HTTP request fails.
     """
     api_key = os.environ.get("JULES_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key:
@@ -50,10 +49,8 @@ async def deploy_to_jules(prompt_text, repo_info):
     logger.debug("Deploying to Jules with payload: %s", payload)
 
     try:
-        # Offload blocking request to thread
-        response = await asyncio.to_thread(
-            requests.post, url, headers=headers, json=payload, timeout=30
-        )
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload, timeout=30)
 
         if response.status_code != 200:
             logger.error(
@@ -64,6 +61,6 @@ async def deploy_to_jules(prompt_text, repo_info):
             )
 
         return response.json()
-    except requests.RequestException as e:
+    except httpx.HTTPError as e:
         logger.error("Request failed: %s", e)
         raise
