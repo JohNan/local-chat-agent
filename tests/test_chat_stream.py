@@ -3,24 +3,22 @@ import os
 import json
 import pytest
 from unittest.mock import MagicMock, patch
+from fastapi.testclient import TestClient
 
 # Ensure app is importable
 sys.path.append(os.getcwd())
 
-from app import create_app
-
+# Import app directly from main
+from app.main import app
 
 @pytest.fixture
 def client():
-    app = create_app()
-    app.config["TESTING"] = True
-    with app.test_client() as client:
-        yield client
+    return TestClient(app)
 
 
 def test_chat_get_stream_basic(client):
     # Mock the Gemini Client
-    with patch("app.routes.CLIENT") as mock_client:
+    with patch("app.main.CLIENT") as mock_client:
         mock_chat = MagicMock()
         mock_client.chats.create.return_value = mock_chat
 
@@ -29,15 +27,16 @@ def test_chat_get_stream_basic(client):
         mock_chunk.text = "Hello world"
         mock_chunk.parts = []
 
-        mock_chat.send_message_stream.return_value = [mock_chunk]
+        # Mock the stream iterator
+        mock_chat.send_message_stream.return_value = iter([mock_chunk])
 
         # Test GET request
         response = client.get("/chat?message=Hi")
 
         assert response.status_code == 200
-        assert response.mimetype == "text/event-stream"
+        assert "text/event-stream" in response.headers["content-type"]
 
-        data = response.get_data(as_text=True)
+        data = response.text
         print(f"DEBUG: Response data:\n{data}")
 
         # Check for message event
@@ -50,7 +49,7 @@ def test_chat_get_stream_basic(client):
 
 
 def test_chat_tool_execution(client):
-    with patch("app.routes.CLIENT") as mock_client:
+    with patch("app.main.CLIENT") as mock_client:
         mock_chat = MagicMock()
         mock_client.chats.create.return_value = mock_chat
 
@@ -70,19 +69,24 @@ def test_chat_tool_execution(client):
         chunk2.text = "Here are the files"
         chunk2.parts = []
 
-        mock_chat.send_message_stream.side_effect = [[chunk1], [chunk2]]
+        # Mock the stream iterator for two calls
+        mock_chat.send_message_stream.side_effect = [iter([chunk1]), iter([chunk2])]
 
         # Mock the tool function itself to avoid actual git ops
-        with patch("app.services.git_ops.list_files", return_value="file1.txt"):
+        with patch("app.services.git_ops.list_files", return_value=["file1.txt"]):
             response = client.get("/chat?message=list files")
 
             assert response.status_code == 200
-            data = response.get_data(as_text=True)
+            data = response.text
             print(f"DEBUG: Tool Response data:\n{data}")
 
             # Check for tool event
             assert "event: tool" in data
-            assert "Listing directory '.'" in data
+            # Check for strict JSON encoded tool message
+            # The tool message is: 🛠 Listing directory '.'...
+            # JSON encoded: "🛠 Listing directory '.'..."
+            # In the stream: data: "..."
+            assert 'Listing directory \'.\'' in data
 
             # Check for final message
             assert "event: message" in data
