@@ -14,39 +14,43 @@ logger = logging.getLogger(__name__)
 CODEBASE_ROOT = os.environ.get("CODEBASE_ROOT", "/codebase")
 
 
+@lru_cache(maxsize=1)
 def _get_remote_url():
     """Attempts to retrieve the git remote origin URL."""
     remote_url = ""
-    # 1. Try git remote get-url origin
-    try:
-        remote_url_bytes = subprocess.check_output(
-            ["git", "remote", "get-url", "origin"],
-            cwd=CODEBASE_ROOT,
-            stderr=subprocess.DEVNULL,
-        )
-        remote_url = remote_url_bytes.decode("utf-8").strip()
-    except subprocess.CalledProcessError:
-        pass
-    except FileNotFoundError:
-        pass
 
-    # 2. Fallback to .git/config
+    # 1. Try .git/config (Much faster than subprocess)
+    git_config_path = os.path.join(CODEBASE_ROOT, ".git", "config")
+    if os.path.exists(git_config_path):
+        try:
+            with open(git_config_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            remote_block_match = re.search(
+                r'\[remote "origin"\](.*?)(?=\[|$)', content, re.DOTALL
+            )
+            if remote_block_match:
+                block_content = remote_block_match.group(1)
+                # Handle quoted and unquoted URLs
+                url_match = re.search(r'url\s*=\s*(?:"([^"]+)"|(\S+))', block_content)
+                if url_match:
+                    # Group 1 is quoted content, Group 2 is unquoted content
+                    remote_url = url_match.group(1) or url_match.group(2)
+        except OSError as e:
+            logger.warning("Failed to parse git config: %s", e)
+
+    # 2. Fallback to git remote get-url origin
     if not remote_url:
-        git_config_path = os.path.join(CODEBASE_ROOT, ".git", "config")
-        if os.path.exists(git_config_path):
-            try:
-                with open(git_config_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                remote_block_match = re.search(
-                    r'\[remote "origin"\](.*?)(?=\[|$)', content, re.DOTALL
-                )
-                if remote_block_match:
-                    block_content = remote_block_match.group(1)
-                    url_match = re.search(r"url\s*=\s*(\S+)", block_content)
-                    if url_match:
-                        remote_url = url_match.group(1)
-            except OSError as e:
-                logger.warning("Failed to parse git config: %s", e)
+        try:
+            remote_url_bytes = subprocess.check_output(
+                ["git", "remote", "get-url", "origin"],
+                cwd=CODEBASE_ROOT,
+                stderr=subprocess.DEVNULL,
+            )
+            remote_url = remote_url_bytes.decode("utf-8").strip()
+        except subprocess.CalledProcessError:
+            pass
+        except FileNotFoundError:
+            pass
 
     return remote_url
 
