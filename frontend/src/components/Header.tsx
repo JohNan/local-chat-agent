@@ -42,7 +42,7 @@ export const Header: React.FC = () => {
             } else {
                 alert("Failed to clear history: " + (data.error || "Unknown error"));
             }
-        } catch (e) {
+        } catch {
             alert("Error clearing history.");
         }
     };

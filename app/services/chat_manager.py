@@ -5,6 +5,7 @@ Service module for managing chat history.
 import os
 import json
 import logging
+import uuid
 
 try:
     import fcntl
@@ -25,6 +26,11 @@ def load_chat_history():
     try:
         with open(CHAT_HISTORY_FILE, "r", encoding="utf-8") as f:
             history = json.load(f)
+
+        # Backfill IDs for messages that lack them
+        for msg in history:
+            if "id" not in msg:
+                msg["id"] = str(uuid.uuid4())
 
         # Sanitization: Remove dangling function calls
         if history and history[-1].get("parts"):
@@ -133,7 +139,7 @@ def save_message(role, text):
     """
     Appends a message to the chat history and saves it.
     """
-    new_message = {"role": role, "parts": [{"text": text}]}
+    new_message = {"id": str(uuid.uuid4()), "role": role, "parts": [{"text": text}]}
 
     # Try optimized append
     try:

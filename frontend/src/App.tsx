@@ -5,6 +5,13 @@ import { ChatInterface } from './components/ChatInterface';
 import { InputArea } from './components/InputArea';
 import type { Message } from './types';
 
+const generateId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+};
+
 function App() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [toolStatus, setToolStatus] = useState<string | null>(null);
@@ -25,6 +32,7 @@ function App() {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const formattedMessages = data.messages.map((m: any) => ({
                     ...m,
+                    id: m.id || generateId(),
                     text: m.parts?.[0]?.text || m.text || ""
                 }));
 
@@ -43,12 +51,12 @@ function App() {
 
     const sendMessage = async (text: string) => {
         // Add user message
-        const userMsg: Message = { role: 'user', text, parts: [{text}] };
+        const userMsg: Message = { id: generateId(), role: 'user', text, parts: [{text}] };
         setMessages(prev => [...prev, userMsg]);
         setOffset(prev => prev + 1);
 
         // Add placeholder for AI message
-        const aiMsg: Message = { role: 'model', text: "", parts: [{text: ""}] };
+        const aiMsg: Message = { id: generateId(), role: 'model', text: "", parts: [{text: ""}] };
         setMessages(prev => [...prev, aiMsg]);
 
         let currentText = "";

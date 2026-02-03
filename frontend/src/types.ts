@@ -3,6 +3,7 @@ export interface MessagePart {
 }
 
 export interface Message {
+    id: string;
     role: 'user' | 'model' | 'ai';
     parts?: MessagePart[];
     text?: string; // Helper for when we flatten it
