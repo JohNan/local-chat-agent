@@ -43,14 +43,9 @@ def test_chat_get_stream_basic(client):
     """Test basic chat streaming with GET request."""
     # Mock the Gemini Client
     with patch("app.main.CLIENT") as mock_client:
-        # Mock CLIENT.aio.chats.create to be an async function returning mock_chat
+        # Mock CLIENT.aio.chats.create to be synchronous returning mock_chat
         mock_chat = MagicMock()
-
-        # mock_client.aio.chats.create needs to be awaitable and return mock_chat
-        async def mock_create_chat(*args, **kwargs):
-            return mock_chat
-
-        mock_client.aio.chats.create = mock_create_chat
+        mock_client.aio.chats.create.return_value = mock_chat
 
         # Mock chunk
         mock_chunk = MagicMock()
@@ -86,11 +81,7 @@ def test_chat_tool_execution(client):
     """Test chat streaming with tool execution."""
     with patch("app.main.CLIENT") as mock_client:
         mock_chat = MagicMock()
-
-        async def mock_create_chat(*args, **kwargs):
-            return mock_chat
-
-        mock_client.aio.chats.create = mock_create_chat
+        mock_client.aio.chats.create.return_value = mock_chat
 
         # Setup mock chunks for 2 turns
         # Turn 1: Tool Call
