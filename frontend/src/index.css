@@ -119,20 +119,14 @@ body {
     border: 1px solid #ff6b6b;
 }
 
-/* Tools */
-.tool-usage {
-    font-size: 0.9em;
-    color: #aaa;
-    margin-left: 44px;
+/* Thought Process */
+.thought-process {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 5px;
-}
-.tool-usage svg {
-    width: 16px;
-    height: 16px;
-    stroke: #007acc;
+    color: #aaa;
+    font-size: 0.9em;
+    margin-bottom: 8px;
 }
 
 /* Input Area */
