@@ -15,19 +15,11 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, disabled })
         }
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            handleSend();
-        }
-    };
-
     return (
         <div className="input-area">
-            <input
-                type="text"
+            <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
                 placeholder="Ask about your code..."
                 disabled={disabled}
             />
