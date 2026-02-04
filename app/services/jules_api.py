@@ -4,7 +4,7 @@ Service module for interacting with the Jules API.
 
 import logging
 import os
-import httpx
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ async def deploy_to_jules(prompt_text, repo_info):
     Raises:
         ValueError: If API keys or source ID are missing.
         RuntimeError: If the Jules API returns an error.
-        httpx.HTTPError: If the HTTP request fails.
+        aiohttp.ClientError: If the HTTP request fails.
     """
     api_key = os.environ.get("JULES_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key:
@@ -49,18 +49,18 @@ async def deploy_to_jules(prompt_text, repo_info):
     logger.debug("Deploying to Jules with payload: %s", payload)
 
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=payload, timeout=30)
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload, timeout=30) as response:
+                if response.status != 200:
+                    text = await response.text()
+                    logger.error(
+                        "Jules API Error: %s - %s", response.status, text
+                    )
+                    raise RuntimeError(
+                        f"Jules API Error: {response.status} - {text}"
+                    )
 
-        if response.status_code != 200:
-            logger.error(
-                "Jules API Error: %s - %s", response.status_code, response.text
-            )
-            raise RuntimeError(
-                f"Jules API Error: {response.status_code} - {response.text}"
-            )
-
-        return response.json()
-    except httpx.HTTPError as e:
+                return await response.json()
+    except aiohttp.ClientError as e:
         logger.error("Request failed: %s", e)
         raise
