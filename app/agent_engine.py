@@ -34,6 +34,24 @@ SYSTEM_INSTRUCTION = (
 )
 
 
+async def _execute_tool(fc):
+    """
+    Executes a single tool call safely in a thread.
+    Returns the result.
+    """
+    logger.info("Executing tool: %s args=%s", fc.name, fc.args)
+    tool_func = TOOL_MAP.get(fc.name)
+    if tool_func:
+        try:
+            # Tools are synchronous and blocking (e.g. file I/O).
+            # Run them in a thread.
+            return await asyncio.to_thread(tool_func, **fc.args)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            return f"Error executing {fc.name}: {e}"
+    else:
+        return f"Error: Tool {fc.name} not found."
+
+
 async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
     """
     Background worker that runs the agent loop and pushes events to the queue.
@@ -114,24 +132,19 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
             tool_status_msg = f"🛠 {joined_descriptions}..."
             await queue.put(f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n")
 
-            response_parts = []
-            for fc in tool_calls:
-                logger.info("Executing tool: %s args=%s", fc.name, fc.args)
-                tool_func = TOOL_MAP.get(fc.name)
-                result = None
-                if tool_func:
-                    try:
-                        # Tools are synchronous and blocking (e.g. file I/O).
-                        # Run them in a thread.
-                        result = await asyncio.to_thread(tool_func, **fc.args)
-                    except Exception as e:  # pylint: disable=broad-exception-caught
-                        result = f"Error executing {fc.name}: {e}"
-                else:
-                    result = f"Error: Tool {fc.name} not found."
+            # Parallel Execution
+            tool_results = await asyncio.gather(
+                *[_execute_tool(fc) for fc in tool_calls]
+            )
 
+            response_parts = []
+            for fc, result in zip(tool_calls, tool_results):
                 # Immediate Persistence: Save tool output
                 # Using 'function' role to denote tool output, preserving it in history
-                chat_manager.save_message("function", str(result))
+                # Run in thread to avoid blocking loop
+                await asyncio.to_thread(
+                    chat_manager.save_message, "function", str(result)
+                )
 
                 response_parts.append(
                     types.Part.from_function_response(
