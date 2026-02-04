@@ -47,7 +47,9 @@ if not GOOGLE_API_KEY:
 
 # Initialize client
 try:
-    CLIENT = genai.Client(api_key=GOOGLE_API_KEY)
+    CLIENT = genai.Client(
+        api_key=GOOGLE_API_KEY, http_options={"api_client": "aiohttp"}
+    )
 except Exception as e:  # pylint: disable=broad-exception-caught
     logger.error("Failed to initialize Gemini client: %s", e)
     CLIENT = None
