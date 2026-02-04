@@ -28,7 +28,10 @@ SYSTEM_INSTRUCTION = (
     "If code changes are required, you must describe them or generate a 'Jules Prompt'.\n"
     '3. **Jules Prompt:** When the user asks to "write a prompt", "deploy", '
     'or "create instructions", you must generate a structured block starting with '
-    "`## Jules Prompt` containing the specific context and acceptance criteria.\n\n"
+    "`## Jules Prompt` containing the specific context and acceptance criteria. "
+    "Every Jules Prompt MUST explicitly instruct the agent to: "
+    "'First, read the `AGENTS.md` file to understand the project architecture "
+    "and development rules before starting any implementation.'\n\n"
     "Note: `read_file` automatically truncates large files. If you need to read the rest, "
     "use the `start_line` parameter."
 )
