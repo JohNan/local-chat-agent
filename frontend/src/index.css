@@ -143,7 +143,7 @@ body {
     display: flex;
     gap: 10px;
 }
-input[type="text"] {
+input[type="text"], textarea {
     flex: 1;
     padding: 10px;
     border-radius: 4px;
@@ -151,6 +151,10 @@ input[type="text"] {
     background-color: var(--input-bg);
     color: var(--text-color);
     outline: none;
+}
+textarea {
+    resize: vertical;
+    font-family: inherit;
 }
 button.primary-btn {
     padding: 10px 20px;
