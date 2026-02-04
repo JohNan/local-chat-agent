@@ -71,20 +71,27 @@ class DeployRequest(BaseModel):
 
 
 def _format_history(history):
-    """Formats chat history for Gemini API."""
+    """Formats chat history for Gemini API, ensuring valid roles."""
     formatted_history = []
     # We need to exclude the very last message (current user msg)
     # when initializing history, because send_message(user_msg) will add it again.
     history_for_gemini = history[:-1] if history else []
 
     for h in history_for_gemini:
+        role = h["role"]
+
+        # FIX: Map 'function' role to 'user' to pass SDK validation
+        if role == "function":
+            role = "user"
+
         parts = []
         for p in h.get("parts", []):
             if isinstance(p, dict) and "text" in p:
                 parts.append(types.Part(text=p["text"]))
             elif isinstance(p, str):
                 parts.append(types.Part(text=p))
-        formatted_history.append({"role": h["role"], "parts": parts})
+
+        formatted_history.append({"role": role, "parts": parts})
     return formatted_history
 
 
