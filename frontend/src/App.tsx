@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import './index.css';
 import { Header } from './components/Header';
 import { ChatInterface } from './components/ChatInterface';
@@ -122,6 +122,18 @@ function App() {
                             console.error("Failed to parse message data:", data, e);
                         }
                     } else if (eventType === 'tool') {
+                        // Clear the thought text as we are entering tool mode
+                        currentText = "";
+                        setMessages(prev => {
+                            const newMsgs = [...prev];
+                            const lastIndex = newMsgs.length - 1;
+                            const last = newMsgs[lastIndex];
+                            if (last && (last.role === 'model' || last.role === 'ai')) {
+                                newMsgs[lastIndex] = { ...last, text: "", parts: [{ text: "" }] };
+                            }
+                            return newMsgs;
+                        });
+
                         try {
                             // Now we expect a JSON string, just like 'message' events
                             const parsedStatus = JSON.parse(data);
@@ -177,11 +189,26 @@ function App() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    const filteredMessages = useMemo(() => {
+        return messages.filter((m, index) => {
+            // Hide function outputs
+            if (m.role === 'function') return false;
+
+            // Hide "Thought" messages (model messages followed by function)
+            if ((m.role === 'model' || m.role === 'ai') && index + 1 < messages.length) {
+                const nextMsg = messages[index + 1];
+                if (nextMsg.role === 'function') return false;
+            }
+
+            return true;
+        });
+    }, [messages]);
+
     return (
         <>
             <Header />
             <ChatInterface
-                messages={messages}
+                messages={filteredMessages}
                 onLoadHistory={loadHistory}
                 toolStatus={toolStatus}
                 isLoadingHistory={loadingHistory}
