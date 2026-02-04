@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useLayoutEffect } from 'react';
-import { Terminal } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import type { Message } from '../types';
 import { MessageBubble } from './MessageBubble';
 
@@ -64,7 +64,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHi
             ))}
             {toolStatus && (
                 <div className="tool-usage">
-                    <Terminal size={16} />
+                    <Loader2 size={16} className="animate-spin" />
                     {toolStatus}
                 </div>
             )}

@@ -180,6 +180,14 @@ pre {
 code {
     font-family: 'Consolas', 'Monaco', monospace;
 }
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
 /* Deploy Button in Chat */
 .deploy-btn {
     background-color: #2da44e;
@@ -189,7 +197,9 @@ code {
     border-radius: 4px;
     cursor: pointer;
     margin-top: 10px;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 .deploy-btn:hover {
     background-color: #2c974b;
