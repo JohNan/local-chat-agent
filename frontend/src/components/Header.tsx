@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, GitPullRequestArrow, Trash2 } from 'lucide-react';
+import { Bot, GitPullRequestArrow, Trash2 } from 'lucide-react';
 import type { RepoStatus } from '../types';
 
 export const Header: React.FC = () => {
@@ -54,7 +54,7 @@ export const Header: React.FC = () => {
     return (
         <div className="header">
             <div className="header-title">
-                <Sparkles size={24} />
+                <Bot size={24} />
                 <span>Gemini Agent</span>
             </div>
             <div className="header-controls">

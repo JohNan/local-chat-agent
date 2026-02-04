@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { Sparkles, User } from 'lucide-react';
+import { Bot, Loader2, Rocket, Check, X, User } from 'lucide-react';
 import type { Message } from '../types';
 
 interface MessageBubbleProps {
@@ -13,6 +13,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     const text = message.text || message.parts?.[0]?.text || "";
     const [deploying, setDeploying] = useState(false);
     const [deployResult, setDeployResult] = useState<string | null>(null);
+    const [isError, setIsError] = useState(false);
 
     const renderMarkdown = (content: string) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,14 +42,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             const data = await response.json();
             if (data.success) {
                 const sessionName = data.result.name || "Unknown Session";
-                setDeployResult(`✅ Started! (${sessionName})`);
+                setDeployResult(`Started! (${sessionName})`);
+                setIsError(false);
             } else {
-                setDeployResult("❌ Error: " + data.error);
+                setDeployResult("Error: " + data.error);
+                setIsError(true);
                 alert("Error deploying: " + data.error);
             }
         } catch (e) {
             console.error(e);
-            setDeployResult("❌ Error");
+            setDeployResult("Error");
+            setIsError(true);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             alert("Error deploying: " + (e as any).message);
         } finally {
@@ -60,7 +64,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         <div className={`message-row ${isAi ? 'ai' : 'user'}`}>
             <div className="avatar">
                 {isAi ? (
-                     <Sparkles size={20} />
+                     <Bot size={20} />
                 ) : (
                      <User size={20} />
                 )}
@@ -70,10 +74,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                  {isAi && hasJulesPrompt && (
                      !deployResult ? (
                          <button className="deploy-btn" onClick={deploy} disabled={deploying}>
-                             {deploying ? "⏳ Sending..." : "🚀 Start Jules Task"}
+                             {deploying ? (
+                                 <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    Sending...
+                                 </>
+                             ) : (
+                                 <>
+                                    <Rocket size={16} />
+                                    Start Jules Task
+                                 </>
+                             )}
                          </button>
                      ) : (
                          <button className="deploy-btn" disabled>
+                             {isError ? <X size={16} /> : <Check size={16} />}
                              {deployResult}
                          </button>
                      )
