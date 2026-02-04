@@ -112,8 +112,12 @@ def test_chat_tool_execution(client):
 
         # Mock the tool function itself to avoid actual git ops
         dummy_fd = types.FunctionDeclaration(name="dummy", description="dummy")
-        with patch("app.services.git_ops.list_files", return_value=["file1.txt"]), \
-             patch("google.genai.types.FunctionDeclaration.from_callable", return_value=dummy_fd):
+        with patch(
+            "app.services.git_ops.list_files", return_value=["file1.txt"]
+        ), patch(
+            "google.genai.types.FunctionDeclaration.from_callable",
+            return_value=dummy_fd,
+        ):
             response = client.get("/chat?message=list files")
 
             assert response.status_code == 200
