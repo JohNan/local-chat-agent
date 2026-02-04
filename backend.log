@@ -1,9 +1,0 @@
-INFO:     Started server process [3785]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:5000 (Press CTRL+C to quit)
-INFO:     127.0.0.1:35762 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:35762 - "GET /static/dist/assets/index-DYVnDLaY.js HTTP/1.1" 200 OK
-INFO:     127.0.0.1:35764 - "GET /static/dist/assets/index-Ck86iH69.css HTTP/1.1" 200 OK
-INFO:     127.0.0.1:35764 - "GET /api/history?limit=20&offset=0 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:35762 - "GET /api/status HTTP/1.1" 200 OK

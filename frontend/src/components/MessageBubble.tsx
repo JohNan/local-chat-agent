@@ -38,7 +38,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         const markerIndex = text.indexOf(marker);
         let promptText = text;
         if (markerIndex !== -1) {
-            promptText = text.substring(markerIndex);
+            // Extract text AFTER the marker
+            promptText = text.substring(markerIndex + marker.length);
+        }
+
+        // Trim whitespace
+        promptText = promptText.trim();
+
+        if (promptText) {
+            const lines = promptText.split('\n');
+            let title = lines[0];
+            // Remove headers
+            title = title.replace(/^#+\s*/, '');
+            // Remove bold/italic markers
+            title = title.replace(/[\*_]/g, '');
+
+            lines[0] = title.trim();
+            promptText = lines.join('\n');
         }
 
         try {
