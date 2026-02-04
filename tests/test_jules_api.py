@@ -28,10 +28,19 @@ async def test_deploy_to_jules_success():
     mock_session.post.return_value.__aenter__.return_value = mock_response
 
     with patch.dict(os.environ, {"JULES_API_KEY": "test-key"}):
-        with patch("aiohttp.ClientSession", return_value=MagicMock()) as mock_session_cls:
+        with patch(
+            "aiohttp.ClientSession", return_value=MagicMock()
+        ) as mock_session_cls:
             mock_session_cls.return_value.__aenter__.return_value = mock_session
 
             result = await jules_api.deploy_to_jules(prompt, repo_info)
+
+            # Check timeout initialization
+            mock_session_cls.assert_called_once()
+            _, cls_kwargs = mock_session_cls.call_args
+            assert "timeout" in cls_kwargs
+            assert isinstance(cls_kwargs["timeout"], aiohttp.ClientTimeout)
+            assert cls_kwargs["timeout"].total == 30
 
             assert result == {"success": True}
 
@@ -73,7 +82,9 @@ async def test_deploy_to_jules_api_error():
     mock_session.post.return_value.__aenter__.return_value = mock_response
 
     with patch.dict(os.environ, {"JULES_API_KEY": "test-key"}):
-        with patch("aiohttp.ClientSession", return_value=MagicMock()) as mock_session_cls:
+        with patch(
+            "aiohttp.ClientSession", return_value=MagicMock()
+        ) as mock_session_cls:
             mock_session_cls.return_value.__aenter__.return_value = mock_session
 
             with pytest.raises(RuntimeError, match="Jules API Error: 500"):
@@ -87,7 +98,9 @@ async def test_deploy_to_jules_request_exception():
     mock_session.post.side_effect = aiohttp.ClientError("Connection failed")
 
     with patch.dict(os.environ, {"JULES_API_KEY": "test-key"}):
-        with patch("aiohttp.ClientSession", return_value=MagicMock()) as mock_session_cls:
+        with patch(
+            "aiohttp.ClientSession", return_value=MagicMock()
+        ) as mock_session_cls:
             mock_session_cls.return_value.__aenter__.return_value = mock_session
 
             with pytest.raises(aiohttp.ClientError):

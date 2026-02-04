@@ -49,16 +49,13 @@ async def deploy_to_jules(prompt_text, repo_info):
     logger.debug("Deploying to Jules with payload: %s", payload)
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=payload, timeout=30) as response:
+        timeout = aiohttp.ClientTimeout(total=30)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, headers=headers, json=payload) as response:
                 if response.status != 200:
                     text = await response.text()
-                    logger.error(
-                        "Jules API Error: %s - %s", response.status, text
-                    )
-                    raise RuntimeError(
-                        f"Jules API Error: {response.status} - {text}"
-                    )
+                    logger.error("Jules API Error: %s - %s", response.status, text)
+                    raise RuntimeError(f"Jules API Error: {response.status} - {text}")
 
                 return await response.json()
     except aiohttp.ClientError as e:
