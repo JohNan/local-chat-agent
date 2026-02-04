@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, GitPullRequestArrow, Trash2, Eraser } from 'lucide-react';
+import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X } from 'lucide-react';
 import type { RepoStatus } from '../types';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+    model: string;
+    setModel: (model: string) => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ model, setModel }) => {
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [loading, setLoading] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
 
     const updateStatus = async () => {
         try {
@@ -62,25 +68,78 @@ export const Header: React.FC = () => {
     }, []);
 
     return (
-        <div className="header">
-            <div className="header-title">
-                <Bot size={24} />
-                <span>Gemini Agent</span>
+        <>
+            <div className="header">
+                <div className="header-title">
+                    <Bot size={24} />
+                    <span>Gemini Agent</span>
+                </div>
+                <div className="header-controls">
+                    <button onClick={clearContext} className="icon-btn" title="Reset Context">
+                        <Eraser size={20} />
+                    </button>
+                    <button onClick={clearHistory} className="icon-btn" title="Clear History">
+                        <Trash2 size={20} />
+                    </button>
+                    <button onClick={() => setShowSettings(true)} className="icon-btn" title="Settings">
+                        <Settings size={20} />
+                    </button>
+                </div>
             </div>
-            <div className="header-controls">
-                <span style={{ fontSize: '0.9em', color: '#aaa' }}>
-                    📂 <span id="repo-status">{status ? `${status.project} (${status.branch})` : 'Loading...'}</span>
-                </span>
-                <button onClick={gitPull} className="icon-btn" title="Git Pull" disabled={loading}>
-                    <GitPullRequestArrow size={20} />
-                </button>
-                <button onClick={clearContext} className="icon-btn" title="Reset Context">
-                    <Eraser size={20} />
-                </button>
-                <button onClick={clearHistory} className="icon-btn" title="Clear History">
-                    <Trash2 size={20} />
-                </button>
-            </div>
-        </div>
+
+            {showSettings && (
+                <div className="settings-overlay">
+                    <div className="settings-modal">
+                        <div className="settings-header">
+                            <h3>Settings</h3>
+                            <button onClick={() => setShowSettings(false)} className="icon-btn">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="settings-content">
+                             <div className="setting-item">
+                                <label>Repository</label>
+                                <span id="repo-status" style={{ display: 'block', padding: '5px 0' }}>
+                                    {status ? `${status.project} (${status.branch})` : 'Loading...'}
+                                </span>
+                            </div>
+
+                             <div className="setting-item">
+                                <label>Model</label>
+                                <select
+                                    value={model}
+                                    onChange={(e) => setModel(e.target.value)}
+                                    className="model-select"
+                                >
+                                    <option value="gemini-3-pro-preview">gemini-3-pro-preview</option>
+                                    <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp</option>
+                                    <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                                </select>
+                            </div>
+
+                            <div className="setting-actions" style={{ marginTop: '20px' }}>
+                                <button
+                                    onClick={gitPull}
+                                    className="icon-btn"
+                                    title="Git Pull"
+                                    disabled={loading}
+                                    style={{
+                                        border: '1px solid #454545',
+                                        width: '100%',
+                                        justifyContent: 'center',
+                                        gap: '10px',
+                                        padding: '8px'
+                                    }}
+                                >
+                                    <GitPullRequestArrow size={20} />
+                                    <span>Git Pull</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 };

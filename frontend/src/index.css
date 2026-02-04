@@ -215,3 +215,57 @@ code {
     border-top: 1px dashed var(--border-color);
     padding-top: 10px;
 }
+
+/* Settings Modal */
+.settings-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.settings-modal {
+    background-color: var(--chat-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 400px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.settings-header h3 {
+    margin: 0;
+}
+.settings-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+.setting-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.setting-item label {
+    font-size: 0.9em;
+    color: #aaa;
+}
+.model-select {
+    padding: 8px;
+    border-radius: 4px;
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    outline: none;
+}

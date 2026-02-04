@@ -14,6 +14,7 @@ const generateId = () => {
 
 function App() {
     const [messages, setMessages] = useState<Message[]>([]);
+    const [model, setModel] = useState("gemini-3-pro-preview");
     const [toolStatus, setToolStatus] = useState<string | null>(null);
     const [offset, setOffset] = useState(0);
     const [hasMore, setHasMore] = useState(true);
@@ -65,7 +66,7 @@ function App() {
             const response = await fetch('/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text })
+                body: JSON.stringify({ message: text, model })
             });
 
             if (!response.body) throw new Error("No response body");
@@ -206,7 +207,7 @@ function App() {
 
     return (
         <>
-            <Header />
+            <Header model={model} setModel={setModel} />
             <ChatInterface
                 messages={filteredMessages}
                 onLoadHistory={loadHistory}
