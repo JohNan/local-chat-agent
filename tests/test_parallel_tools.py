@@ -4,8 +4,6 @@ Tests for parallel tool execution in agent engine.
 
 import sys
 import os
-import asyncio
-import json
 from unittest.mock import MagicMock, patch, AsyncMock
 import pytest
 from fastapi.testclient import TestClient
@@ -13,12 +11,14 @@ from fastapi.testclient import TestClient
 # Ensure app is importable
 sys.path.append(os.getcwd())
 
-from app.main import app
+from app.main import app  # pylint: disable=wrong-import-position
+
 
 @pytest.fixture(name="client")
 def fixture_client():
     """Fixture to provide a TestClient instance."""
     return TestClient(app)
+
 
 class AsyncIterator:
     """Helper to create an async iterator from a list."""
@@ -27,14 +27,15 @@ class AsyncIterator:
         self.items = items
 
     def __aiter__(self):
-        self.iter = iter(self.items)
+        self.iter = iter(self.items)  # pylint: disable=attribute-defined-outside-init
         return self
 
     async def __anext__(self):
         try:
             return next(self.iter)
-        except StopIteration:
-            raise StopAsyncIteration
+        except StopIteration as e:
+            raise StopAsyncIteration from e
+
 
 def test_parallel_tool_execution(client):
     """Test that multiple tools are executed in parallel."""
@@ -74,14 +75,6 @@ def test_parallel_tool_execution(client):
         # Mock the actual tool implementations with delays to simulate work
         # and verify concurrency (though difficult to prove in unit test, we can check calls)
 
-        async def mock_read_file(filepath):
-            await asyncio.sleep(0.1)
-            return f"Content of {filepath}"
-
-        async def mock_list_files(directory):
-            await asyncio.sleep(0.1)
-            return ["file1.txt", "file2.txt"]
-
         # Note: The real tools are synchronous, but asyncio.to_thread handles them.
         # We can mock them as synchronous functions.
 
@@ -90,7 +83,10 @@ def test_parallel_tool_execution(client):
 
         # Patch the tools in TOOL_MAP directly because agent_engine imports them at module level
         # so patching git_ops directly doesn't update TOOL_MAP
-        with patch.dict("app.agent_engine.TOOL_MAP", {"read_file": mock_read_impl, "list_files": mock_list_impl}):
+        with patch.dict(
+            "app.agent_engine.TOOL_MAP",
+            {"read_file": mock_read_impl, "list_files": mock_list_impl},
+        ):
 
             response = client.get("/chat?message=do both")
 
