@@ -187,7 +187,19 @@ async def chat(request: ChatRequest):
     chat_session = CLIENT.aio.chats.create(
         model="gemini-3-pro-preview",
         config=types.GenerateContentConfig(
-            tools=[git_ops.list_files, git_ops.read_file],
+            tools=[
+                types.Tool(
+                    function_declarations=[
+                        types.FunctionDeclaration.from_callable(
+                            client=CLIENT, callable=git_ops.list_files
+                        ),
+                        types.FunctionDeclaration.from_callable(
+                            client=CLIENT, callable=git_ops.read_file
+                        ),
+                    ],
+                    google_search=types.GoogleSearch(),
+                )
+            ],
             system_instruction=agent_engine.SYSTEM_INSTRUCTION,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(
                 disable=True
@@ -221,7 +233,19 @@ async def chat_get(message: str = Query(...)):
     chat_session = CLIENT.aio.chats.create(
         model="gemini-3-pro-preview",
         config=types.GenerateContentConfig(
-            tools=[git_ops.list_files, git_ops.read_file],
+            tools=[
+                types.Tool(
+                    function_declarations=[
+                        types.FunctionDeclaration.from_callable(
+                            client=CLIENT, callable=git_ops.list_files
+                        ),
+                        types.FunctionDeclaration.from_callable(
+                            client=CLIENT, callable=git_ops.read_file
+                        ),
+                    ],
+                    google_search=types.GoogleSearch(),
+                )
+            ],
             system_instruction=agent_engine.SYSTEM_INSTRUCTION,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(
                 disable=True
