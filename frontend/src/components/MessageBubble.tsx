@@ -9,6 +9,14 @@ interface MessageBubbleProps {
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+    if (message.role === 'system') {
+        return (
+            <div className="context-reset-divider">
+                {message.text || "--- Context Reset ---"}
+            </div>
+        );
+    }
+
     const isAi = message.role === 'model' || message.role === 'ai';
     const text = message.text || message.parts?.[0]?.text || "";
     const [deploying, setDeploying] = useState(false);

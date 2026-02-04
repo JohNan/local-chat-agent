@@ -204,3 +204,14 @@ code {
 .deploy-btn:hover {
     background-color: #2c974b;
 }
+
+/* Context Reset Divider */
+.context-reset-divider {
+    width: 100%;
+    text-align: center;
+    color: #888;
+    font-size: 0.8em;
+    margin: 20px 0;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 10px;
+}

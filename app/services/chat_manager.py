@@ -135,6 +135,11 @@ def _append_optimized(new_message):
                 fcntl.flock(f, fcntl.LOCK_UN)
 
 
+def add_context_marker():
+    """Adds a context reset marker to the history."""
+    save_message("system", "--- Context Reset ---")
+
+
 def save_message(role, text):
     """
     Appends a message to the chat history and saves it.
