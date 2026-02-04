@@ -94,6 +94,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                 )}
             </div>
             <div className="message-bubble">
+                 {message.thought && (
+                    <div className="thought-process">
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>{message.thought}</span>
+                    </div>
+                 )}
                  <div dangerouslySetInnerHTML={renderMarkdown(text)} />
                  {isAi && hasJulesPrompt && (
                      !deployResult ? (
