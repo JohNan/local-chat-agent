@@ -72,10 +72,19 @@ class DeployRequest(BaseModel):
 
 def _format_history(history):
     """Formats chat history for Gemini API, ensuring valid roles."""
+    # Find last system message index
+    start_index = 0
+    for i, msg in enumerate(history):
+        if msg.get("role") == "system":
+            start_index = i + 1
+
+    # Slice effective history
+    history_subset = history[start_index:]
+
     formatted_history = []
     # We need to exclude the very last message (current user msg)
     # when initializing history, because send_message(user_msg) will add it again.
-    history_for_gemini = history[:-1] if history else []
+    history_for_gemini = history_subset[:-1] if history_subset else []
 
     for h in history_for_gemini:
         role = h["role"]
@@ -136,6 +145,19 @@ def api_history(limit: int = 20, offset: int = 0):
     """Retrieves paginated chat history."""
     result = chat_manager.get_history_page(limit, offset)
     return result
+
+
+@app.post("/api/context_reset")
+def api_context_reset():
+    """Inserts a context reset marker."""
+    try:
+        chat_manager.add_context_marker()
+        return {"status": "success"}
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error adding context marker: %s", e)
+        return JSONResponse(
+            status_code=500, content={"status": "error", "error": str(e)}
+        )
 
 
 @app.post("/api/reset")

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, GitPullRequestArrow, Trash2 } from 'lucide-react';
+import { Bot, GitPullRequestArrow, Trash2, Eraser } from 'lucide-react';
 import type { RepoStatus } from '../types';
 
 export const Header: React.FC = () => {
@@ -47,6 +47,16 @@ export const Header: React.FC = () => {
         }
     };
 
+    const clearContext = async () => {
+        if (!confirm("Are you sure you want to reset the AI context?")) return;
+        try {
+            await fetch('/api/context_reset', { method: 'POST' });
+            window.location.reload();
+        } catch (e) {
+            alert("Error resetting context.");
+        }
+    };
+
     useEffect(() => {
         updateStatus();
     }, []);
@@ -63,6 +73,9 @@ export const Header: React.FC = () => {
                 </span>
                 <button onClick={gitPull} className="icon-btn" title="Git Pull" disabled={loading}>
                     <GitPullRequestArrow size={20} />
+                </button>
+                <button onClick={clearContext} className="icon-btn" title="Reset Context">
+                    <Eraser size={20} />
                 </button>
                 <button onClick={clearHistory} className="icon-btn" title="Clear History">
                     <Trash2 size={20} />
