@@ -4,7 +4,7 @@ export interface MessagePart {
 
 export interface Message {
     id: string;
-    role: 'user' | 'model' | 'ai';
+    role: 'user' | 'model' | 'ai' | 'function';
     parts?: MessagePart[];
     text?: string; // Helper for when we flatten it
 }
