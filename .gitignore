@@ -9,3 +9,5 @@ docker-compose.yml
 chat_history.json
 config/
 app/static/dist
+logs/
+*.log

@@ -9,20 +9,51 @@ on:
       - main
 
 jobs:
-  test-and-lint:
+  frontend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: docker build -t gemini-agent .
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv pip install --system -r requirements.txt
 
       - name: Run Tests
-        run: docker run --rm -v ${{ github.workspace }}:/codebase -w /codebase gemini-agent pytest
+        run: pytest
 
       - name: Run Black
-        run: docker run --rm -v ${{ github.workspace }}:/codebase -w /codebase gemini-agent black --check .
+        run: black --check .
 
       - name: Run Pylint
-        run: docker run --rm -v ${{ github.workspace }}:/codebase -w /codebase -e PYTHONPATH=. gemini-agent pylint app/
+        run: PYTHONPATH=. pylint app/

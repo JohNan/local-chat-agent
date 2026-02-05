@@ -1,5 +1,7 @@
 # Gemini Code Agent: Prompt Architect
 
+> **⚠️ Security Warning**: This tool provides read/write access to your filesystem. Run LOCALLY only. DO NOT expose port 5000.
+
 A lightweight, self-hosted web interface that acts as a "Prompt Architect" for another AI agent named "Jules". This tool analyzes your local codebase using Google's Gemini API and Automatic Function Calling to generate precise, high-context prompts.
 
 ## Features
@@ -22,7 +24,12 @@ A lightweight, self-hosted web interface that acts as a "Prompt Architect" for a
     cp .env.example .env
     # Edit .env and paste your GOOGLE_API_KEY
     ```
-3.  **Configure Docker Compose**:
+3.  **Local Setup (Optional)**:
+    For local development, use the setup script which uses `uv` for faster installation:
+    ```bash
+    ./setup_env.sh
+    ```
+4.  **Configure Docker Compose**:
     Copy the example compose file:
     ```bash
     cp docker-compose.example.yml docker-compose.yml
@@ -36,7 +43,7 @@ Run the application using Docker Compose:
 docker-compose up --build
 ```
 
-The current directory is mounted to `/codebase` in the container (read-only).
+The current directory is mounted to `/codebase` in the container.
 
 ## Usage
 
