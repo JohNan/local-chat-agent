@@ -8,6 +8,10 @@
     --border-color: #454545;
     --icon-color: #cccccc;
 }
+html {
+    height: 100%;
+    overflow: hidden;
+}
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: var(--bg-color);
@@ -15,13 +19,15 @@ body {
     margin: 0;
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100%;
+    overflow: hidden;
 }
 #root {
     display: flex;
     flex-direction: column;
     height: 100%;
     width: 100%;
+    overflow: hidden;
 }
 /* Header */
 .header {
@@ -31,6 +37,10 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 .header-title {
     font-weight: bold;
@@ -65,6 +75,7 @@ body {
 .chat-container {
     flex: 1;
     overflow-y: auto;
+    min-height: 0;
     padding: 20px;
     display: flex;
     flex-direction: column;
@@ -119,20 +130,14 @@ body {
     border: 1px solid #ff6b6b;
 }
 
-/* Tools */
-.tool-usage {
-    font-size: 0.9em;
-    color: #aaa;
-    margin-left: 44px;
+/* Thought Process */
+.thought-process {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 5px;
-}
-.tool-usage svg {
-    width: 16px;
-    height: 16px;
-    stroke: #007acc;
+    color: #aaa;
+    font-size: 0.9em;
+    margin-bottom: 8px;
 }
 
 /* Input Area */
@@ -142,6 +147,7 @@ body {
     border-top: 1px solid var(--border-color);
     display: flex;
     gap: 10px;
+    flex-shrink: 0;
 }
 input[type="text"], textarea {
     flex: 1;
