@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useLayoutEffect } from 'react';
-import { Loader2 } from 'lucide-react';
 import type { Message } from '../types';
 import { MessageBubble } from './MessageBubble';
 
@@ -59,15 +58,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHi
 
     return (
         <div className="chat-container" ref={containerRef} onScroll={handleScroll}>
-            {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} />
+            {messages.map((msg, index) => (
+                <MessageBubble
+                    key={msg.id}
+                    message={msg}
+                    toolStatus={index === messages.length - 1 ? toolStatus : null}
+                />
             ))}
-            {toolStatus && (
-                <div className="tool-usage">
-                    <Loader2 size={16} className="animate-spin" />
-                    {toolStatus}
-                </div>
-            )}
         </div>
     );
 };
