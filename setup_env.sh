@@ -3,26 +3,30 @@ set -e  # Stop immediately if a step fails
 
 echo "🛠️  Setting up Python environment for Gemini Agent..."
 
-# 1. Create and activate a virtual environment (Best Practice)
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
+# 1. Install uv if not present
+if ! command -v uv &> /dev/null; then
+    echo "Installing uv..."
+    pip install uv
 fi
+
+# 2. Create virtual environment using uv
+echo "Creating virtual environment..."
+uv venv venv
+
+# 3. Activate venv
 source venv/bin/activate
 
-# 2. Upgrade pip
-pip install --upgrade pip
-
-# 3. Install dependencies from file
+# 4. Install dependencies using uv
 if [ -f "requirements.txt" ]; then
-    pip install -r requirements.txt
+    echo "Installing dependencies..."
+    uv pip install -r requirements.txt
 else
-    # Fallback if file not created yet (first run)
-    pip install flask google-genai markdown
+    echo "requirements.txt not found. Installing default packages..."
+    uv pip install flask google-genai markdown
 fi
 
-# 4. Install tools for code quality (Important for Jules!)
-# 'black' formats code automatically
-# 'pylint' finds errors
-pip install black pylint
+# 5. Install dev tools
+echo "Installing dev tools..."
+uv pip install black pylint
 
-echo "✅ Environment ready! Active venv and dependencies installed."
+echo "✅ Environment ready! Run 'source venv/bin/activate' to start."
