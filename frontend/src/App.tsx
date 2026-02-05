@@ -15,7 +15,7 @@ const generateId = () => {
 function App() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [model, setModel] = useState("gemini-3-pro-preview");
-    const [toolStatus, setToolStatus] = useState<string | null>(null);
+    const [currentToolStatus, setCurrentToolStatus] = useState<string | null>(null);
     const [offset, setOffset] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [loadingHistory, setLoadingHistory] = useState(false);
@@ -123,43 +123,37 @@ function App() {
                             console.error("Failed to parse message data:", data, e);
                         }
                     } else if (eventType === 'tool') {
+                        // Clear the thought text as we are entering tool mode
                         currentText = "";
-                        let cleanStatus = "Executing tools...";
-                        try {
-                            const parsedStatus = JSON.parse(data);
-                            cleanStatus = parsedStatus.replace(/🛠\s*/, '');
-                        } catch (e) {
-                            console.warn("Tool status parse error:", e);
-                        }
-
                         setMessages(prev => {
                             const newMsgs = [...prev];
                             const lastIndex = newMsgs.length - 1;
                             const last = newMsgs[lastIndex];
                             if (last && (last.role === 'model' || last.role === 'ai')) {
-                                newMsgs[lastIndex] = {
-                                    ...last,
-                                    text: "",
-                                    parts: [{ text: "" }],
-                                    thought: cleanStatus
-                                };
+                                newMsgs[lastIndex] = { ...last, text: "", parts: [{ text: "" }] };
                             }
                             return newMsgs;
                         });
+
+                        try {
+                            // Now we expect a JSON string, just like 'message' events
+                            const parsedStatus = JSON.parse(data);
+                            setCurrentToolStatus(parsedStatus);
+                        } catch (e) {
+                            console.warn("Tool status parse error:", e);
+                            // Fallback if something goes wrong, but show the error
+                            setCurrentToolStatus("Executing tools...");
+                        }
                     } else if (eventType === 'done' || eventType === 'error') {
                         if (eventType === 'error') console.error("Stream error:", data);
+                        setCurrentToolStatus(null);
                         // Final update to ensure we didn't miss anything
                         setMessages(prev => {
                             const newMsgs = [...prev];
                             const lastIndex = newMsgs.length - 1;
                             const last = newMsgs[lastIndex];
                             if (last && (last.role === 'model' || last.role === 'ai')) {
-                                newMsgs[lastIndex] = {
-                                    ...last,
-                                    text: currentText,
-                                    parts: [{ text: currentText }],
-                                    thought: undefined
-                                };
+                                newMsgs[lastIndex] = { ...last, text: currentText, parts: [{ text: currentText }] };
                             }
                             return newMsgs;
                         });
@@ -175,21 +169,18 @@ function App() {
                             const lastIndex = newMsgs.length - 1;
                             const last = newMsgs[lastIndex];
                             if (last && (last.role === 'model' || last.role === 'ai')) {
-                                newMsgs[lastIndex] = {
-                                    ...last,
-                                    text: currentText,
-                                    parts: [{ text: currentText }],
-                                    thought: undefined
-                                };
+                                newMsgs[lastIndex] = { ...last, text: currentText, parts: [{ text: currentText }] };
                             }
                             return newMsgs;
                         });
+                        setCurrentToolStatus(null);
                         lastUpdate = now;
                     }
                 }
             }
         } catch (error) {
             console.error("Fetch failed:", error);
+            setCurrentToolStatus(null);
         }
     };
 
@@ -220,6 +211,7 @@ function App() {
             <ChatInterface
                 messages={filteredMessages}
                 onLoadHistory={loadHistory}
+                toolStatus={currentToolStatus}
                 isLoadingHistory={loadingHistory}
             />
             <InputArea onSendMessage={sendMessage} />

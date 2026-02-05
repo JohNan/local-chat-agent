@@ -7,7 +7,6 @@ export interface Message {
     role: 'user' | 'model' | 'ai' | 'function' | 'system';
     parts?: MessagePart[];
     text?: string; // Helper for when we flatten it
-    thought?: string;
 }
 
 export interface HistoryResponse {

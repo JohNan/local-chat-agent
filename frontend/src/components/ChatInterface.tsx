@@ -1,14 +1,16 @@
-import React, { useRef, useLayoutEffect } from 'react';
+import React, { useEffect, useRef, useLayoutEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 import type { Message } from '../types';
 import { MessageBubble } from './MessageBubble';
 
 interface ChatInterfaceProps {
     messages: Message[];
     onLoadHistory: () => void;
+    toolStatus: string | null;
     isLoadingHistory: boolean;
 }
 
-export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHistory, isLoadingHistory }) => {
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHistory, toolStatus, isLoadingHistory }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const prevMsgCountRef = useRef(0);
 
@@ -42,6 +44,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHi
         prevMsgCountRef.current = newCount;
     }, [messages, isLoadingHistory]);
 
+    // Force scroll to bottom on tool status change (active streaming)
+    useEffect(() => {
+        if (toolStatus && containerRef.current) {
+            containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        }
+    }, [toolStatus]);
+
     const handleScroll = () => {
         if (containerRef.current && containerRef.current.scrollTop === 0 && !isLoadingHistory) {
             onLoadHistory();
@@ -53,6 +62,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHi
             {messages.map((msg) => (
                 <MessageBubble key={msg.id} message={msg} />
             ))}
+            {toolStatus && (
+                <div className="tool-usage">
+                    <Loader2 size={16} className="animate-spin" />
+                    {toolStatus}
+                </div>
+            )}
         </div>
     );
 };
