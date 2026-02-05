@@ -8,17 +8,30 @@ It runs on **Python 3.11+** using **FastAPI** and **Google Gemini API**.
 - **Backend:** `app/` package (FastAPI). Entry point is `app/main.py`.
   - Routes: Defined in `app/main.py`.
   - Services: Business logic in `app/services/`.
-- **Frontend:** `app/static/dist/index.html`. Served by FastAPI.
+- **Frontend:** React + Vite (TypeScript). Build artifacts are served by FastAPI at `app/static/dist`.
 - **Container:** Dockerized via `Dockerfile`.
 
 ## Development Rules
 1. **Model:** Always ensure `gemini-3-pro-preview` is used.
-2. **Formatting:** Run `black app/` before submitting any code changes.
+2. **Formatting & Testing:** Run `black .`, `pylint app/`, and `pytest` before committing.
 3. **No Database:** Do NOT add SQL/Vector databases. We use "Function Calling" to read files directly.
 4. **Security:** Never hardcode API keys. Use `os.environ.get("GOOGLE_API_KEY")`.
 
 ## Testing
-To test the server locally inside this environment:
+
+### Backend Tests & Linting
+Run these commands to verify the backend:
+1. `pytest`
+2. `black --check .`
+3. `PYTHONPATH=. pylint app/`
+
+### Frontend Checks
+Run these commands inside the `frontend/` directory:
+1. `npm run lint`
+2. `npm run build`
+
+### Running the Server
+To run the server locally for manual testing:
 1. `source venv/bin/activate` (if applicable)
 2. `export GOOGLE_API_KEY="test_key"` (or use real key from env)
 3. `uvicorn app.main:app --reload`
