@@ -58,7 +58,7 @@ export const Header: React.FC<HeaderProps> = ({ model, setModel }) => {
         try {
             await fetch('/api/context_reset', { method: 'POST' });
             window.location.reload();
-        } catch (e) {
+        } catch {
             alert("Error resetting context.");
         }
     };

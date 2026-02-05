@@ -46,9 +46,56 @@ The current directory is mounted to `/codebase` in the container (read-only).
 3.  The agent will investigate and produce a **Jules Prompt**.
 4.  Copy this prompt and send it to your Jules agent.
 
+## Development / Contributing
+
+To develop locally, you can verify your changes using the following commands:
+
+### Backend Verification
+
+-   **Linting**:
+    ```bash
+    black .
+    PYTHONPATH=. pylint app/
+    ```
+-   **Testing**:
+    ```bash
+    pytest
+    ```
+
+### Frontend Verification
+
+-   **Linting**:
+    ```bash
+    cd frontend && npm run lint
+    ```
+-   **Building**:
+    ```bash
+    cd frontend && npm run build
+    ```
+
+### Docker Verification
+
+To match the CI environment exactly:
+
+1.  **Build the Image**:
+    ```bash
+    docker build -t gemini-agent .
+    ```
+2.  **Run Checks**:
+    ```bash
+    # Run Tests
+    docker run --rm -v $(pwd):/codebase -w /codebase gemini-agent pytest
+
+    # Run Black
+    docker run --rm -v $(pwd):/codebase -w /codebase gemini-agent black --check .
+
+    # Run Pylint
+    docker run --rm -v $(pwd):/codebase -w /codebase -e PYTHONPATH=. gemini-agent pylint app/
+    ```
+
 ## Architecture
 
--   **Backend**: Flask (Python)
+-   **Backend**: FastAPI (Python)
 -   **AI**: Google Gemini 3 Pro Preview
--   **Frontend**: Embedded HTML/JS with Markdown
+-   **Frontend**: React + Vite (TypeScript)
 -   **Deployment**: Docker

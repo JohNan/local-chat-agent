@@ -9,6 +9,10 @@ interface MessageBubbleProps {
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+    const [deploying, setDeploying] = useState(false);
+    const [deployResult, setDeployResult] = useState<string | null>(null);
+    const [isError, setIsError] = useState(false);
+
     if (message.role === 'system') {
         return (
             <div className="context-reset-divider">
@@ -19,9 +23,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
     const isAi = message.role === 'model' || message.role === 'ai';
     const text = message.text || message.parts?.[0]?.text || "";
-    const [deploying, setDeploying] = useState(false);
-    const [deployResult, setDeployResult] = useState<string | null>(null);
-    const [isError, setIsError] = useState(false);
 
     const renderMarkdown = (content: string) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,7 +52,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             // Remove headers
             title = title.replace(/^#+\s*/, '');
             // Remove bold/italic markers
-            title = title.replace(/[\*_]/g, '');
+            title = title.replace(/[*_]/g, '');
 
             lines[0] = title.trim();
             promptText = lines.join('\n');
