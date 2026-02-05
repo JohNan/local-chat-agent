@@ -15,6 +15,10 @@ const generateId = () => {
 function App() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [model, setModel] = useState("gemini-3-pro-preview");
+    const [webSearchEnabled, setWebSearchEnabled] = useState(() => {
+        const saved = localStorage.getItem("webSearchEnabled");
+        return saved !== null ? JSON.parse(saved) : false;
+    });
     const [currentToolStatus, setCurrentToolStatus] = useState<string | null>(null);
     const [offset, setOffset] = useState(0);
     const [hasMore, setHasMore] = useState(true);
@@ -66,7 +70,11 @@ function App() {
             const response = await fetch('/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text, model })
+                body: JSON.stringify({
+                    message: text,
+                    model,
+                    include_web_search: webSearchEnabled
+                })
             });
 
             if (!response.body) throw new Error("No response body");
@@ -178,6 +186,11 @@ function App() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Persist web search preference
+    useEffect(() => {
+        localStorage.setItem("webSearchEnabled", JSON.stringify(webSearchEnabled));
+    }, [webSearchEnabled]);
+
     const filteredMessages = useMemo(() => {
         return messages.filter((m, index) => {
             // Hide function outputs
@@ -195,7 +208,12 @@ function App() {
 
     return (
         <>
-            <Header model={model} setModel={setModel} />
+            <Header
+                model={model}
+                setModel={setModel}
+                webSearchEnabled={webSearchEnabled}
+                setWebSearchEnabled={setWebSearchEnabled}
+            />
             <ChatInterface
                 messages={filteredMessages}
                 onLoadHistory={loadHistory}

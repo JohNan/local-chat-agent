@@ -41,6 +41,11 @@ app.add_middleware(
 
 # --- Configuration ---
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+ENABLE_GOOGLE_SEARCH = os.environ.get("ENABLE_GOOGLE_SEARCH", "false").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 if not GOOGLE_API_KEY:
     logger.warning("Warning: GOOGLE_API_KEY environment variable not set.")
@@ -60,6 +65,7 @@ class ChatRequest(BaseModel):
 
     message: str
     model: str = "gemini-3-pro-preview"
+    include_web_search: bool | None = None
 
 
 class DeployRequest(BaseModel):
@@ -235,24 +241,43 @@ async def chat(request: ChatRequest):
     full_history = chat_manager.load_chat_history()
     formatted_history = _format_history(full_history)
 
+    # Determine if search is enabled
+    if request.include_web_search is not None:
+        enable_search = request.include_web_search
+    else:
+        enable_search = ENABLE_GOOGLE_SEARCH
+
+    # Configure tools
+    function_declarations = [
+        types.FunctionDeclaration.from_callable(
+            client=CLIENT, callable=git_ops.list_files
+        ),
+        types.FunctionDeclaration.from_callable(
+            client=CLIENT, callable=git_ops.read_file
+        ),
+    ]
+
+    google_search_tool = types.GoogleSearch() if enable_search else None
+
+    # Construct tool list
+    tool = types.Tool(
+        function_declarations=function_declarations, google_search=google_search_tool
+    )
+
+    # Configure system instruction
+    system_instruction = agent_engine.SYSTEM_INSTRUCTION
+    if enable_search:
+        system_instruction += (
+            "\n\nYou also have access to Google Search to "
+            "find real-time documentation and solutions."
+        )
+
     # Use native async client
     chat_session = CLIENT.aio.chats.create(
         model=request.model,
         config=types.GenerateContentConfig(
-            tools=[
-                types.Tool(
-                    function_declarations=[
-                        types.FunctionDeclaration.from_callable(
-                            client=CLIENT, callable=git_ops.list_files
-                        ),
-                        types.FunctionDeclaration.from_callable(
-                            client=CLIENT, callable=git_ops.read_file
-                        ),
-                    ],
-                    google_search=types.GoogleSearch(),
-                )
-            ],
-            system_instruction=agent_engine.SYSTEM_INSTRUCTION,
+            tools=[tool],
+            system_instruction=system_instruction,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(
                 disable=True
             ),
