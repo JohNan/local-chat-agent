@@ -123,18 +123,6 @@ function App() {
                             console.error("Failed to parse message data:", data, e);
                         }
                     } else if (eventType === 'tool') {
-                        // Clear the thought text as we are entering tool mode
-                        currentText = "";
-                        setMessages(prev => {
-                            const newMsgs = [...prev];
-                            const lastIndex = newMsgs.length - 1;
-                            const last = newMsgs[lastIndex];
-                            if (last && (last.role === 'model' || last.role === 'ai')) {
-                                newMsgs[lastIndex] = { ...last, text: "", parts: [{ text: "" }] };
-                            }
-                            return newMsgs;
-                        });
-
                         try {
                             // Now we expect a JSON string, just like 'message' events
                             const parsedStatus = JSON.parse(data);

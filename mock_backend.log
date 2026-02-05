@@ -1,0 +1,15 @@
+INFO:     Started server process [4538]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:5000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:43394 - "GET /api/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43406 - "GET /api/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:43420 - "GET /api/history?limit=20&offset=0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43428 - "GET /api/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43444 - "GET /api/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:43446 - "GET /api/history?limit=20&offset=0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43816 - "POST /chat HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [4538]

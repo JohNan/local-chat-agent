@@ -6,9 +6,10 @@ import type { Message } from '../types';
 
 interface MessageBubbleProps {
     message: Message;
+    toolStatus?: string | null;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatus }) => {
     const [deploying, setDeploying] = useState(false);
     const [deployResult, setDeployResult] = useState<string | null>(null);
     const [isError, setIsError] = useState(false);
@@ -44,6 +45,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         }
 
         // Trim whitespace
+        promptText = promptText.trim();
+
+        // Clean markdown code blocks
+        promptText = promptText.replace(/^```(markdown)?\s*/, '');
+        promptText = promptText.replace(/\s*```$/, '');
         promptText = promptText.trim();
 
         if (promptText) {
@@ -96,6 +102,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             </div>
             <div className="message-bubble">
                  <div dangerouslySetInnerHTML={renderMarkdown(text)} />
+                 {isAi && toolStatus && (
+                    <div className="tool-usage" style={{ marginLeft: 0 }}>
+                        <Loader2 size={16} className="animate-spin" />
+                        {toolStatus}
+                    </div>
+                 )}
                  {isAi && hasJulesPrompt && (
                      !deployResult ? (
                          <button className="deploy-btn" onClick={deploy} disabled={deploying}>
