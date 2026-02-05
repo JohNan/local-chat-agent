@@ -221,3 +221,21 @@ code {
     border-top: 1px dashed var(--border-color);
     padding-top: 10px;
 }
+
+/* Mobile Optimization */
+@media (max-width: 768px) {
+    .chat-container {
+        padding: 10px 5px;
+    }
+    .message-row {
+        max-width: 98%;
+        gap: 8px;
+    }
+    .avatar {
+        width: 28px;
+        height: 28px;
+    }
+    .message-bubble {
+        padding: 8px 12px;
+    }
+}
