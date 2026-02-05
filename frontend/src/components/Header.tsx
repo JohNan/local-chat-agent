@@ -5,9 +5,16 @@ import type { RepoStatus } from '../types';
 interface HeaderProps {
     model: string;
     setModel: (model: string) => void;
+    webSearchEnabled: boolean;
+    setWebSearchEnabled: (enabled: boolean) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ model, setModel }) => {
+export const Header: React.FC<HeaderProps> = ({
+    model,
+    setModel,
+    webSearchEnabled,
+    setWebSearchEnabled,
+}) => {
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [loading, setLoading] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
@@ -140,6 +147,19 @@ export const Header: React.FC<HeaderProps> = ({ model, setModel }) => {
                                         </option>
                                     ))}
                                 </select>
+                            </div>
+
+                            <div className="setting-item" style={{ flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    id="web-search-checkbox"
+                                    checked={webSearchEnabled}
+                                    onChange={(e) => setWebSearchEnabled(e.target.checked)}
+                                    style={{ width: 'auto' }}
+                                />
+                                <label htmlFor="web-search-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
+                                    Enable Web Search
+                                </label>
                             </div>
 
                             <div className="setting-actions" style={{ marginTop: '20px' }}>

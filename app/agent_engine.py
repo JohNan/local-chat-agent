@@ -52,6 +52,7 @@ async def _execute_tool(fc):
         except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error executing {fc.name}: {e}"
     else:
+        logger.warning("Unknown tool call: %s", fc.name)
         return f"Error: Tool {fc.name} not found."
 
 
