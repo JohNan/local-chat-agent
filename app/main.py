@@ -59,6 +59,7 @@ class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
 
     message: str
+    model: str = "gemini-3-pro-preview"
 
 
 class DeployRequest(BaseModel):
@@ -214,7 +215,7 @@ async def chat(request: ChatRequest):
 
     # Use native async client
     chat_session = CLIENT.aio.chats.create(
-        model="gemini-3-pro-preview",
+        model=request.model,
         config=types.GenerateContentConfig(
             tools=[
                 types.Tool(
