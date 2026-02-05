@@ -174,6 +174,29 @@ def api_reset():
         )
 
 
+@app.get("/api/models")
+def api_models():
+    """Returns a list of available Gemini models."""
+    if not CLIENT:
+        return JSONResponse(
+            status_code=500, content={"error": "Gemini client not initialized"}
+        )
+    try:
+        models = []
+        for m in CLIENT.models.list():
+            if (
+                "generateContent" in m.supported_actions
+                and m.name.startswith("models/gemini-")
+            ):
+                # Strip "models/" prefix
+                model_name = m.name.replace("models/", "")
+                models.append(model_name)
+        return {"models": models}
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Failed to fetch models: %s", e)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
 @app.post("/api/deploy_to_jules")
 async def deploy_to_jules_route(request: DeployRequest):
     """Endpoint to deploy session to Jules."""

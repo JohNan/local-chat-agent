@@ -11,6 +11,28 @@ export const Header: React.FC<HeaderProps> = ({ model, setModel }) => {
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [loading, setLoading] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [availableModels, setAvailableModels] = useState<string[]>([
+        "gemini-3-pro-preview",
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-pro"
+    ]);
+
+    useEffect(() => {
+        const fetchModels = async () => {
+            try {
+                const res = await fetch('/api/models');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.models && Array.isArray(data.models)) {
+                        setAvailableModels(data.models);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to fetch models:", e);
+            }
+        };
+        fetchModels();
+    }, [showSettings]);
 
     const updateStatus = async () => {
         try {
@@ -112,9 +134,11 @@ export const Header: React.FC<HeaderProps> = ({ model, setModel }) => {
                                     onChange={(e) => setModel(e.target.value)}
                                     className="model-select"
                                 >
-                                    <option value="gemini-3-pro-preview">gemini-3-pro-preview</option>
-                                    <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp</option>
-                                    <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                                    {availableModels.map((m) => (
+                                        <option key={m} value={m}>
+                                            {m}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
 
