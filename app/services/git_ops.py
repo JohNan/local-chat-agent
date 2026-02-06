@@ -7,6 +7,7 @@ import re
 import subprocess
 import logging
 from functools import lru_cache
+import pathspec
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +134,20 @@ def perform_git_pull():
         return {"success": False, "output": str(e)}
 
 
+@lru_cache(maxsize=1)
+def _load_gitignore_spec() -> pathspec.PathSpec:
+    """Loads .gitignore patterns and returns a PathSpec."""
+    ignore_patterns = [".git/", "__pycache__/", "node_modules/", "venv/", ".env"]
+    gitignore_path = os.path.join(CODEBASE_ROOT, ".gitignore")
+    if os.path.exists(gitignore_path):
+        try:
+            with open(gitignore_path, "r", encoding="utf-8") as f:
+                ignore_patterns.extend(f.readlines())
+        except OSError as e:
+            logger.warning("Failed to read .gitignore: %s", e)
+    return pathspec.PathSpec.from_lines("gitignore", ignore_patterns)
+
+
 def list_files(directory: str = ".") -> list[str]:
     """
     Lists all files in the given directory (recursive), ignoring specific directories.
@@ -150,24 +165,33 @@ def list_files(directory: str = ".") -> list[str]:
     if not os.path.exists(base_path):
         return [f"Error: Directory {directory} does not exist."]
 
-    # Pre-calculate offset for relative pathing
-    offset = len(CODEBASE_ROOT)
-    if not CODEBASE_ROOT.endswith(os.sep):
-        offset += 1
+    spec = _load_gitignore_spec()
 
     for root, dirs, files in os.walk(base_path):
-        # Ignore directories
-        dirs[:] = [
-            d
-            for d in dirs
-            if d not in {".git", "__pycache__", "node_modules", "venv", ".env"}
-        ]
+        # Calculate relative path from CODEBASE_ROOT to current 'root'
+        # This is needed to check ignores which are relative to git root
+        rel_root = os.path.relpath(root, CODEBASE_ROOT)
+        if rel_root == ".":
+            rel_root = ""
+
+        # Filter directories in-place to prevent recursion into ignored ones
+        # We iterate over a copy of dirs so we can modify dirs safely
+        valid_dirs = []
+        for d in dirs:
+            # Construct path relative to repo root
+            d_path = os.path.join(rel_root, d)
+            # Check if directory matches ignore patterns
+            # Append slash to ensure it matches directory-only patterns like "dir/"
+            if not spec.match_file(d_path + "/"):
+                valid_dirs.append(d)
+
+        # Update dirs in-place to prune traversal
+        dirs[:] = valid_dirs
 
         for file in files:
-            full_path = os.path.join(root, file)
-            # Get relative path from CODEBASE_ROOT
-            rel_path = full_path[offset:]
-            files_list.append(rel_path)
+            rel_path = os.path.join(rel_root, file)
+            if not spec.match_file(rel_path):
+                files_list.append(rel_path)
 
     logger.debug("Found %d files.", len(files_list))
     return files_list
