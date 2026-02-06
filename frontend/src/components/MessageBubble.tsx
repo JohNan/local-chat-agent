@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { Bot, Loader2, Rocket, Check, X, User } from 'lucide-react';
+import { Bot, Loader2, Rocket, Check, X, User, GitPullRequestArrow, RefreshCw } from 'lucide-react';
 import type { Message } from '../types';
 
 interface MessageBubbleProps {
@@ -13,6 +13,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatu
     const [deploying, setDeploying] = useState(false);
     const [deployResult, setDeployResult] = useState<string | null>(null);
     const [isError, setIsError] = useState(false);
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [statusData, setStatusData] = useState<any>(null);
+    const [checkingStatus, setCheckingStatus] = useState(false);
 
     if (message.role === 'system') {
         return (
@@ -74,6 +78,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatu
             if (data.success) {
                 const sessionName = data.result.name || "Unknown Session";
                 setDeployResult(`Started! (${sessionName})`);
+                setSessionId(data.result.name);
                 setIsError(false);
             } else {
                 setDeployResult("Error: " + data.error);
@@ -89,6 +94,50 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatu
         } finally {
             setDeploying(false);
         }
+    };
+
+    const checkStatus = async () => {
+        if (!sessionId) return;
+        setCheckingStatus(true);
+        try {
+            const response = await fetch(`/api/jules_session/${sessionId}`);
+            const data = await response.json();
+            setStatusData(data);
+        } catch (e) {
+            console.error(e);
+            alert("Error checking status");
+        } finally {
+            setCheckingStatus(false);
+        }
+    };
+
+    const renderStatus = () => {
+        if (!statusData) return null;
+
+        // Find PR URL if exists
+        let prUrl = null;
+        if (statusData.outputs) {
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             statusData.outputs.forEach((output: any) => {
+                 if (output.pullRequest && output.pullRequest.url) {
+                     prUrl = output.pullRequest.url;
+                 }
+             });
+        }
+
+        const state = statusData.state || "UNKNOWN";
+
+        return (
+            <div className="status-box" style={{ marginTop: '10px', fontSize: '0.9em', padding: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px' }}>
+                <div><strong>Status:</strong> {state}</div>
+                {prUrl && (
+                    <a href={prUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '4px', color: '#0969da', textDecoration: 'none' }}>
+                        <GitPullRequestArrow size={14} />
+                        View PR
+                    </a>
+                )}
+            </div>
+        );
     };
 
     return (
@@ -109,26 +158,39 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatu
                     </div>
                  )}
                  {isAi && hasJulesPrompt && (
-                     !deployResult ? (
-                         <button className="deploy-btn" onClick={deploy} disabled={deploying}>
-                             {deploying ? (
-                                 <>
-                                    <Loader2 size={16} className="animate-spin" />
-                                    Sending...
-                                 </>
-                             ) : (
-                                 <>
-                                    <Rocket size={16} />
-                                    Start Jules Task
-                                 </>
-                             )}
-                         </button>
-                     ) : (
-                         <button className="deploy-btn" disabled>
-                             {isError ? <X size={16} /> : <Check size={16} />}
-                             {deployResult}
-                         </button>
-                     )
+                     <div className="jules-controls" style={{ marginTop: '8px' }}>
+                         {!deployResult ? (
+                             <button className="deploy-btn" onClick={deploy} disabled={deploying}>
+                                 {deploying ? (
+                                     <>
+                                        <Loader2 size={16} className="animate-spin" />
+                                        Sending...
+                                     </>
+                                 ) : (
+                                     <>
+                                        <Rocket size={16} />
+                                        Start Jules Task
+                                     </>
+                                 )}
+                             </button>
+                         ) : (
+                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                 <button className="deploy-btn" disabled>
+                                     {isError ? <X size={16} /> : <Check size={16} />}
+                                     {deployResult}
+                                 </button>
+
+                                 {sessionId && !isError && (
+                                     <button className="deploy-btn" onClick={checkStatus} disabled={checkingStatus} style={{ background: '#f0f0f0', color: '#333', border: '1px solid #ccc' }}>
+                                         {checkingStatus ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                                         Check Status
+                                     </button>
+                                 )}
+
+                                 {renderStatus()}
+                             </div>
+                         )}
+                     </div>
                  )}
             </div>
         </div>

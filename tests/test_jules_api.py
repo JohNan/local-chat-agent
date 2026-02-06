@@ -6,7 +6,7 @@ import os
 import sys
 from unittest.mock import MagicMock, patch, AsyncMock
 import pytest
-import httpx
+import aiohttp
 
 # Ensure we can import app from the root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -20,15 +20,21 @@ async def test_deploy_to_jules_success():
     prompt = "Test prompt"
     repo_info = {"source_id": "src-123", "branch": "test-branch"}
 
-    mock_response = MagicMock()
-    mock_response.status_code = 200
+    mock_response = AsyncMock()
+    mock_response.status = 200
     mock_response.json.return_value = {"success": True}
 
-    mock_client = AsyncMock()
-    mock_client.post.return_value = mock_response
+    # Mock the context manager returned by client.post
+    mock_post_ctx = AsyncMock()
+    mock_post_ctx.__aenter__.return_value = mock_response
+
+    mock_client = MagicMock()
+    mock_client.post.return_value = mock_post_ctx
 
     with patch.dict(os.environ, {"JULES_API_KEY": "test-key"}):
-        with patch("httpx.AsyncClient", return_value=MagicMock()) as mock_client_cls:
+        with patch(
+            "aiohttp.ClientSession", return_value=MagicMock()
+        ) as mock_client_cls:
             mock_client_cls.return_value.__aenter__.return_value = mock_client
 
             result = await jules_api.deploy_to_jules(prompt, repo_info)
@@ -43,6 +49,7 @@ async def test_deploy_to_jules_success():
                 kwargs["json"]["sourceContext"]["githubRepoContext"]["startingBranch"]
                 == "test-branch"
             )
+            assert kwargs["json"]["automationMode"] == "AUTO_CREATE_PR"
 
 
 @pytest.mark.asyncio
@@ -65,15 +72,20 @@ async def test_deploy_to_jules_missing_source_id():
 @pytest.mark.asyncio
 async def test_deploy_to_jules_api_error():
     """Test API error."""
-    mock_response = MagicMock()
-    mock_response.status_code = 500
-    mock_response.text = "Internal Error"
+    mock_response = AsyncMock()
+    mock_response.status = 500
+    mock_response.text.return_value = "Internal Error"
 
-    mock_client = AsyncMock()
-    mock_client.post.return_value = mock_response
+    mock_post_ctx = AsyncMock()
+    mock_post_ctx.__aenter__.return_value = mock_response
+
+    mock_client = MagicMock()
+    mock_client.post.return_value = mock_post_ctx
 
     with patch.dict(os.environ, {"JULES_API_KEY": "test-key"}):
-        with patch("httpx.AsyncClient", return_value=MagicMock()) as mock_client_cls:
+        with patch(
+            "aiohttp.ClientSession", return_value=MagicMock()
+        ) as mock_client_cls:
             mock_client_cls.return_value.__aenter__.return_value = mock_client
 
             with pytest.raises(RuntimeError, match="Jules API Error: 500"):
@@ -83,12 +95,41 @@ async def test_deploy_to_jules_api_error():
 @pytest.mark.asyncio
 async def test_deploy_to_jules_request_exception():
     """Test request exception."""
-    mock_client = AsyncMock()
-    mock_client.post.side_effect = httpx.HTTPError("Connection failed")
+    mock_client = MagicMock()
+    mock_client.post.side_effect = aiohttp.ClientError("Connection failed")
 
     with patch.dict(os.environ, {"JULES_API_KEY": "test-key"}):
-        with patch("httpx.AsyncClient", return_value=MagicMock()) as mock_client_cls:
+        with patch(
+            "aiohttp.ClientSession", return_value=MagicMock()
+        ) as mock_client_cls:
             mock_client_cls.return_value.__aenter__.return_value = mock_client
 
-            with pytest.raises(httpx.HTTPError):
+            with pytest.raises(aiohttp.ClientError):
                 await jules_api.deploy_to_jules("prompt", {"source_id": "123"})
+
+
+@pytest.mark.asyncio
+async def test_get_session_status_success():
+    """Test successful status retrieval."""
+    session_name = "sessions/123"
+
+    mock_response = AsyncMock()
+    mock_response.status = 200
+    mock_response.json.return_value = {"state": "SUCCEEDED"}
+
+    mock_get_ctx = AsyncMock()
+    mock_get_ctx.__aenter__.return_value = mock_response
+
+    mock_client = MagicMock()
+    mock_client.get.return_value = mock_get_ctx
+
+    with patch.dict(os.environ, {"JULES_API_KEY": "test-key"}):
+        with patch(
+            "aiohttp.ClientSession", return_value=MagicMock()
+        ) as mock_client_cls:
+            mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+            result = await jules_api.get_session_status(session_name)
+            assert result == {"state": "SUCCEEDED"}
+
+            mock_client.get.assert_called_once()
