@@ -145,7 +145,7 @@ def _load_gitignore_spec() -> pathspec.PathSpec:
                 ignore_patterns.extend(f.readlines())
         except OSError as e:
             logger.warning("Failed to read .gitignore: %s", e)
-    return pathspec.PathSpec.from_lines("gitignore", ignore_patterns)
+    return pathspec.PathSpec.from_lines("gitwildmatch", ignore_patterns)
 
 
 def list_files(directory: str = ".") -> list[str]:

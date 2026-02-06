@@ -1,6 +1,12 @@
-import os
+"""
+Tests for git operations respecting .gitignore.
+"""
+
+# pylint: disable=protected-access, redefined-outer-name, unused-import
+
 import pytest
 from app.services import git_ops
+
 
 @pytest.fixture
 def temp_codebase(tmp_path, mocker):
@@ -10,7 +16,9 @@ def temp_codebase(tmp_path, mocker):
     yield tmp_path
     git_ops._load_gitignore_spec.cache_clear()
 
+
 def test_list_files_respects_gitignore(temp_codebase):
+    """Test that files listed in .gitignore are excluded from list_files."""
     # 1. Setup .gitignore
     gitignore_content = """
 ignored_dir/
@@ -28,7 +36,9 @@ secret.txt
 
     # Ignored directory
     (temp_codebase / "ignored_dir").mkdir()
-    (temp_codebase / "ignored_dir" / "should_not_be_seen.txt").write_text("hidden", encoding="utf-8")
+    (temp_codebase / "ignored_dir" / "should_not_be_seen.txt").write_text(
+        "hidden", encoding="utf-8"
+    )
 
     # Ignored file patterns
     (temp_codebase / "error.log").write_text("error", encoding="utf-8")
@@ -49,13 +59,14 @@ secret.txt
     # Should contain:
     assert "src/main.py" in files
     assert "README.md" in files
-    assert ".gitignore" in files # Usually not ignored unless specified
+    assert ".gitignore" in files  # Usually not ignored unless specified
 
     # Should NOT contain:
     assert "ignored_dir/should_not_be_seen.txt" not in files
     assert "error.log" not in files
     assert "src/app.log" not in files
     assert "secret.txt" not in files
+
 
 def test_list_files_default_ignores(temp_codebase):
     """Test that default ignores (like .git) are still respected even without .gitignore."""
@@ -72,6 +83,7 @@ def test_list_files_default_ignores(temp_codebase):
 
     assert ".git/config" not in files
     assert "node_modules/package.json" not in files
+
 
 def test_list_files_nested_ignore(temp_codebase):
     """Test that ignore rules work for nested files."""
