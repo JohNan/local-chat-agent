@@ -15,6 +15,8 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 CHAT_HISTORY_FILE = os.environ.get("CHAT_HISTORY_FILE", "chat_history.json")
+# Size of the chunk to read from end of file to find the closing bracket
+SCAN_SIZE = 4096
 
 
 def load_chat_history():
@@ -76,8 +78,10 @@ def save_chat_history(history):
 
 
 def _append_optimized(new_message):
-    """Helper to append message using file seeking."""
-    # pylint: disable=too-many-locals
+    """
+    Helper to append message using file seeking to avoid O(N) rewrite.
+    Returns True if successful, False if fallback is needed.
+    """
     if not (
         os.path.exists(CHAT_HISTORY_FILE) and os.path.getsize(CHAT_HISTORY_FILE) > 0
     ):
@@ -90,35 +94,40 @@ def _append_optimized(new_message):
             f.seek(0, os.SEEK_END)
             end_pos = f.tell()
 
-            # Scan backwards for ']'
-            scan_size = min(end_pos, 1024)
-            f.seek(-scan_size, os.SEEK_END)
-            tail = f.read(scan_size)
+            # Scan backwards for the JSON array closing bracket ']'
+            read_size = min(end_pos, SCAN_SIZE)
+            f.seek(-read_size, os.SEEK_END)
+            tail = f.read(read_size)
             last_bracket_idx = tail.rfind(b"]")
 
             if last_bracket_idx == -1:
                 return False
 
-            truncate_pos = end_pos - scan_size + last_bracket_idx
+            # Calculate where the file should be truncated (overwrite ']')
+            truncate_pos = end_pos - read_size + last_bracket_idx
 
-            # Check if array is empty
+            # Determine if the existing list is empty (i.e. "[]")
+            # We scan backwards from the closing bracket looking for non-whitespace
             is_empty_array = False
-            found_char = False
+            found_start = False
 
             # Scan backwards from ']' in the already read 'tail'
+            # Start from the character immediately before ']'
             search_idx = last_bracket_idx - 1
             while search_idx >= 0:
                 char = tail[search_idx : search_idx + 1]
                 if char.strip():
-                    found_char = True
+                    # Found a non-whitespace character
                     if char == b"[":
                         is_empty_array = True
+                    found_start = True
                     break
                 search_idx -= 1
 
-            # If not found in tail, scan further back if needed
-            if not found_char and truncate_pos > 0:
-                # Fallback to full rewrite if we can't easily determine structure
+            # If we didn't find the start character in the tail, we can't be sure
+            # about the structure (it might be a very long array or weird formatting).
+            # Fallback to full rewrite to be safe.
+            if not found_start and truncate_pos > 0:
                 return False
 
             f.seek(truncate_pos)
