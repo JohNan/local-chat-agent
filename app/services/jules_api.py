@@ -55,12 +55,8 @@ async def deploy_to_jules(prompt_text, repo_info):
             async with client.post(url, headers=headers, json=payload) as response:
                 if response.status != 200:
                     text = await response.text()
-                    logger.error(
-                        "Jules API Error: %s - %s", response.status, text
-                    )
-                    raise RuntimeError(
-                        f"Jules API Error: {response.status} - {text}"
-                    )
+                    logger.error("Jules API Error: %s - %s", response.status, text)
+                    raise RuntimeError(f"Jules API Error: {response.status} - {text}")
 
                 return await response.json()
     except aiohttp.ClientError as e:
@@ -96,12 +92,8 @@ async def get_session_status(session_name):
             async with client.get(url, headers=headers) as response:
                 if response.status != 200:
                     text = await response.text()
-                    logger.error(
-                        "Jules API Error: %s - %s", response.status, text
-                    )
-                    raise RuntimeError(
-                        f"Jules API Error: {response.status} - {text}"
-                    )
+                    logger.error("Jules API Error: %s - %s", response.status, text)
+                    raise RuntimeError(f"Jules API Error: {response.status} - {text}")
                 return await response.json()
     except aiohttp.ClientError as e:
         logger.error("Request failed: %s", e)
