@@ -224,6 +224,19 @@ async def deploy_to_jules_route(request: DeployRequest):
         )
 
 
+@app.get("/api/jules_session/{session_name:path}")
+async def get_jules_session_status(session_name: str):
+    """Retrieves the status of a Jules session."""
+    try:
+        result = await jules_api.get_session_status(session_name)
+        return result
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500, content={"success": False, "error": str(e)}
+        )
+
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
     """Handles chat messages (POST)."""
