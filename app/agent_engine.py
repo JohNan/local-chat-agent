@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 TOOL_MAP = {"list_files": git_ops.list_files, "read_file": git_ops.read_file}
 
 SYSTEM_INSTRUCTION = (
+    "Technical Lead Agent\n"
     "You are the Technical Lead and Prompt Architect. "
     "You have **READ-ONLY** access to the user's codebase.\n\n"
     "**CRITICAL RULES:**\n"
@@ -133,7 +134,7 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
 
             joined_descriptions = ", ".join(tool_descriptions)
             # STRICT JSON ENCODING prevents newlines from breaking SSE
-            tool_status_msg = f"🛠 {joined_descriptions}..."
+            tool_status_msg = f"{joined_descriptions}..."
             await queue.put(f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n")
 
             # Parallel Execution
