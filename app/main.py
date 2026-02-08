@@ -268,6 +268,12 @@ async def chat(request: ChatRequest):
         types.FunctionDeclaration.from_callable(
             client=CLIENT, callable=git_ops.read_file
         ),
+        types.FunctionDeclaration.from_callable(
+            client=CLIENT, callable=git_ops.get_file_history
+        ),
+        types.FunctionDeclaration.from_callable(
+            client=CLIENT, callable=git_ops.get_recent_commits
+        ),
     ]
 
     google_search_tool = types.GoogleSearch() if enable_search else None
@@ -331,6 +337,12 @@ async def chat_get(message: str = Query(...)):
                         ),
                         types.FunctionDeclaration.from_callable(
                             client=CLIENT, callable=git_ops.read_file
+                        ),
+                        types.FunctionDeclaration.from_callable(
+                            client=CLIENT, callable=git_ops.get_file_history
+                        ),
+                        types.FunctionDeclaration.from_callable(
+                            client=CLIENT, callable=git_ops.get_recent_commits
                         ),
                     ],
                     google_search=types.GoogleSearch(),

@@ -15,7 +15,12 @@ from app.services import git_ops, chat_manager
 logger = logging.getLogger(__name__)
 
 # Helper for tool map
-TOOL_MAP = {"list_files": git_ops.list_files, "read_file": git_ops.read_file}
+TOOL_MAP = {
+    "list_files": git_ops.list_files,
+    "read_file": git_ops.read_file,
+    "get_file_history": git_ops.get_file_history,
+    "get_recent_commits": git_ops.get_recent_commits,
+}
 
 SYSTEM_INSTRUCTION = (
     "Technical Lead Agent\n"
@@ -129,6 +134,12 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
                     tool_descriptions.append(
                         f"Listing directory '{fc.args.get('directory')}'"
                     )
+                elif fc.name == "get_file_history":
+                    tool_descriptions.append(
+                        f"Getting history for '{fc.args.get('filepath')}'"
+                    )
+                elif fc.name == "get_recent_commits":
+                    tool_descriptions.append("Getting recent commits")
                 else:
                     tool_descriptions.append(f"Running {fc.name}")
 
