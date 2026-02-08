@@ -264,3 +264,78 @@ def read_file(filepath: str, start_line: int = 1, end_line: int = None) -> str:
 
     except OSError as e:
         return f"Error reading file: {str(e)}"
+
+
+def get_file_history(filepath: str, max_count: int = 10) -> str:
+    """
+    Retrieves the git history for a specific file.
+
+    Args:
+        filepath: The path of the file to get history for.
+        max_count: The maximum number of commits to retrieve. Defaults to 10.
+
+    Returns:
+        A string containing the git history, or an error message.
+    """
+    # Sanitize filepath
+    if filepath.startswith("/"):
+        filepath = filepath.lstrip("/")
+
+    try:
+        # Use git log to get the history
+        result = subprocess.run(
+            [
+                "git",
+                "log",
+                "-n",
+                str(max_count),
+                "--pretty=format:%h - %an, %ar : %s",
+                "--",
+                filepath,
+            ],
+            cwd=CODEBASE_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout or "No history found for this file."
+    except subprocess.CalledProcessError as e:
+        logger.error("Git log failed: %s", e.stderr)
+        return f"Error retrieving history: {e.stderr or e.stdout}"
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error retrieving file history: %s", e)
+        return f"Error retrieving history: {str(e)}"
+
+
+def get_recent_commits(max_count: int = 10) -> str:
+    """
+    Retrieves the most recent commits for the repository.
+
+    Args:
+        max_count: The maximum number of commits to retrieve. Defaults to 10.
+
+    Returns:
+        A string containing the recent commits, or an error message.
+    """
+    try:
+        # Use git log to get the recent commits
+        result = subprocess.run(
+            [
+                "git",
+                "log",
+                "-n",
+                str(max_count),
+                "--pretty=format:%h - %an, %ar : %s",
+            ],
+            cwd=CODEBASE_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout or "No recent commits found."
+    except subprocess.CalledProcessError as e:
+        logger.error("Git log failed: %s", e.stderr)
+        return f"Error retrieving recent commits: {e.stderr or e.stdout}"
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error retrieving recent commits: %s", e)
+        return f"Error retrieving recent commits: {str(e)}"
