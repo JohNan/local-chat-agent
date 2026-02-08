@@ -339,3 +339,64 @@ def get_recent_commits(max_count: int = 10) -> str:
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error retrieving recent commits: %s", e)
         return f"Error retrieving recent commits: {str(e)}"
+
+
+def grep_code(query: str, case_sensitive: bool = False) -> str:
+    """
+    Searches the codebase for a specific string pattern.
+    Uses 'git grep' if available, otherwise falls back to 'grep'.
+
+    Args:
+        query: The string to search for.
+        case_sensitive: Whether the search should be case-sensitive. Defaults to False.
+
+    Returns:
+        A string containing the search results (truncated to 2000 chars), or an error message.
+    """
+    try:
+        # Determine grep command
+        # Preferred: git grep -n [-i] "query"
+        cmd = ["git", "grep", "-n"]
+
+        if not case_sensitive:
+            cmd.append("-i")
+
+        cmd.append(query)
+
+        # Check if we are in a git repo
+        is_git_repo = os.path.exists(os.path.join(CODEBASE_ROOT, ".git"))
+
+        if not is_git_repo:
+            # Fallback to standard grep: grep -r -n [-i] "query" .
+            cmd = ["grep", "-r", "-n"]
+            if not case_sensitive:
+                cmd.append("-i")
+            cmd.append(query)
+            cmd.append(".")
+
+        # Execute
+        result = subprocess.run(
+            cmd,
+            cwd=CODEBASE_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,  # Don't raise on grep exit code 1 (no matches)
+        )
+
+        output = result.stdout
+        if result.returncode > 1:
+            # Grep error (exit code 2 usually)
+            return f"Error executing grep: {result.stderr or 'Unknown error'}"
+
+        if not output:
+            return "No matches found."
+
+        # Truncate
+        if len(output) > 2000:
+            return output[:2000] + "\n... [Output truncated to 2000 chars]"
+
+        return output
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error searching code: %s", e)
+        return f"Error searching code: {str(e)}"
