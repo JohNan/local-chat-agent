@@ -1,12 +1,14 @@
 """
 Tests for git_ops.grep_code.
 """
+
 import os
 import shutil
 import tempfile
 from unittest.mock import MagicMock, patch
 import pytest
 from app.services import git_ops
+
 
 @pytest.fixture(name="temp_codebase")
 def fixture_temp_codebase():
@@ -27,6 +29,7 @@ def fixture_temp_codebase():
     git_ops.CODEBASE_ROOT = original_root
     shutil.rmtree(temp_dir)
 
+
 def test_grep_code_basic(temp_codebase):
     """Test grep_code finds a known string."""
     # Ensure fixture is used
@@ -36,12 +39,14 @@ def test_grep_code_basic(temp_codebase):
     assert "def target_function" in result
     assert "test_file.py" in result
 
+
 def test_grep_code_no_matches(temp_codebase):
     """Test grep_code returns 'No matches found.' for a non-existent string."""
     assert os.path.isdir(temp_codebase)
 
     result = git_ops.grep_code("non_existent_string")
     assert result == "No matches found."
+
 
 def test_grep_code_case_insensitive(temp_codebase):
     """Test grep_code handles case insensitivity."""
@@ -54,6 +59,7 @@ def test_grep_code_case_insensitive(temp_codebase):
     # Test 2: Case Sensitive
     result = git_ops.grep_code("TARGET_FUNCTION", case_sensitive=True)
     assert result == "No matches found."
+
 
 def test_grep_code_truncation(temp_codebase):
     """Test grep_code truncates output."""
