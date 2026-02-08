@@ -8,6 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.services import git_ops
 
+
 def test_get_file_outline_python():
     content = """
 class MyClass:
@@ -22,6 +23,7 @@ def global_function():
         assert "class MyClass" in outline
         assert "def method_one" in outline
         assert "def global_function" in outline
+
 
 def test_get_file_outline_kotlin():
     content = """
@@ -40,6 +42,7 @@ class ViewModel : ViewModel() {
         assert "fun MyScreen" in outline
         assert "class ViewModel" in outline
 
+
 def test_get_file_outline_js():
     content = """
 export const myConst = 1;
@@ -55,6 +58,7 @@ class MyComponent extends React.Component {
         assert "export const myConst" in outline
         assert "export function myFunction" in outline
         assert "class MyComponent" in outline
+
 
 def test_read_android_manifest():
     content = """
