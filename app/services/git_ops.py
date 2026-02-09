@@ -532,7 +532,8 @@ def read_android_manifest(manifest_path: str = None) -> str:
         # ElementTree.fromstring can handle it, but sometimes encoding declarations cause issues
         root = ET.fromstring(content)
 
-        # Handle XML namespaces (android:name usually maps to http://schemas.android.com/apk/res/android)
+        # Handle XML namespaces
+        # (android:name usually maps to http://schemas.android.com/apk/res/android)
         ns = {"android": "http://schemas.android.com/apk/res/android"}
 
         package = root.get("package", "Unknown")
