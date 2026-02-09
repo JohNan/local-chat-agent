@@ -14,6 +14,9 @@ from app.services import git_ops, chat_manager
 
 logger = logging.getLogger(__name__)
 
+# Global queue for current task
+CURRENT_TASK_QUEUE = None
+
 # Helper for tool map
 TOOL_MAP = {
     "list_files": git_ops.list_files,
@@ -82,7 +85,9 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
     Background worker that runs the agent loop and pushes events to the queue.
     Decoupled from the HTTP response to ensure completion even if client disconnects.
     """
-    # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-nested-blocks
+    # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-nested-blocks, global-statement
+    global CURRENT_TASK_QUEUE
+    CURRENT_TASK_QUEUE = queue
     current_msg = user_msg
     turn = 0
 
@@ -196,6 +201,7 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
         logger.error("Worker Error: %s", traceback.format_exc())
         await queue.put(f"event: error\ndata: {json.dumps(str(e))}\n\n")
     finally:
+        CURRENT_TASK_QUEUE = None
         # Signal end of queue
         await queue.put(None)
         logger.info("Background worker finished.")
