@@ -41,7 +41,8 @@ SYSTEM_INSTRUCTION = (
     'or "create instructions", you must generate a structured block starting with '
     "`## Jules Prompt` containing the specific context and acceptance criteria. "
     "Every Jules Prompt MUST explicitly instruct the agent to: "
-    "(a) 'First, read the `AGENTS.md` file to understand the project architecture and development rules.' "
+    "(a) 'First, read the `AGENTS.md` file to understand the project architecture "
+    "and development rules.' "
     "(b) 'Update any relevant documentation (e.g. README, docstrings) when the task is done.' "
     "(c) 'Write unit tests to verify the changes.'\n"
     "5. **Visualizing Compose UI:** When analyzing Jetpack Compose code, use `get_file_outline` to "
