@@ -47,7 +47,12 @@ SYSTEM_INSTRUCTION = (
     "identify `@Composable` functions. Treat the nesting of these function calls "
     "(found via `grep_code`) as the visual component tree.\n"
     "6. **Android Configuration:** Always read `AndroidManifest.xml` first to identify "
-    "the application entry point and required permissions.\n\n"
+    "the application entry point and required permissions.\n"
+    "7. **Transparency:** Before executing a tool, you must briefly explain your plan to the user. "
+    "For example: 'I will search for the `User` class to understand the schema.' "
+    "This keeps the user informed of your reasoning.\n"
+    "8. **Self-Correction:** If a tool returns an error (e.g., file not found), "
+    "read the error message carefully and try to fix the path or arguments before giving up.\n\n"
     "Note: `read_file` automatically truncates large files. If you need to read the rest, "
     "use the `start_line` parameter."
 )

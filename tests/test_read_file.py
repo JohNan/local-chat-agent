@@ -78,8 +78,8 @@ def test_read_file_truncation_default(mock_codebase):
 
     assert "Line 2000" in content
     assert "Line 2001" not in content
-    assert "File truncated" in content
-    assert "Showing lines 1-2000" in content
+    assert "Truncated." in content
+    assert "Read limit is 2000 lines" in content
 
 
 def test_read_file_pagination(mock_codebase):
