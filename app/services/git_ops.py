@@ -196,6 +196,15 @@ def list_files(directory: str = ".") -> list[str]:
                 files_list.append(rel_path)
 
     logger.debug("Found %d files.", len(files_list))
+
+    MAX_FILES = 500
+    if len(files_list) > MAX_FILES:
+        original_count = len(files_list)
+        files_list = files_list[:MAX_FILES]
+        files_list.append(
+            f"... [List truncated. Total files: {original_count}. Use a specific directory or 'grep_code' to find files.]"
+        )
+
     return files_list
 
 
@@ -239,15 +248,22 @@ def read_file(filepath: str, start_line: int = 1, end_line: int = None) -> str:
             # 1-based indexing for input, 0-based for slicing
             start_idx = max(0, start_line - 1)
 
-            should_truncate = False
+            MAX_LINES = 2000
+            limit_end = start_line + MAX_LINES - 1
+            truncated_by_limit = False
+
             if end_line is None:
-                if start_line == 1 and total_lines > 2000:
-                    end_idx = 2000
-                    should_truncate = True
+                if total_lines > limit_end:
+                    end_idx = limit_end
+                    truncated_by_limit = True
                 else:
                     end_idx = total_lines
             else:
-                end_idx = end_line
+                if end_line > limit_end:
+                    end_idx = limit_end
+                    truncated_by_limit = True
+                else:
+                    end_idx = end_line
 
             # Handle out of bounds gracefully
             if start_idx >= total_lines:
@@ -256,10 +272,10 @@ def read_file(filepath: str, start_line: int = 1, end_line: int = None) -> str:
             # Python list slicing handles end_idx > len gracefully
             content = "".join(lines[start_idx:end_idx])
 
-            if should_truncate:
+            if truncated_by_limit:
                 content += (
-                    f"\n... [File truncated. Showing lines 1-2000 of {total_lines}. "
-                    "Use start_line=2001 to read more.]"
+                    f"\n... [Truncated. Read limit is {MAX_LINES} lines. "
+                    f"Use start_line={end_idx+1} to read more.]"
                 )
 
             return content
