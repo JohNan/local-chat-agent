@@ -7,8 +7,33 @@ A lightweight, self-hosted web interface that acts as a "Prompt Architect" for a
 ## Features
 
 -   **Prompt Architect**: Generates structured "Jules Prompt" blocks with file paths and acceptance criteria.
+-   **Chat History Persistence**: Chat history is automatically saved to a flat JSON file (`chat_history.json`), allowing you to resume sessions across restarts.
+-   **Lazy Loading**: The frontend efficiently handles large chat histories by lazy loading messages as you scroll up, ensuring high performance.
+-   **Context Reset**: Insert a "Context Reset" marker to start a fresh logical session without deleting your entire history.
+-   **Git Integration**: Perform `git pull` operations directly from the UI to keep your local codebase up-to-date.
 -   **No Vector DB**: Uses real-time file exploration (`list_files`, `read_file`) instead of stale embeddings.
 -   **Lightweight**: Runs on older hardware (no AVX required).
+
+## Available Tools
+
+The agent is equipped with the following tools to explore and understand your codebase:
+
+-   `list_files`: Lists files in a directory (respects `.gitignore`).
+-   `read_file`: Reads the content of a specific file.
+-   `grep_code`: Searches for code patterns using regex.
+-   `get_file_history`: Retrieves the git history of a file.
+-   `get_recent_commits`: Shows the most recent commits in the repository.
+-   `get_file_outline`: Extracts the structure (classes, functions) of a file.
+-   `read_android_manifest`: Parses `AndroidManifest.xml` for package and activity details.
+
+## API Endpoints
+
+The backend exposes several key endpoints:
+
+-   `GET /api/history`: Retrieves paginated chat history.
+-   `GET /api/models`: Lists available Gemini models.
+-   `POST /api/context_reset`: Inserts a context reset marker into the history.
+-   `POST /api/git_pull`: Executes a `git pull` command.
 
 ## Prerequisites
 
@@ -48,10 +73,11 @@ The current directory is mounted to `/codebase` in the container.
 ## Usage
 
 1.  Open `http://localhost:5000`.
-2.  Ask for help with your code.
+2.  **Select Model**: You can dynamically switch between available Gemini models using the dropdown in the header.
+3.  Ask for help with your code.
     -   Example: "Analyze `server.py` and tell me how to add a new route."
-3.  The agent will investigate and produce a **Jules Prompt**.
-4.  Copy this prompt and send it to your Jules agent.
+4.  The agent will investigate and produce a **Jules Prompt**.
+5.  Copy this prompt and send it to your Jules agent.
 
 ## Development / Contributing
 
