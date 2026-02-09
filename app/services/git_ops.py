@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 # Default to /codebase inside Docker, but fallback to current directory for local testing
 CODEBASE_ROOT = os.environ.get("CODEBASE_ROOT", "/codebase")
+MAX_FILES_LIMIT = 500
+MAX_READ_LINES = 2000
 
 
 @lru_cache(maxsize=1)
@@ -197,12 +199,12 @@ def list_files(directory: str = ".") -> list[str]:
 
     logger.debug("Found %d files.", len(files_list))
 
-    MAX_FILES = 500
-    if len(files_list) > MAX_FILES:
+    if len(files_list) > MAX_FILES_LIMIT:
         original_count = len(files_list)
-        files_list = files_list[:MAX_FILES]
+        files_list = files_list[:MAX_FILES_LIMIT]
         files_list.append(
-            f"... [List truncated. Total files: {original_count}. Use a specific directory or 'grep_code' to find files.]"
+            f"... [List truncated. Total files: {original_count}. "
+            "Use a specific directory or 'grep_code' to find files.]"
         )
 
     return files_list
@@ -248,8 +250,7 @@ def read_file(filepath: str, start_line: int = 1, end_line: int = None) -> str:
             # 1-based indexing for input, 0-based for slicing
             start_idx = max(0, start_line - 1)
 
-            MAX_LINES = 2000
-            limit_end = start_line + MAX_LINES - 1
+            limit_end = start_line + MAX_READ_LINES - 1
             truncated_by_limit = False
 
             if end_line is None:
@@ -274,7 +275,7 @@ def read_file(filepath: str, start_line: int = 1, end_line: int = None) -> str:
 
             if truncated_by_limit:
                 content += (
-                    f"\n... [Truncated. Read limit is {MAX_LINES} lines. "
+                    f"\n... [Truncated. Read limit is {MAX_READ_LINES} lines. "
                     f"Use start_line={end_idx+1} to read more.]"
                 )
 
