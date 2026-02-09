@@ -6,6 +6,8 @@ import os
 import re
 import subprocess
 import logging
+import ast
+import xml.etree.ElementTree as ET
 from functools import lru_cache
 import pathspec
 
@@ -400,3 +402,167 @@ def grep_code(query: str, case_sensitive: bool = False) -> str:
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error searching code: %s", e)
         return f"Error searching code: {str(e)}"
+
+
+def _get_outline_python(content: str) -> list[str]:
+    """Helper to outline Python files."""
+    outline = []
+    try:
+        tree = ast.parse(content)
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                outline.append(f"Line {node.lineno}: def {node.name}(...)")
+            elif isinstance(node, ast.ClassDef):
+                outline.append(f"Line {node.lineno}: class {node.name}")
+                for subnode in node.body:
+                    if isinstance(subnode, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        outline.append(
+                            f"  Line {subnode.lineno}: def {subnode.name}(...)"
+                        )
+    except SyntaxError as e:
+        outline.append(f"Error parsing Python file: {e}")
+    return outline
+
+
+def _get_outline_kotlin(content: str) -> list[str]:
+    """Helper to outline Kotlin files."""
+    outline = []
+    pattern = re.compile(
+        r"^\s*((@\w+\s*)*\s*(fun|class|data class|interface|object)\s+[\w<>]+)",
+        re.MULTILINE,
+    )
+    for match in pattern.finditer(content):
+        lineno = content[: match.start()].count("\n") + 1
+        signature = match.group(1).strip().replace("\n", " ")
+        signature = re.sub(r"\s+", " ", signature)
+        outline.append(f"Line {lineno}: {signature}")
+    return outline
+
+
+def _get_outline_js(content: str) -> list[str]:
+    """Helper to outline JS/TS files."""
+    outline = []
+    pattern = re.compile(
+        r"^\s*(export\s+)?(default\s+)?(async\s+)?"
+        r"(function|class|const|let|var|interface|type|enum)\s+([\w$]+)",
+        re.MULTILINE,
+    )
+    for i, line in enumerate(content.splitlines(), 1):
+        match = pattern.search(line)
+        if match:
+            outline.append(f"Line {i}: {match.group(0).strip()}")
+    return outline
+
+
+def get_file_outline(filepath: str) -> str:
+    """
+    Extracts a high-level outline of a file (classes, functions, etc.).
+    Supports Python (.py), Kotlin (.kt), and JS/TS (.js, .ts, .jsx, .tsx).
+
+    Args:
+        filepath: The path of the file to outline.
+
+    Returns:
+        A formatted string describing the file structure.
+    """
+    # Reuse read_file to handle path security and reading
+    content = read_file(filepath)
+    if content.startswith("Error:"):
+        return content
+
+    ext = os.path.splitext(filepath)[1].lower()
+
+    if ext == ".py":
+        outline = _get_outline_python(content)
+    elif ext == ".kt":
+        outline = _get_outline_kotlin(content)
+    elif ext in [".js", ".ts", ".jsx", ".tsx"]:
+        outline = _get_outline_js(content)
+    else:
+        return f"File type {ext} not supported for outline extraction."
+
+    if not outline:
+        return "No structural elements found."
+
+    return "\n".join(outline)
+
+
+def _is_entry_point(activity, ns):
+    """Helper to check if an activity is a main entry point."""
+    ns_uri = ns["android"]
+    for intent_filter in activity.findall("intent-filter"):
+        has_main = False
+        has_launcher = False
+        for action in intent_filter.findall("action"):
+            name = action.get(f"{{{ns_uri}}}name")
+            if not name:
+                name = action.get("android:name")
+            if name == "android.intent.action.MAIN":
+                has_main = True
+        for category in intent_filter.findall("category"):
+            name = category.get(f"{{{ns_uri}}}name")
+            if not name:
+                name = category.get("android:name")
+            if name == "android.intent.category.LAUNCHER":
+                has_launcher = True
+        if has_main and has_launcher:
+            return True
+    return False
+
+
+def read_android_manifest(manifest_path: str = None) -> str:
+    """
+    Parses an AndroidManifest.xml file to extract key configuration details.
+
+    Args:
+        manifest_path: Path to the manifest file. Defaults to 'app/src/main/AndroidManifest.xml'.
+
+    Returns:
+        A formatted string containing package name, permissions, and entry points.
+    """
+    if not manifest_path:
+        manifest_path = "app/src/main/AndroidManifest.xml"
+
+    content = read_file(manifest_path)
+    if content.startswith("Error:"):
+        return content
+
+    try:
+        # Strip XML declaration if present to avoid parsing issues with strings
+        # ElementTree.fromstring can handle it, but sometimes encoding declarations cause issues
+        root = ET.fromstring(content)
+
+        # Handle XML namespaces
+        # (android:name usually maps to http://schemas.android.com/apk/res/android)
+        ns = {"android": "http://schemas.android.com/apk/res/android"}
+
+        package = root.get("package", "Unknown")
+
+        permissions = []
+        for elem in root.findall("uses-permission"):
+            # Try with namespace first, then without
+            name = elem.get(f"{{{ns['android']}}}name") or elem.get("android:name")
+            if name:
+                permissions.append(name)
+
+        activities = []
+        for app_elem in root.findall("application"):
+            for activity in app_elem.findall("activity"):
+                name = activity.get(f"{{{ns['android']}}}name")
+                if not name:
+                    name = activity.get("android:name")
+                is_entry = _is_entry_point(activity, ns)
+                activities.append(f"{name}{' [ENTRY POINT]' if is_entry else ''}")
+
+        output = [
+            f"Package: {package}",
+            "\nPermissions:",
+        ]
+        output.extend([f"- {p}" for p in permissions])
+        output.append("\nActivities:")
+        output.extend([f"- {a}" for a in activities])
+
+        return "\n".join(output)
+
+    except ET.ParseError as e:
+        return f"Error parsing AndroidManifest.xml: {e}"

@@ -21,6 +21,8 @@ TOOL_MAP = {
     "get_file_history": git_ops.get_file_history,
     "get_recent_commits": git_ops.get_recent_commits,
     "grep_code": git_ops.grep_code,
+    "get_file_outline": git_ops.get_file_outline,
+    "read_android_manifest": git_ops.read_android_manifest,
 }
 
 SYSTEM_INSTRUCTION = (
@@ -40,7 +42,12 @@ SYSTEM_INSTRUCTION = (
     "`## Jules Prompt` containing the specific context and acceptance criteria. "
     "Every Jules Prompt MUST explicitly instruct the agent to: "
     "'First, read the `AGENTS.md` file to understand the project architecture "
-    "and development rules before starting any implementation.'\n\n"
+    "and development rules before starting any implementation.'\n"
+    "5. **Visualizing Compose UI:** When analyzing Jetpack Compose code, use `get_file_outline` to "
+    "identify `@Composable` functions. Treat the nesting of these function calls "
+    "(found via `grep_code`) as the visual component tree.\n"
+    "6. **Android Configuration:** Always read `AndroidManifest.xml` first to identify "
+    "the application entry point and required permissions.\n\n"
     "Note: `read_file` automatically truncates large files. If you need to read the rest, "
     "use the `start_line` parameter."
 )
@@ -143,6 +150,10 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
                     )
                 elif fc.name == "get_recent_commits":
                     tool_descriptions.append("Getting recent commits")
+                elif fc.name == "get_file_outline":
+                    tool_descriptions.append(f"Outlining '{fc.args.get('filepath')}'")
+                elif fc.name == "read_android_manifest":
+                    tool_descriptions.append("Reading Android Manifest")
                 else:
                     tool_descriptions.append(f"Running {fc.name}")
 
