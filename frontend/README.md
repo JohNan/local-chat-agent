@@ -1,73 +1,70 @@
-# React + TypeScript + Vite
+# Gemini Code Agent - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This directory contains the React + TypeScript frontend for the Gemini Code Agent. It provides a chat interface to interact with the backend agent, featuring markdown rendering, code highlighting, and tool execution status.
 
-Currently, two official plugins are available:
+## Architecture
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+The frontend is built using **React**, **Vite**, and **TypeScript**.
 
-## React Compiler
+### Key Components
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+-   **`App.tsx`**: The main application component. It manages the global state, including:
+    -   `messages`: The array of chat messages.
+    -   `model`: The currently selected Gemini model.
+    -   `webSearchEnabled`: State for the web search toggle.
+    -   `loadHistory`: Function to fetch paginated history from the backend.
+    -   `sendMessage`: Handles sending user input and processing the streaming response.
 
-## Expanding the ESLint configuration
+-   **`ChatInterface.tsx`**: The main chat view area.
+    -   **Lazy Loading**: Implements efficient scrolling by loading older messages as the user scrolls to the top.
+    -   **Scroll Management**: Uses `useLayoutEffect` to maintain scroll position when history is prepended, preventing "scroll jumping".
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+-   **`MessageBubble.tsx`**: Renders individual chat messages.
+    -   Supports Markdown rendering.
+    -   Displays syntax-highlighted code blocks.
+    -   Shows tool execution status (e.g., "Reading file...").
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+-   **`InputArea.tsx`**: The user input component.
+    -   Handles text input.
+    -   Provides the model selection dropdown.
+    -   Includes the "Deploy to Jules" button.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+-   **`Header.tsx`**: The application header.
+    -   Contains the "Settings" modal for configuration (Git Pull, Repo Status).
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## State Management
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+State is primarily managed in `App.tsx` using standard React hooks (`useState`, `useEffect`, `useCallback`).
+-   **Chat History**: Loaded via the `/api/history` endpoint.
+-   **Streaming**: Chat responses are streamed using Server-Sent Events (SSE), with the `sendMessage` function parsing the stream to update message content and tool status in real-time.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Development
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Prerequisites
+
+-   Node.js (v18+)
+-   npm
+
+### Commands
+
+-   **Install Dependencies**:
+    ```bash
+    npm install
+    ```
+
+-   **Run Development Server**:
+    ```bash
+    npm run dev
+    ```
+    This will start the Vite dev server at `http://localhost:5173`. Note that you need the backend running on port 5000 for API calls to work (proxied via `vite.config.ts`).
+
+-   **Linting**:
+    ```bash
+    npm run lint
+    ```
+
+-   **Build**:
+    ```bash
+    npm run build
+    ```
+    The build artifacts are output to `../app/static/dist` (as configured in `vite.config.ts`) to be served by the FastAPI backend.

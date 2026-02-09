@@ -8,14 +8,17 @@ It runs on **Python 3.11+** using **FastAPI** and **Google Gemini API**.
 - **Backend:** `app/` package (FastAPI). Entry point is `app/main.py`.
   - Routes: Defined in `app/main.py`.
   - Services: Business logic in `app/services/`.
+    - `chat_manager.py`: Handles chat history persistence and pagination.
+    - `git_ops.py`: Git operations and file system tools.
 - **Frontend:** React + Vite (TypeScript). Build artifacts are served by FastAPI at `app/static/dist`.
 - **Container:** Dockerized via `Dockerfile`.
 
 ## Development Rules
 1. **Model:** Always ensure `gemini-3-pro-preview` is used.
 2. **Formatting & Testing:** Run `black .`, `pylint app/`, and `pytest` before committing.
-3. **No Database:** Do NOT add SQL/Vector databases. We use "Function Calling" to read files directly.
+3. **No Database:** Do NOT add SQL/Vector databases. We use "Function Calling" to read files directly. We use flat JSON files for persistence (e.g., `chat_history.json`).
 4. **Security:** Never hardcode API keys. Use `os.environ.get("GOOGLE_API_KEY")`.
+5. **Frontend State:** Complex scroll logic (lazy loading) is handled in `ChatInterface.tsx` using `useLayoutEffect`. Maintain this pattern to prevent scroll jumping.
 
 ## Testing
 
