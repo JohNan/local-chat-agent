@@ -32,7 +32,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatu
     const renderMarkdown = (content: string) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const html = marked.parse(content) as any; // Cast to any to avoid type issues with Promise<string> if marked is misconfigured
-        const cleanHtml = DOMPurify.sanitize(html);
+        const cleanHtml = DOMPurify.sanitize(html, { ADD_TAGS: ['details', 'summary'] });
         return { __html: cleanHtml };
     };
 
