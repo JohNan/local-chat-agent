@@ -10,16 +10,20 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from app.main import app
 from app import agent_engine
 
+
 @pytest.mark.asyncio
 async def test_api_stop_no_active_task():
     """Test /api/stop when no task is running."""
     # Ensure no task is running
     agent_engine.CURRENT_TASK = None
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         response = await ac.post("/api/stop")
     assert response.status_code == 200
     assert response.json() == {"status": "no_active_task"}
+
 
 @pytest.mark.asyncio
 async def test_api_stop_with_active_task():
@@ -38,7 +42,9 @@ async def test_api_stop_with_active_task():
     agent_engine.CURRENT_TASK = task
 
     try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             response = await ac.post("/api/stop")
 
         assert response.status_code == 200

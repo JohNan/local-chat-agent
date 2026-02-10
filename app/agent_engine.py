@@ -84,7 +84,6 @@ async def _execute_tool(fc):
 
 def cancel_current_task():
     """Cancels the current running task."""
-    global CURRENT_TASK
     if CURRENT_TASK and not CURRENT_TASK.done():
         logger.info("Cancelling current task...")
         CURRENT_TASK.cancel()
@@ -238,7 +237,7 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
 
     except asyncio.CancelledError:
         logger.info("Task was cancelled.")
-        await queue.put("event: error\ndata: \"Task was cancelled by user.\"\n\n")
+        await queue.put('event: error\ndata: "Task was cancelled by user."\n\n')
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Worker Error: %s", traceback.format_exc())
         await queue.put(f"event: error\ndata: {json.dumps(str(e))}\n\n")
