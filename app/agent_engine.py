@@ -144,6 +144,8 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
 
             # Decision Point
             if not tool_calls:
+                if reasoning_trace:
+                    reasoning_trace.pop()
                 break
 
             # Execute Tools
@@ -201,26 +203,27 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
             current_msg = response_parts
 
         # Construct Summary
-        summary_markdown = (
-            "\n\n<details><summary>Click to view reasoning and tool usage</summary>\n\n"
-        )
+        if tool_usage_counts or reasoning_trace:
+            summary_markdown = (
+                "\n\n<details><summary>Click to view reasoning and tool usage</summary>\n\n"
+            )
 
-        # Tool Usage
-        if tool_usage_counts:
-            summary_markdown += "#### Tool Usage\n"
-            for tool, count in tool_usage_counts.items():
-                summary_markdown += f"- **{tool}**: {count}\n"
-            summary_markdown += "\n"
+            # Tool Usage
+            if tool_usage_counts:
+                summary_markdown += "#### Tool Usage\n"
+                for tool, count in tool_usage_counts.items():
+                    summary_markdown += f"- **{tool}**: {count}\n"
+                summary_markdown += "\n"
 
-        # Reasoning Trace
-        if reasoning_trace:
-            summary_markdown += "#### Reasoning Trace\n"
-            for i, step in enumerate(reasoning_trace, 1):
-                summary_markdown += f"{i}. {step}\n\n"
+            # Reasoning Trace
+            if reasoning_trace:
+                summary_markdown += "#### Reasoning Trace\n"
+                for i, step in enumerate(reasoning_trace, 1):
+                    summary_markdown += f"{i}. {step}\n\n"
 
-        summary_markdown += "</details>"
+            summary_markdown += "</details>"
 
-        await queue.put(f"event: message\ndata: {json.dumps(summary_markdown)}\n\n")
+            await queue.put(f"event: message\ndata: {json.dumps(summary_markdown)}\n\n")
 
         await queue.put("event: done\ndata: [DONE]\n\n")
 

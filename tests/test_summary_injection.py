@@ -107,7 +107,7 @@ async def test_summary_injection():
                 assert "**list_files**: 1" in msg
                 assert "#### Reasoning Trace" in msg
                 assert "Thinking..." in msg
-                assert "Done." in msg
+                assert "Done." not in msg
 
         assert summary_found, "Summary message not found in queue output"
 
