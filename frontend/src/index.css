@@ -194,8 +194,6 @@ button:disabled {
     cursor: not-allowed;
 }
 pre {
-    background-color: #1e1e1e;
-    padding: 10px;
     border-radius: 4px;
     overflow-x: auto;
 }
