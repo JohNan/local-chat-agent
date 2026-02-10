@@ -7,6 +7,7 @@ import json
 import logging
 import traceback
 import asyncio
+from collections import defaultdict
 
 from google.genai import types
 
@@ -44,10 +45,8 @@ SYSTEM_INSTRUCTION = (
     'or "create instructions", you must generate a structured block starting with '
     "`## Jules Prompt` containing the specific context and acceptance criteria. "
     "Every Jules Prompt MUST explicitly instruct the agent to: "
-    "(a) 'First, read the `AGENTS.md` file to understand the project architecture "
-    "and development rules.' "
-    "(b) 'Update any relevant documentation (e.g. README, docstrings) when the task is done.' "
-    "(c) 'Write unit tests to verify the changes.'\n"
+    "'First, read the `AGENTS.md` file to understand the project architecture "
+    "and development rules before starting any implementation.'\n"
     "5. **Visualizing Compose UI:** When analyzing Jetpack Compose code, use `get_file_outline` to "
     "identify `@Composable` functions. Treat the nesting of these function calls "
     "(found via `grep_code`) as the visual component tree.\n"
@@ -92,6 +91,8 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
     CURRENT_TASK_QUEUE = queue
     current_msg = user_msg
     turn = 0
+    tool_usage_counts = defaultdict(int)
+    reasoning_trace = []
 
     try:
         while turn < 30:
@@ -134,6 +135,7 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
                 full_turn_text = "".join(turn_text_parts)
                 if full_turn_text:
                     chat_manager.save_message("model", full_turn_text)
+                    reasoning_trace.append(full_turn_text)
 
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Turn %d Error: %s", turn, traceback.format_exc())
@@ -148,6 +150,7 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
             logger.debug("[TURN %d] Executing tools...", turn)
             tool_descriptions = []
             for fc in tool_calls:
+                tool_usage_counts[fc.name] += 1
                 if fc.name == "read_file":
                     tool_descriptions.append(
                         f"Reading file '{fc.args.get('filepath')}'"
@@ -196,6 +199,28 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
 
             # Update State
             current_msg = response_parts
+
+        # Construct Summary
+        summary_markdown = (
+            "\n\n<details><summary>Click to view reasoning and tool usage</summary>\n\n"
+        )
+
+        # Tool Usage
+        if tool_usage_counts:
+            summary_markdown += "#### Tool Usage\n"
+            for tool, count in tool_usage_counts.items():
+                summary_markdown += f"- **{tool}**: {count}\n"
+            summary_markdown += "\n"
+
+        # Reasoning Trace
+        if reasoning_trace:
+            summary_markdown += "#### Reasoning Trace\n"
+            for i, step in enumerate(reasoning_trace, 1):
+                summary_markdown += f"{i}. {step}\n\n"
+
+        summary_markdown += "</details>"
+
+        await queue.put(f"event: message\ndata: {json.dumps(summary_markdown)}\n\n")
 
         await queue.put("event: done\ndata: [DONE]\n\n")
 
