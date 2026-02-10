@@ -100,6 +100,7 @@ body {
 }
 .message-bubble {
     padding: 10px 15px;
+    padding-right: 32px;
     border-radius: 8px;
     line-height: 1.5;
     position: relative;
@@ -114,6 +115,27 @@ body {
     background-color: var(--ai-msg-bg);
     color: var(--text-color);
 }
+.copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+}
+
 .error-message {
     color: #ff6b6b;
     border: 1px solid #ff6b6b;

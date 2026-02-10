@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js';
-import { Bot, Loader2, Rocket, Check, X, User, GitPullRequestArrow, RefreshCw } from 'lucide-react';
+import { Bot, Loader2, Rocket, Check, X, User, GitPullRequestArrow, RefreshCw, Copy } from 'lucide-react';
 import type { Message } from '../types';
 
 // Configure marked with highlight.js
@@ -30,6 +30,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatu
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [statusData, setStatusData] = useState<any>(null);
     const [checkingStatus, setCheckingStatus] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     if (message.role === 'system') {
         return (
@@ -41,6 +42,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatu
 
     const isAi = message.role === 'model' || message.role === 'ai';
     const text = message.text || message.parts?.[0]?.text || "";
+
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+        }
+    };
 
     const renderMarkdown = (content: string) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -167,6 +178,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatu
             </div>
             <div className="message-bubble">
                  <div dangerouslySetInnerHTML={renderMarkdown(text)} />
+                 <button
+                    onClick={handleCopy}
+                    className="copy-btn"
+                    title="Copy to clipboard"
+                    aria-label="Copy message"
+                 >
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                 </button>
                  {isAi && toolStatus && (
                     <div className="tool-usage" style={{ marginLeft: 0 }}>
                         <Loader2 size={16} className="animate-spin" />
