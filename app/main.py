@@ -180,6 +180,17 @@ def api_reset():
         )
 
 
+@app.get("/api/stream/active")
+async def stream_active():
+    """Returns the active stream if one exists."""
+    if agent_engine.CURRENT_TASK_QUEUE is not None:
+        return StreamingResponse(
+            stream_generator(agent_engine.CURRENT_TASK_QUEUE),
+            media_type="text/event-stream",
+        )
+    return JSONResponse(status_code=404, content={"active": False})
+
+
 @app.get("/api/models")
 def api_models():
     """Returns a list of available Gemini models."""
