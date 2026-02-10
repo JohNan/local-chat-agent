@@ -12,7 +12,16 @@ marked.use({
             const language = lang || 'plaintext';
             const validLanguage = hljs.getLanguage(language) ? language : 'plaintext';
             const highlighted = hljs.highlight(text, { language: validLanguage }).value;
-            return `<pre><code class="hljs language-${validLanguage}">${highlighted}</code></pre>`;
+            return `
+            <div class="code-block-wrapper">
+                <div class="code-header">
+                    <span class="code-lang">${validLanguage}</span>
+                    <button class="copy-code-btn" aria-label="Copy code">
+                        Copy
+                    </button>
+                </div>
+                <pre><code class="hljs language-${validLanguage}">${highlighted}</code></pre>
+            </div>`;
         }
     }
 });
@@ -57,10 +66,37 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatu
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const html = marked.parse(content) as any; // Cast to any to avoid type issues with Promise<string> if marked is misconfigured
         const cleanHtml = DOMPurify.sanitize(html, {
-            ADD_TAGS: ['details', 'summary', 'pre', 'code'],
-            ADD_ATTR: ['class']
+            ADD_TAGS: ['details', 'summary', 'pre', 'code', 'div', 'button', 'span'],
+            ADD_ATTR: ['class', 'aria-label']
         });
         return { __html: cleanHtml };
+    };
+
+    const handleCodeCopy = (e: React.MouseEvent<HTMLDivElement>) => {
+        const target = e.target as HTMLElement;
+        const btn = target.closest('.copy-code-btn');
+        if (!btn) return;
+
+        const wrapper = btn.closest('.code-block-wrapper');
+        if (!wrapper) return;
+
+        const codeElement = wrapper.querySelector('code');
+        if (!codeElement) return;
+
+        const codeText = codeElement.textContent || "";
+
+        navigator.clipboard.writeText(codeText).then(() => {
+            btn.textContent = 'Copied!';
+            setTimeout(() => {
+                btn.textContent = 'Copy';
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy code: ', err);
+            btn.textContent = 'Error';
+            setTimeout(() => {
+                btn.textContent = 'Copy';
+            }, 2000);
+        });
     };
 
     const hasJulesPrompt = text.includes("## Jules Prompt");
@@ -177,7 +213,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatu
                 )}
             </div>
             <div className="message-bubble">
-                 <div dangerouslySetInnerHTML={renderMarkdown(text)} />
+                 <div dangerouslySetInnerHTML={renderMarkdown(text)} onClick={handleCodeCopy} />
                  <button
                     onClick={handleCopy}
                     className="copy-btn"
