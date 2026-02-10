@@ -96,16 +96,26 @@ def _format_history(history):
     for h in history_for_gemini:
         role = h["role"]
 
-        # FIX: Map 'function' role to 'user' to pass SDK validation
-        if role == "function":
-            role = "user"
-
         parts = []
+        has_function_response = False
         for p in h.get("parts", []):
-            if isinstance(p, dict) and "text" in p:
-                parts.append(types.Part(text=p["text"]))
+            if isinstance(p, dict):
+                if "functionResponse" in p:
+                    has_function_response = True
+                    parts.append(
+                        types.Part.from_function_response(
+                            name=p["functionResponse"]["name"],
+                            response=p["functionResponse"]["response"],
+                        )
+                    )
+                elif "text" in p:
+                    parts.append(types.Part(text=p["text"]))
             elif isinstance(p, str):
                 parts.append(types.Part(text=p))
+
+        # Map 'function' role to 'user' ONLY for legacy text-based function messages
+        if role == "function" and not has_function_response:
+            role = "user"
 
         formatted_history.append({"role": role, "parts": parts})
     return formatted_history
