@@ -267,11 +267,11 @@ async def chat(request: ChatRequest):
     user_msg = request.message
 
     # Save user message first
-    chat_manager.save_message("user", user_msg)
+    await asyncio.to_thread(chat_manager.save_message, "user", user_msg)
 
     # Load history including the message we just saved
-    full_history = chat_manager.load_chat_history()
-    formatted_history = _format_history(full_history)
+    full_history = await asyncio.to_thread(chat_manager.load_chat_history)
+    formatted_history = await asyncio.to_thread(_format_history, full_history)
 
     # Determine if search is enabled
     if request.include_web_search is not None:
@@ -349,9 +349,9 @@ async def chat_get(message: str = Query(...)):
             status_code=500, content={"error": "Gemini client not initialized"}
         )
 
-    chat_manager.save_message("user", message)
-    full_history = chat_manager.load_chat_history()
-    formatted_history = _format_history(full_history)
+    await asyncio.to_thread(chat_manager.save_message, "user", message)
+    full_history = await asyncio.to_thread(chat_manager.load_chat_history)
+    formatted_history = await asyncio.to_thread(_format_history, full_history)
 
     # Use native async client
     chat_session = CLIENT.aio.chats.create(
