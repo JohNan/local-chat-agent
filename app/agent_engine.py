@@ -204,9 +204,9 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
 
         # Construct Summary
         if tool_usage_counts or reasoning_trace:
-            summary_markdown = (
-                "\n\n<details><summary>Click to view reasoning and tool usage</summary>\n\n"
-            )
+            # pylint: disable=line-too-long
+            summary_markdown = "\n\n<details><summary>Click to view reasoning and tool usage</summary>\n\n"
+            # pylint: enable=line-too-long
 
             # Tool Usage
             if tool_usage_counts:
