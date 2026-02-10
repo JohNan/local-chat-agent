@@ -232,7 +232,7 @@ async def deploy_to_jules_route(request: DeployRequest):
                 content={"success": False, "error": "No prompt provided"},
             )
 
-        repo_info = git_ops.get_repo_info()
+        repo_info = await asyncio.to_thread(git_ops.get_repo_info)
         result = await jules_api.deploy_to_jules(prompt_text, repo_info)
         return {"success": True, "result": result}
 
