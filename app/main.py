@@ -180,6 +180,14 @@ def api_reset():
         )
 
 
+@app.post("/api/stop")
+def api_stop():
+    """Stops the current generation task."""
+    if agent_engine.cancel_current_task():
+        return {"status": "stopped"}
+    return {"status": "no_active_task"}
+
+
 @app.get("/api/stream/active")
 async def stream_active():
     """Returns the active stream if one exists."""

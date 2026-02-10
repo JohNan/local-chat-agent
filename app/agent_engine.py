@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Global queue for current task
 CURRENT_TASK_QUEUE = None
+CURRENT_TASK: asyncio.Task | None = None
 
 # Helper for tool map
 TOOL_MAP = {
@@ -81,14 +82,25 @@ async def _execute_tool(fc):
         return f"Error: Tool {fc.name} not found."
 
 
+def cancel_current_task():
+    """Cancels the current running task."""
+    global CURRENT_TASK
+    if CURRENT_TASK and not CURRENT_TASK.done():
+        logger.info("Cancelling current task...")
+        CURRENT_TASK.cancel()
+        return True
+    return False
+
+
 async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
     """
     Background worker that runs the agent loop and pushes events to the queue.
     Decoupled from the HTTP response to ensure completion even if client disconnects.
     """
     # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-nested-blocks, global-statement
-    global CURRENT_TASK_QUEUE
+    global CURRENT_TASK_QUEUE, CURRENT_TASK
     CURRENT_TASK_QUEUE = queue
+    CURRENT_TASK = asyncio.current_task()
     current_msg = user_msg
     turn = 0
     tool_usage_counts = defaultdict(int)
@@ -224,11 +236,15 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
 
         await queue.put("event: done\ndata: [DONE]\n\n")
 
+    except asyncio.CancelledError:
+        logger.info("Task was cancelled.")
+        await queue.put("event: error\ndata: \"Task was cancelled by user.\"\n\n")
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Worker Error: %s", traceback.format_exc())
         await queue.put(f"event: error\ndata: {json.dumps(str(e))}\n\n")
     finally:
         CURRENT_TASK_QUEUE = None
+        CURRENT_TASK = None
         # Signal end of queue
         await queue.put(None)
         logger.info("Background worker finished.")
