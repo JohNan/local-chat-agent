@@ -1,8 +1,21 @@
 import React, { useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import hljs from 'highlight.js';
 import { Bot, Loader2, Rocket, Check, X, User, GitPullRequestArrow, RefreshCw } from 'lucide-react';
 import type { Message } from '../types';
+
+// Configure marked with highlight.js
+marked.use({
+    renderer: {
+        code({ text, lang }: { text: string, lang?: string }) {
+            const language = lang || 'plaintext';
+            const validLanguage = hljs.getLanguage(language) ? language : 'plaintext';
+            const highlighted = hljs.highlight(text, { language: validLanguage }).value;
+            return `<pre><code class="hljs language-${validLanguage}">${highlighted}</code></pre>`;
+        }
+    }
+});
 
 interface MessageBubbleProps {
     message: Message;
@@ -32,7 +45,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatu
     const renderMarkdown = (content: string) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const html = marked.parse(content) as any; // Cast to any to avoid type issues with Promise<string> if marked is misconfigured
-        const cleanHtml = DOMPurify.sanitize(html, { ADD_TAGS: ['details', 'summary'] });
+        const cleanHtml = DOMPurify.sanitize(html, {
+            ADD_TAGS: ['details', 'summary', 'pre', 'code'],
+            ADD_ATTR: ['class']
+        });
         return { __html: cleanHtml };
     };
 
