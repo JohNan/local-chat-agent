@@ -1,40 +1,10 @@
 import unittest
-from unittest.mock import MagicMock, patch
 import sys
 import os
+from google.genai import types
 
 # Add repo root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-# Mock google.genai and types before importing app.main
-sys.modules["google"] = MagicMock()
-sys.modules["google.genai"] = MagicMock()
-types_mock = MagicMock()
-sys.modules["google.genai"].types = types_mock
-
-
-# Mock Part class
-class MockPart:
-    def __init__(self, text=None, function_response=None):
-        self.text = text
-        self.function_response = function_response
-
-    @staticmethod
-    def from_function_response(name, response):
-        return MockPart(function_response={"name": name, "response": response})
-
-    def __eq__(self, other):
-        return (
-            self.text == other.text
-            and self.function_response == other.function_response
-        )
-
-    def __repr__(self):
-        return f"Part(text={self.text}, function_response={self.function_response})"
-
-
-types_mock.Part = MockPart
-types_mock.Part.from_function_response = MockPart.from_function_response
 
 # Now import app.main
 from app import main
@@ -82,9 +52,34 @@ class TestHistoryFormat(unittest.TestCase):
 
         # Expect functionResponse part
         part = formatted[1]["parts"][0]
-        self.assertIsNotNone(part.function_response)
-        self.assertEqual(part.function_response["name"], "my_tool")
-        self.assertEqual(part.function_response["response"]["result"], "tool result")
+
+        # The real types.Part might not expose function_response as a property directly
+        # It's likely hidden or accessed differently. Let's check or inspect.
+        # But we can check via .to_json_dict() or similar if properties fail.
+        # Or inspect the object directly.
+
+        # Based on previous `dir(types.Part)`, it has `function_response` logic internally?
+        # No, `dir` showed `from_function_response` but didn't show an explicit `function_response` property?
+        # Wait, `dir` showed `__pydantic_fields__` etc. It's a Pydantic model.
+        # So it likely has attributes matching the constructor args or fields.
+
+        # Let's try direct attribute access first, but be prepared for failures.
+        # If it fails, we can use `part.model_dump()` or `part.dict()` (since it's pydantic v2/v1 compat).
+
+        try:
+            # Try accessing attribute directly (Pydantic model style)
+            # The field name in `from_function_response` is `response`.
+            # But the part likely stores it in `function_response` or similar.
+            # Let's dump it to be safe.
+            data = part.model_dump(exclude_none=True)
+            self.assertIn("function_response", data)
+            self.assertEqual(data["function_response"]["name"], "my_tool")
+            self.assertEqual(
+                data["function_response"]["response"]["result"], "tool result"
+            )
+        except AttributeError:
+            # Fallback for older pydantic or different structure
+            self.fail(f"Could not inspect part: {part}")
 
 
 if __name__ == "__main__":

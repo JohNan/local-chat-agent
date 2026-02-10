@@ -1,6 +1,6 @@
 [
   {
-    "id": "54ce73f9-d3cc-4d9e-8f97-30599aac1224",
+    "id": "4d96b5a6-859c-436e-aa36-b98358678ee8",
     "role": "user",
     "parts": [
       {
@@ -8,4 +8,83 @@
       }
     ]
   }
+,
+{
+  "id": "9cf4cfda-fdb2-4709-8d82-d76014a58920",
+  "role": "model",
+  "parts": [
+    {
+      "text": "Thinking..."
+    }
+  ]
+}
+,
+{
+  "id": "fb4e0a33-6b3e-4138-bed7-bdc7b08a6b57",
+  "role": "function",
+  "parts": [
+    {
+      "text": "['file1.txt', 'file2.txt']",
+      "functionResponse": {
+        "name": "list_files",
+        "response": {
+          "result": [
+            "file1.txt",
+            "file2.txt"
+          ]
+        }
+      }
+    }
+  ]
+}
+,
+{
+  "id": "de991f9d-b85d-427a-a064-a7d5ad213396",
+  "role": "model",
+  "parts": [
+    {
+      "text": "Done."
+    }
+  ]
+}
+,
+{
+  "id": "85c50950-a75d-4267-b7db-6b77243e51f5",
+  "role": "user",
+  "parts": [
+    {
+      "text": "Search for something"
+    }
+  ]
+}
+,
+{
+  "id": "f089f8f3-0b30-4c44-80c1-43a6eec083a4",
+  "role": "user",
+  "parts": [
+    {
+      "text": "Hello"
+    }
+  ]
+}
+,
+{
+  "id": "6a0f1b3a-68e5-4aa3-a983-5910b2947c95",
+  "role": "user",
+  "parts": [
+    {
+      "text": "Hello"
+    }
+  ]
+}
+,
+{
+  "id": "6add961e-4b52-403e-8996-a5ae07189580",
+  "role": "user",
+  "parts": [
+    {
+      "text": "Hello"
+    }
+  ]
+}
 ]
