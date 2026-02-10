@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import './index.css';
 import { Header } from './components/Header';
 import { ChatInterface } from './components/ChatInterface';
@@ -23,6 +23,8 @@ function App() {
     const [offset, setOffset] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [loadingHistory, setLoadingHistory] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     const loadHistory = useCallback(async () => {
         if (loadingHistory || !hasMore) return;
@@ -205,6 +207,22 @@ function App() {
         }
     };
 
+    const handleStop = async () => {
+        // Client-side abort
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        setIsGenerating(false);
+
+        // Backend abort
+        try {
+            await fetch('/api/stop', { method: 'POST' });
+        } catch (e) {
+            console.error("Failed to stop backend:", e);
+        }
+    };
+
     const sendMessage = async (text: string) => {
         // Add user message
         const userMsg: Message = { id: generateId(), role: 'user', text, parts: [{text}] };
@@ -215,6 +233,10 @@ function App() {
         const aiMsg: Message = { id: generateId(), role: 'model', text: "", parts: [{text: ""}] };
         setMessages(prev => [...prev, aiMsg]);
 
+        setIsGenerating(true);
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         try {
             const response = await fetch('/chat', {
                 method: 'POST',
@@ -223,14 +245,22 @@ function App() {
                     message: text,
                     model,
                     include_web_search: webSearchEnabled
-                })
+                }),
+                signal: controller.signal
             });
 
             await readStream(response, () => {});
 
         } catch (error) {
-            console.error("Fetch failed:", error);
+            if (error instanceof Error && error.name === 'AbortError') {
+                console.log("Generation stopped by user");
+            } else {
+                console.error("Fetch failed:", error);
+            }
             setCurrentToolStatus(null);
+        } finally {
+            setIsGenerating(false);
+            abortControllerRef.current = null;
         }
     };
 
@@ -278,7 +308,11 @@ function App() {
                 toolStatus={currentToolStatus}
                 isLoadingHistory={loadingHistory}
             />
-            <InputArea onSendMessage={sendMessage} />
+            <InputArea
+                onSendMessage={sendMessage}
+                isGenerating={isGenerating}
+                onStop={handleStop}
+            />
         </>
     );
 }
