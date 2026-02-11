@@ -240,7 +240,6 @@ def api_history(limit: int = 20, offset: int = 0):
 @app.post("/api/context_reset")
 def api_context_reset():
     """Inserts a context reset marker."""
-    global CACHE_STATE  # pylint: disable=global-statement
     try:
         chat_manager.add_context_marker()
         CACHE_STATE.clear()  # Invalidate cache
@@ -255,7 +254,6 @@ def api_context_reset():
 @app.post("/api/reset")
 def api_reset():
     """Resets chat history."""
-    global CACHE_STATE  # pylint: disable=global-statement
     try:
         chat_manager.reset_history()
         CACHE_STATE.clear()  # Invalidate cache

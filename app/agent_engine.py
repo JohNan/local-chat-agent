@@ -85,9 +85,11 @@ SYSTEM_INSTRUCTION = (
     "read the error message carefully and try to fix the path or arguments before giving up.\n\n"
     "Note: `read_file` automatically truncates large files. If you need to read the rest, "
     "use the `start_line` parameter.\n\n"
-    "You have access to a secure Python sandbox (Code Execution tool). Use it for complex calculations, "
-    "data processing, or verifying logic. However, for reading/writing files in the user's project, "
-    "you MUST use the provided local tools (`read_file`, `list_files`, etc.) as the sandbox is isolated."
+    "You have access to a secure Python sandbox (Code Execution tool). "
+    "Use it for complex calculations, data processing, or verifying logic. "
+    "However, for reading/writing files in the user's project, "
+    "you MUST use the provided local tools (`read_file`, `list_files`, etc.) "
+    "as the sandbox is isolated."
 )
 
 
