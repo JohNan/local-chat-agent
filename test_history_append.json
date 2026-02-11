@@ -1,6 +1,6 @@
 [
   {
-    "id": "bb239f80-2570-4942-bc16-2dda38e52967",
+    "id": "83c9ed94-cb48-4748-a121-72dc185a4744",
     "role": "user",
     "parts": [
       {
@@ -10,46 +10,17 @@
   }
 ,
 {
-  "id": "390ed86e-7b88-4c61-9c87-66cc4ae76e85",
+  "id": "63de6e39-350a-4bda-a8fb-5e41128acaca",
   "role": "model",
   "parts": [
     {
-      "text": "Thinking..."
+      "text": "Done.\n\n<details><summary>Click to view reasoning and tool usage</summary>\n\n#### Tool Usage\n- **list_files**: 1\n\n#### Reasoning Trace\n1. Thinking...\n\n</details>"
     }
   ]
 }
 ,
 {
-  "id": "e9b76d66-8653-4aff-aa02-d8a56944768d",
-  "role": "function",
-  "parts": [
-    {
-      "text": "['file1.txt', 'file2.txt']",
-      "functionResponse": {
-        "name": "list_files",
-        "response": {
-          "result": [
-            "file1.txt",
-            "file2.txt"
-          ]
-        }
-      }
-    }
-  ]
-}
-,
-{
-  "id": "02309493-0a0c-44f9-8868-8f80f6729893",
-  "role": "model",
-  "parts": [
-    {
-      "text": "Done."
-    }
-  ]
-}
-,
-{
-  "id": "d57717b3-fbda-4dd2-922e-a5820bc6b67a",
+  "id": "60d4c4c1-89c6-4dcb-b379-5ea746aced63",
   "role": "user",
   "parts": [
     {
@@ -59,7 +30,7 @@
 }
 ,
 {
-  "id": "f5737b39-40c9-4608-a3f2-fdcdf8514ccb",
+  "id": "1a00cb06-a1d3-4c3c-a616-1103f984b9e3",
   "role": "user",
   "parts": [
     {
@@ -69,7 +40,7 @@
 }
 ,
 {
-  "id": "9e676536-1fc1-4636-96b5-f401006209fa",
+  "id": "cca48d8d-3f47-4079-9da1-67f9771ce884",
   "role": "user",
   "parts": [
     {
@@ -79,7 +50,7 @@
 }
 ,
 {
-  "id": "e66175a8-1687-4da4-b83a-12d5112fbe7f",
+  "id": "d535b3bd-f67a-43e4-958f-18c72afe5b62",
   "role": "user",
   "parts": [
     {

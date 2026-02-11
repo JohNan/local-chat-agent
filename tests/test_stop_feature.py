@@ -15,7 +15,7 @@ from app import agent_engine
 async def test_api_stop_no_active_task():
     """Test /api/stop when no task is running."""
     # Ensure no task is running
-    agent_engine.CURRENT_TASK = None
+    agent_engine.CURRENT_STATE = None
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -37,9 +37,11 @@ async def test_api_stop_with_active_task():
         except asyncio.CancelledError:
             pass
 
-    # Manually set the CURRENT_TASK
+    # Manually set the CURRENT_STATE
     task = asyncio.create_task(dummy_task())
-    agent_engine.CURRENT_TASK = task
+    state = agent_engine.TaskState()
+    state.task_handle = task
+    agent_engine.CURRENT_STATE = state
 
     try:
         async with AsyncClient(
@@ -63,4 +65,4 @@ async def test_api_stop_with_active_task():
             await task
         except asyncio.CancelledError:
             pass
-        agent_engine.CURRENT_TASK = None
+        agent_engine.CURRENT_STATE = None

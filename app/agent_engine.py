@@ -15,9 +15,34 @@ from app.services import git_ops, chat_manager
 
 logger = logging.getLogger(__name__)
 
-# Global queue for current task
-CURRENT_TASK_QUEUE = None
-CURRENT_TASK: asyncio.Task | None = None
+
+class TaskState:
+    """Manages the state of the active task, including listeners and replay buffer."""
+
+    def __init__(self):
+        self.listeners = []
+        self.replay_buffer = []
+        self.task_handle = asyncio.current_task()
+
+    async def broadcast(self, event: str | None):
+        """Broadcasts an event to all listeners and appends to replay buffer."""
+        if event is not None:
+            self.replay_buffer.append(event)
+
+        # Snapshot listeners to avoid duplicates if a new listener is added during broadcast
+        current_listeners = list(self.listeners)
+        for queue in current_listeners:
+            await queue.put(event)
+
+    def add_listener(self, queue: asyncio.Queue):
+        """Adds a new listener and replays buffered events."""
+        self.listeners.append(queue)
+        for event in self.replay_buffer:
+            queue.put_nowait(event)
+
+
+# Global state for current task
+CURRENT_STATE: TaskState | None = None
 
 # Helper for tool map
 TOOL_MAP = {
@@ -63,6 +88,15 @@ SYSTEM_INSTRUCTION = (
 )
 
 
+def get_active_stream_queue() -> asyncio.Queue | None:
+    """Returns a new queue for the active task stream if it exists."""
+    if CURRENT_STATE:
+        queue = asyncio.Queue()
+        CURRENT_STATE.add_listener(queue)
+        return queue
+    return None
+
+
 async def _execute_tool(fc):
     """
     Executes a single tool call safely in a thread.
@@ -84,26 +118,33 @@ async def _execute_tool(fc):
 
 def cancel_current_task():
     """Cancels the current running task."""
-    if CURRENT_TASK and not CURRENT_TASK.done():
+    if (
+        CURRENT_STATE
+        and CURRENT_STATE.task_handle
+        and not CURRENT_STATE.task_handle.done()
+    ):
         logger.info("Cancelling current task...")
-        CURRENT_TASK.cancel()
+        CURRENT_STATE.task_handle.cancel()
         return True
     return False
 
 
-async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
+async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: str):
     """
     Background worker that runs the agent loop and pushes events to the queue.
     Decoupled from the HTTP response to ensure completion even if client disconnects.
     """
     # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-nested-blocks, global-statement
-    global CURRENT_TASK_QUEUE, CURRENT_TASK
-    CURRENT_TASK_QUEUE = queue
-    CURRENT_TASK = asyncio.current_task()
+    global CURRENT_STATE
+    task_state = TaskState()
+    CURRENT_STATE = task_state
+    task_state.add_listener(initial_queue)
+
     current_msg = user_msg
     turn = 0
     tool_usage_counts = defaultdict(int)
     reasoning_trace = []
+    final_answer = ""
 
     try:
         while turn < 30:
@@ -122,7 +163,7 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
                     try:
                         if chunk.text:
                             turn_text_parts.append(chunk.text)
-                            await queue.put(
+                            await task_state.broadcast(
                                 f"event: message\ndata: {json.dumps(chunk.text)}\n\n"
                             )
                     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -146,11 +187,11 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
                         )
 
                 # End of stream for this turn.
-                # Immediate Persistence: Save the text generated in this turn.
                 full_turn_text = "".join(turn_text_parts)
 
                 # Prepare parts for persistence, including function calls
                 parts_to_save = []
+
                 if full_turn_text:
                     parts_to_save.append({"text": full_turn_text})
 
@@ -168,13 +209,15 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
 
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Turn %d Error: %s", turn, traceback.format_exc())
-                await queue.put(f"event: error\ndata: {json.dumps(str(e))}\n\n")
+                await task_state.broadcast(
+                    f"event: error\ndata: {json.dumps(str(e))}\n\n"
+                )
                 return
 
             # Decision Point
             if not tool_calls:
                 if reasoning_trace:
-                    reasoning_trace.pop()
+                    final_answer = reasoning_trace.pop()
                 break
 
             # Execute Tools
@@ -206,7 +249,9 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
             joined_descriptions = ", ".join(tool_descriptions)
             # STRICT JSON ENCODING prevents newlines from breaking SSE
             tool_status_msg = f"{joined_descriptions}..."
-            await queue.put(f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n")
+            await task_state.broadcast(
+                f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n"
+            )
 
             # Parallel Execution
             tool_results = await asyncio.gather(
@@ -215,24 +260,6 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
 
             response_parts = []
             for fc, result in zip(tool_calls, tool_results):
-                # Immediate Persistence: Save tool output
-                # Using 'function' role to denote tool output, preserving it in history
-                # Run in thread to avoid blocking loop
-                await asyncio.to_thread(
-                    chat_manager.save_message,
-                    "function",
-                    str(result),
-                    parts=[
-                        {
-                            "text": str(result),
-                            "functionResponse": {
-                                "name": fc.name,
-                                "response": {"result": result},
-                            },
-                        }
-                    ],
-                )
-
                 response_parts.append(
                     types.Part.from_function_response(
                         name=fc.name, response={"result": result}
@@ -243,39 +270,56 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
             current_msg = response_parts
 
         # Construct Summary
+        stream_summary_markdown = ""
+
         if tool_usage_counts or reasoning_trace:
             # pylint: disable=line-too-long
-            summary_markdown = "\n\n<details><summary>Click to view reasoning and tool usage</summary>\n\n"
+            stream_summary_markdown = "\n\n<details><summary>Click to view reasoning and tool usage</summary>\n\n"
             # pylint: enable=line-too-long
 
             # Tool Usage
             if tool_usage_counts:
-                summary_markdown += "#### Tool Usage\n"
+                stream_summary_markdown += "#### Tool Usage\n"
                 for tool, count in tool_usage_counts.items():
-                    summary_markdown += f"- **{tool}**: {count}\n"
-                summary_markdown += "\n"
+                    stream_summary_markdown += f"- **{tool}**: {count}\n"
+                stream_summary_markdown += "\n"
 
             # Reasoning Trace
             if reasoning_trace:
-                summary_markdown += "#### Reasoning Trace\n"
+                stream_summary_markdown += "#### Reasoning Trace\n"
                 for i, step in enumerate(reasoning_trace, 1):
-                    summary_markdown += f"{i}. {step}\n\n"
+                    stream_summary_markdown += f"{i}. {step}\n\n"
 
-            summary_markdown += "</details>"
+            stream_summary_markdown += "</details>"
 
-            await queue.put(f"event: message\ndata: {json.dumps(summary_markdown)}\n\n")
+            await task_state.broadcast(
+                f"event: message\ndata: {json.dumps(stream_summary_markdown)}\n\n"
+            )
 
-        await queue.put("event: done\ndata: [DONE]\n\n")
+        # Construct History Summary (includes Final Answer + Details)
+        history_summary = ""
+        if final_answer:
+            history_summary += final_answer
+
+        if stream_summary_markdown:
+            history_summary += stream_summary_markdown
+
+        # Save to history ONLY at the very end
+        if history_summary:
+            await asyncio.to_thread(chat_manager.save_message, "model", history_summary)
+
+        await task_state.broadcast("event: done\ndata: [DONE]\n\n")
 
     except asyncio.CancelledError:
         logger.info("Task was cancelled.")
-        await queue.put('event: error\ndata: "Task was cancelled by user."\n\n')
+        await task_state.broadcast(
+            'event: error\ndata: "Task was cancelled by user."\n\n'
+        )
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Worker Error: %s", traceback.format_exc())
-        await queue.put(f"event: error\ndata: {json.dumps(str(e))}\n\n")
+        await task_state.broadcast(f"event: error\ndata: {json.dumps(str(e))}\n\n")
     finally:
-        CURRENT_TASK_QUEUE = None
-        CURRENT_TASK = None
+        CURRENT_STATE = None
         # Signal end of queue
-        await queue.put(None)
+        await task_state.broadcast(None)
         logger.info("Background worker finished.")
