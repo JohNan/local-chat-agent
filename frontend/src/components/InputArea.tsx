@@ -25,7 +25,7 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, disabled, i
                 placeholder="Ask about your code..."
                 disabled={disabled || isGenerating}
                 onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                         e.preventDefault();
                         if (!disabled && !isGenerating && input.trim()) {
                             handleSend();

@@ -25,18 +25,15 @@ async def test_summary_injection():
         chunk1 = MagicMock()
         chunk1.text = "Here is the plan."
         chunk1.parts = [types.Part(text="Here is the plan.")]
+        chunk1.function_calls = []
         yield chunk1
 
         # Second chunk: tool call
         chunk2 = MagicMock()
         chunk2.text = None
-        chunk2.parts = [
-            types.Part(
-                function_call=types.FunctionCall(
-                    name="list_files", args={"directory": "."}
-                )
-            )
-        ]
+        fc = types.FunctionCall(name="list_files", args={"directory": "."})
+        chunk2.parts = [types.Part(function_call=fc)]
+        chunk2.function_calls = [fc]
         yield chunk2
 
     chat_session.send_message_stream.return_value = mock_stream()
@@ -58,23 +55,21 @@ async def test_summary_injection():
             chunk1 = MagicMock()
             chunk1.text = "Thinking..."
             chunk1.parts = [types.Part(text="Thinking...")]
+            chunk1.function_calls = []
             yield chunk1
 
             chunk2 = MagicMock()
             chunk2.text = None
-            chunk2.parts = [
-                types.Part(
-                    function_call=types.FunctionCall(
-                        name="list_files", args={"directory": "."}
-                    )
-                )
-            ]
+            fc = types.FunctionCall(name="list_files", args={"directory": "."})
+            chunk2.parts = [types.Part(function_call=fc)]
+            chunk2.function_calls = [fc]
             yield chunk2
 
         async def turn_2_stream():
             chunk3 = MagicMock()
             chunk3.text = "Done."
             chunk3.parts = [types.Part(text="Done.")]
+            chunk3.function_calls = []
             yield chunk3
 
         async def mock_send_message_stream(*args, **kwargs):
