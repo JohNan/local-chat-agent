@@ -189,23 +189,8 @@ async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: s
                 # End of stream for this turn.
                 full_turn_text = "".join(turn_text_parts)
 
-                # Prepare parts for persistence, including function calls
-                parts_to_save = []
-
                 if full_turn_text:
-                    parts_to_save.append({"text": full_turn_text})
-
-                for fc in tool_calls:
-                    parts_to_save.append(
-                        {"functionCall": {"name": fc.name, "args": fc.args}}
-                    )
-
-                if parts_to_save:
-                    chat_manager.save_message(
-                        "model", full_turn_text, parts=parts_to_save
-                    )
-                    if full_turn_text:
-                        reasoning_trace.append(full_turn_text)
+                    reasoning_trace.append(full_turn_text)
 
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Turn %d Error: %s", turn, traceback.format_exc())
