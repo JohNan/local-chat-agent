@@ -139,7 +139,7 @@ def get_cached_content_config(
     Context caching is only available for input token counts >= 32,768.
     Returns: (cache_name, history_delta)
     """
-    global CACHE_STATE  # pylint: disable=global-variable-not-assigned
+    global CACHE_STATE  # pylint: disable=global-statement
 
     sys_hash = str(hash(system_instruction))
 
