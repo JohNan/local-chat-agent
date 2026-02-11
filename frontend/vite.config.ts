@@ -15,4 +15,8 @@ export default defineConfig({
     emptyOutDir: true,
   },
   base: '/static/dist/',
+  test: {
+    environment: 'jsdom',
+    globals: true,
+  },
 })

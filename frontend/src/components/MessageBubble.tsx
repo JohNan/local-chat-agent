@@ -40,6 +40,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
     const [statusData, setStatusData] = useState<any>(null);
     const [checkingStatus, setCheckingStatus] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [copyError, setCopyError] = useState(false);
 
     if (message.role === 'system') {
         return (
@@ -56,9 +57,12 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
         try {
             await navigator.clipboard.writeText(text);
             setCopied(true);
+            setCopyError(false);
             setTimeout(() => setCopied(false), 2000);
         } catch (err) {
             console.error('Failed to copy text: ', err);
+            setCopyError(true);
+            setTimeout(() => setCopyError(false), 2000);
         }
     };
 
@@ -216,11 +220,11 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                  <div dangerouslySetInnerHTML={renderMarkdown(text)} onClick={handleCodeCopy} />
                  <button
                     onClick={handleCopy}
-                    className="copy-btn"
-                    title="Copy to clipboard"
+                    className={`copy-btn ${copyError ? 'error-message' : ''}`}
+                    title={copyError ? "Failed to copy" : "Copy to clipboard"}
                     aria-label="Copy message"
                  >
-                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                    {copied ? <Check size={14} /> : copyError ? <X size={14} /> : <Copy size={14} />}
                  </button>
                  {isAi && toolStatus && (
                     <div className="tool-usage" style={{ marginLeft: 0 }}>
