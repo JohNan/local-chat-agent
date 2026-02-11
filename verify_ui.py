@@ -1,6 +1,7 @@
 from playwright.sync_api import sync_playwright, expect
 import time
 
+
 def test_ui_changes(page):
     # Navigate to the frontend
     print("Navigating to frontend...")
@@ -49,7 +50,11 @@ def test_ui_changes(page):
     # Expect the message to appear in the chat history
     print("Waiting for message to appear...")
     # Wait for user message bubble
-    user_message = page.locator(".message-row.user .message-bubble").filter(has_text="Hello World").last
+    user_message = (
+        page.locator(".message-row.user .message-bubble")
+        .filter(has_text="Hello World")
+        .last
+    )
     expect(user_message).to_be_visible()
     print("PASS: Message appeared in chat.")
 
@@ -79,6 +84,7 @@ def test_ui_changes(page):
     # Take screenshot of mobile state
     page.screenshot(path="verify_mobile.png")
     print("Screenshot taken: verify_mobile.png")
+
 
 if __name__ == "__main__":
     with sync_playwright() as p:
