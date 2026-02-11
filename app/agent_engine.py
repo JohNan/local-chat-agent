@@ -11,7 +11,7 @@ from collections import defaultdict
 
 from google.genai import types
 
-from app.services import git_ops, chat_manager
+from app.services import git_ops, chat_manager, rag_manager
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,7 @@ TOOL_MAP = {
     "grep_code": git_ops.grep_code,
     "get_file_outline": git_ops.get_file_outline,
     "read_android_manifest": git_ops.read_android_manifest,
+    "search_codebase_semantic": rag_manager.retrieve_context,
 }
 
 SYSTEM_INSTRUCTION = (
@@ -63,6 +64,8 @@ SYSTEM_INSTRUCTION = (
     "1. **Explore First:** When the user asks a question, "
     "you must **IMMEDIATELY** use `list_files`, `grep_code`, or `read_file` to investigate. "
     "**NEVER** ask the user for file paths or code snippets. Find them yourself.\n"
+    "   - Use `search_codebase_semantic` for high-level questions "
+    "(e.g. 'How does auth work?', 'Where is the User model?').\n"
     "2. **Debug with History:** If analyzing a bug or regression, "
     "use `get_file_history` to understand recent changes and intent before suggesting a fix.\n"
     "3. **Read-Only:** You cannot edit, write, or delete files. "
@@ -233,6 +236,10 @@ async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: s
                     tool_descriptions.append(f"Outlining '{fc.args.get('filepath')}'")
                 elif fc.name == "read_android_manifest":
                     tool_descriptions.append("Reading Android Manifest")
+                elif fc.name == "search_codebase_semantic":
+                    tool_descriptions.append(
+                        f"Searching codebase for '{fc.args.get('query')}'"
+                    )
                 else:
                     tool_descriptions.append(f"Running {fc.name}")
 

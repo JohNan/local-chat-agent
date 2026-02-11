@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from google import genai
 from google.genai import types
 
-from app.services import git_ops, jules_api, chat_manager
+from app.services import git_ops, jules_api, chat_manager, rag_manager
 from app import agent_engine
 
 # Configure logging
@@ -299,6 +299,14 @@ async def chat_stream_active():
     return await stream_active()
 
 
+@app.post("/rag/reindex")
+async def rag_reindex():
+    """Triggers a codebase re-index."""
+    # Run in background
+    asyncio.create_task(asyncio.to_thread(rag_manager.index_codebase_task))
+    return {"status": "indexing started"}
+
+
 @app.get("/api/models")
 def api_models():
     """Returns a list of available Gemini models."""
@@ -402,6 +410,9 @@ async def chat(request: ChatRequest):
         types.FunctionDeclaration.from_callable(
             client=CLIENT, callable=git_ops.read_android_manifest
         ),
+        types.FunctionDeclaration.from_callable(
+            client=CLIENT, callable=rag_manager.retrieve_context
+        ),
     ]
 
     google_search_tool = types.GoogleSearch() if enable_search else None
@@ -500,6 +511,9 @@ async def chat_get(message: str = Query(...)):
                         ),
                         types.FunctionDeclaration.from_callable(
                             client=CLIENT, callable=git_ops.read_android_manifest
+                        ),
+                        types.FunctionDeclaration.from_callable(
+                            client=CLIENT, callable=rag_manager.retrieve_context
                         ),
                     ],
                     google_search=types.GoogleSearch(),
