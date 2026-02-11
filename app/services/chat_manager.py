@@ -37,7 +37,9 @@ def load_chat_history():
         # Sanitization: Remove dangling function calls
         if history and history[-1].get("parts"):
             last_parts = history[-1]["parts"]
-            if any("function_call" in part for part in last_parts):
+            if any(
+                "function_call" in part or "functionCall" in part for part in last_parts
+            ):
                 history.pop()
                 logger.warning(
                     "Detected incomplete function call in history. "
@@ -47,7 +49,10 @@ def load_chat_history():
         # Sanitization: Remove orphaned function responses at start
         if history and history[0].get("parts"):
             first_parts = history[0]["parts"]
-            if any("function_response" in part for part in first_parts):
+            if any(
+                "function_response" in part or "functionResponse" in part
+                for part in first_parts
+            ):
                 history.pop(0)
                 logger.warning(
                     "Detected orphaned function response in history. "
