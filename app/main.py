@@ -201,9 +201,10 @@ def api_stop():
 @app.get("/api/stream/active")
 async def stream_active():
     """Returns the active stream if one exists."""
-    if agent_engine.CURRENT_TASK_QUEUE is not None:
+    queue = agent_engine.get_active_stream_queue()
+    if queue:
         return StreamingResponse(
-            stream_generator(agent_engine.CURRENT_TASK_QUEUE),
+            stream_generator(queue),
             media_type="text/event-stream",
         )
     return JSONResponse(status_code=404, content={"active": False})
