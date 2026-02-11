@@ -11,3 +11,4 @@ config/
 app/static/dist
 logs/
 *.log
+node_modules/
