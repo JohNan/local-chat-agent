@@ -57,6 +57,9 @@ except Exception as e:  # pylint: disable=broad-exception-caught
     logger.error("Failed to initialize Gemini client: %s", e)
     CLIENT = None
 
+# Global cache state
+CACHE_STATE = {}
+
 # --- Models ---
 
 
@@ -128,6 +131,69 @@ def _format_history(history):
     return formatted_history
 
 
+def get_cached_content_config(
+    client, full_history, system_instruction, model, ttl_minutes=60
+):
+    """
+    Gets or creates a cache for the chat history, enabling reuse.
+    Context caching is only available for input token counts >= 32,768.
+    Returns: (cache_name, history_delta)
+    """
+    global CACHE_STATE  # pylint: disable=global-variable-not-assigned
+
+    sys_hash = str(hash(system_instruction))
+
+    # 1. Attempt Reuse
+    if CACHE_STATE:
+        cached_count = CACHE_STATE.get("message_count", 0)
+        cached_sys_hash = CACHE_STATE.get("system_instruction_hash")
+        cached_content_hash = CACHE_STATE.get("content_hash")
+
+        if cached_sys_hash == sys_hash and len(full_history) >= cached_count:
+            prefix = full_history[:cached_count]
+            # Verify prefix matches cached content
+            if str(hash(str(prefix))) == cached_content_hash:
+                delta_history = full_history[cached_count:]
+                # Reuse if delta isn't too large (e.g. < 20 messages)
+                if len(delta_history) <= 20:
+                    return CACHE_STATE["name"], delta_history
+
+    # 2. Check if eligible for new cache
+    total_text = str(system_instruction) + str(full_history)
+    # Threshold: ~100k chars (approx 25k tokens, safe buffer for 32k requirement)
+    if len(total_text) < 100000:
+        # Too small, verify if we should clear stale cache
+        if CACHE_STATE and len(full_history) < CACHE_STATE.get("message_count", 0):
+            CACHE_STATE.clear()
+        return None, full_history
+
+    # 3. Create New Cache
+    try:
+        cache = client.caches.create(
+            model=model,
+            config=types.CreateCachedContentConfig(
+                contents=full_history,
+                system_instruction=system_instruction,
+                ttl=f"{ttl_minutes * 60}s",
+            ),
+        )
+
+        CACHE_STATE = {
+            "name": cache.name,
+            "message_count": len(full_history),
+            "content_hash": str(hash(str(full_history))),
+            "system_instruction_hash": sys_hash,
+        }
+
+        return cache.name, []
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.warning("Failed to create context cache: %s", e)
+        # Clear state if creation failed to avoid stale state issues?
+        # Maybe not necessary, but safer.
+        return None, full_history
+
+
 async def stream_generator(queue: asyncio.Queue):
     """
     Reads from the queue and yields to the client.
@@ -174,8 +240,10 @@ def api_history(limit: int = 20, offset: int = 0):
 @app.post("/api/context_reset")
 def api_context_reset():
     """Inserts a context reset marker."""
+    global CACHE_STATE  # pylint: disable=global-statement
     try:
         chat_manager.add_context_marker()
+        CACHE_STATE.clear()  # Invalidate cache
         return {"status": "success"}
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error adding context marker: %s", e)
@@ -187,8 +255,10 @@ def api_context_reset():
 @app.post("/api/reset")
 def api_reset():
     """Resets chat history."""
+    global CACHE_STATE  # pylint: disable=global-statement
     try:
         chat_manager.reset_history()
+        CACHE_STATE.clear()  # Invalidate cache
         return {"status": "success"}
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error resetting history: %s", e)
@@ -340,7 +410,9 @@ async def chat(request: ChatRequest):
 
     # Construct tool list
     tool = types.Tool(
-        function_declarations=function_declarations, google_search=google_search_tool
+        function_declarations=function_declarations,
+        google_search=google_search_tool,
+        code_execution=types.ToolCodeExecution(),
     )
 
     # Configure system instruction
@@ -351,17 +423,35 @@ async def chat(request: ChatRequest):
             "find real-time documentation and solutions."
         )
 
-    # Use native async client
-    chat_session = CLIENT.aio.chats.create(
-        model=request.model,
-        config=types.GenerateContentConfig(
+    # Context Caching Logic
+    cache_name, history_arg = get_cached_content_config(
+        CLIENT, formatted_history, system_instruction, request.model
+    )
+
+    if cache_name:
+        logger.info("Using context cache: %s", cache_name)
+        config = types.GenerateContentConfig(
+            tools=[tool],
+            cached_content=cache_name,
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                disable=True
+            ),
+        )
+    else:
+        # history_arg is full history in this case
+        config = types.GenerateContentConfig(
             tools=[tool],
             system_instruction=system_instruction,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(
                 disable=True
             ),
-        ),
-        history=formatted_history,
+        )
+
+    # Use native async client
+    chat_session = CLIENT.aio.chats.create(
+        model=request.model,
+        config=config,
+        history=history_arg,
     )
 
     queue = asyncio.Queue()
@@ -415,6 +505,7 @@ async def chat_get(message: str = Query(...)):
                         ),
                     ],
                     google_search=types.GoogleSearch(),
+                    code_execution=types.ToolCodeExecution(),
                 )
             ],
             system_instruction=agent_engine.SYSTEM_INSTRUCTION,
