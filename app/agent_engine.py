@@ -201,7 +201,18 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
                 # Using 'function' role to denote tool output, preserving it in history
                 # Run in thread to avoid blocking loop
                 await asyncio.to_thread(
-                    chat_manager.save_message, "function", str(result)
+                    chat_manager.save_message,
+                    "function",
+                    str(result),
+                    parts=[
+                        {
+                            "text": str(result),
+                            "functionResponse": {
+                                "name": fc.name,
+                                "response": {"result": result},
+                            },
+                        }
+                    ],
                 )
 
                 response_parts.append(

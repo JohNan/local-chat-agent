@@ -96,16 +96,26 @@ def _format_history(history):
     for h in history_for_gemini:
         role = h["role"]
 
-        # FIX: Map 'function' role to 'user' to pass SDK validation
-        if role == "function":
-            role = "user"
-
         parts = []
+        has_function_response = False
         for p in h.get("parts", []):
-            if isinstance(p, dict) and "text" in p:
-                parts.append(types.Part(text=p["text"]))
+            if isinstance(p, dict):
+                if "functionResponse" in p:
+                    has_function_response = True
+                    parts.append(
+                        types.Part.from_function_response(
+                            name=p["functionResponse"]["name"],
+                            response=p["functionResponse"]["response"],
+                        )
+                    )
+                elif "text" in p:
+                    parts.append(types.Part(text=p["text"]))
             elif isinstance(p, str):
                 parts.append(types.Part(text=p))
+
+        # Map 'function' role to 'user' ONLY for legacy text-based function messages
+        if role == "function" and not has_function_response:
+            role = "user"
 
         formatted_history.append({"role": role, "parts": parts})
     return formatted_history
@@ -232,7 +242,7 @@ async def deploy_to_jules_route(request: DeployRequest):
                 content={"success": False, "error": "No prompt provided"},
             )
 
-        repo_info = git_ops.get_repo_info()
+        repo_info = await asyncio.to_thread(git_ops.get_repo_info)
         result = await jules_api.deploy_to_jules(prompt_text, repo_info)
         return {"success": True, "result": result}
 
@@ -271,7 +281,7 @@ async def chat(request: ChatRequest):
 
     # Load history including the message we just saved
     full_history = await asyncio.to_thread(chat_manager.load_chat_history)
-    formatted_history = _format_history(full_history)
+    formatted_history = await asyncio.to_thread(_format_history, full_history)
 
     # Determine if search is enabled
     if request.include_web_search is not None:
@@ -351,7 +361,7 @@ async def chat_get(message: str = Query(...)):
 
     await asyncio.to_thread(chat_manager.save_message, "user", message)
     full_history = await asyncio.to_thread(chat_manager.load_chat_history)
-    formatted_history = _format_history(full_history)
+    formatted_history = await asyncio.to_thread(_format_history, full_history)
 
     # Use native async client
     chat_session = CLIENT.aio.chats.create(

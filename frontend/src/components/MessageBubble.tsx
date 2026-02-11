@@ -31,7 +31,7 @@ interface MessageBubbleProps {
     toolStatus?: string | null;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatus }) => {
+const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolStatus }) => {
     const [deploying, setDeploying] = useState(false);
     const [deployResult, setDeployResult] = useState<string | null>(null);
     const [isError, setIsError] = useState(false);
@@ -267,3 +267,5 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, toolStatu
         </div>
     );
 };
+
+export const MessageBubble = React.memo(MessageBubbleComponent);

@@ -149,11 +149,13 @@ def add_context_marker():
     save_message("system", "--- Context Reset ---")
 
 
-def save_message(role, text):
+def save_message(role, text, parts=None):
     """
     Appends a message to the chat history and saves it.
     """
-    new_message = {"id": str(uuid.uuid4()), "role": role, "parts": [{"text": text}]}
+    if parts is None:
+        parts = [{"text": text}]
+    new_message = {"id": str(uuid.uuid4()), "role": role, "parts": parts}
 
     # Try optimized append
     try:

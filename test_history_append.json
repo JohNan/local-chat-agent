@@ -1,6 +1,6 @@
 [
   {
-    "id": "f74bc507-6cd8-4c49-b1ce-ffe61e4dc9fd",
+    "id": "4d96b5a6-859c-436e-aa36-b98358678ee8",
     "role": "user",
     "parts": [
       {
@@ -10,7 +10,7 @@
   }
 ,
 {
-  "id": "aa64ae4c-281a-4082-9d9b-ae3c5c22c78a",
+  "id": "9cf4cfda-fdb2-4709-8d82-d76014a58920",
   "role": "model",
   "parts": [
     {
@@ -20,17 +20,26 @@
 }
 ,
 {
-  "id": "2f667862-b65e-43f1-8e2a-aae0753240a7",
+  "id": "fb4e0a33-6b3e-4138-bed7-bdc7b08a6b57",
   "role": "function",
   "parts": [
     {
-      "text": "['file1.txt', 'file2.txt']"
+      "text": "['file1.txt', 'file2.txt']",
+      "functionResponse": {
+        "name": "list_files",
+        "response": {
+          "result": [
+            "file1.txt",
+            "file2.txt"
+          ]
+        }
+      }
     }
   ]
 }
 ,
 {
-  "id": "2ee4d08d-3361-43fd-b27a-497228477e5b",
+  "id": "de991f9d-b85d-427a-a064-a7d5ad213396",
   "role": "model",
   "parts": [
     {
@@ -40,7 +49,7 @@
 }
 ,
 {
-  "id": "c28a22fa-560f-453b-ae81-3ddbb3388b56",
+  "id": "85c50950-a75d-4267-b7db-6b77243e51f5",
   "role": "user",
   "parts": [
     {
@@ -50,7 +59,7 @@
 }
 ,
 {
-  "id": "d30abca2-bc2d-447a-b788-b3d57e6d8151",
+  "id": "f089f8f3-0b30-4c44-80c1-43a6eec083a4",
   "role": "user",
   "parts": [
     {
@@ -60,7 +69,7 @@
 }
 ,
 {
-  "id": "e66aff76-b985-4a8d-8983-87454c929138",
+  "id": "6a0f1b3a-68e5-4aa3-a983-5910b2947c95",
   "role": "user",
   "parts": [
     {
@@ -70,7 +79,7 @@
 }
 ,
 {
-  "id": "bd81f088-6dfb-46fa-abef-396ea0e3e2e4",
+  "id": "6add961e-4b52-403e-8996-a5ae07189580",
   "role": "user",
   "parts": [
     {
