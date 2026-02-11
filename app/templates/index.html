@@ -279,11 +279,78 @@
                 } else {
                     hasMoreHistory = false;
                 }
+
+                // Check for active task on initial load
+                if (!isScrollUp && !hasMoreHistory) {
+                    // We only check if we are at the bottom (or it's the first load which is effectively bottom if history is short)
+                    // Actually, logic: if it is initial load (!isScrollUp), we should check.
+                    const statusRes = await fetch('/chat/status');
+                    const statusData = await statusRes.json();
+
+                    if (statusData.active) {
+                        const aiRow = createMessageElement('model', '');
+                        chatContainer.appendChild(aiRow);
+                        const aiBubble = aiRow.querySelector('.message-bubble');
+                        streamEvents('/chat/stream_active', aiBubble);
+                    }
+                }
+
             } catch (e) {
                 console.error("Failed to load history:", e);
             } finally {
                 isLoadingHistory = false;
             }
+        }
+
+        function streamEvents(url, targetBubble) {
+            const source = new EventSource(url);
+            let currentAiText = targetBubble.dataset.raw || "";
+
+            // Remove any existing status indicator
+            removeStatusIndicator();
+            scrollToBottom();
+
+            source.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    currentAiText += data;
+                    targetBubble.dataset.raw = currentAiText;
+                    targetBubble.innerHTML = marked.parse(currentAiText);
+
+                    // Check for Jules Prompt marker
+                    if (currentAiText.includes("## Jules Prompt")) {
+                        addDeployButton(targetBubble);
+                    }
+
+                    // We received text, so probably tool is done if it was running (or concurrent)
+                    removeStatusIndicator();
+                    scrollToBottom();
+
+                } catch (e) {
+                    console.error("Error parsing message JSON:", e);
+                }
+            };
+
+            source.addEventListener("tool", function(event) {
+                 let toolText = "Executing tools...";
+                 try {
+                     toolText = JSON.parse(event.data);
+                 } catch(e) {
+                     toolText = event.data || toolText;
+                 }
+                 showStatusIndicator(toolText);
+            });
+
+            source.addEventListener("error", function(event) {
+                console.error("EventSource error:", event);
+                source.close();
+                removeStatusIndicator();
+            });
+
+            source.addEventListener("done", function(event) {
+                source.close();
+                removeStatusIndicator();
+            });
         }
 
         function createMessageElement(role, text) {
@@ -322,55 +389,13 @@
 
         function sendRequest(text) {
             const streamUrl = '/chat?message=' + encodeURIComponent(text);
-            const source = new EventSource(streamUrl);
 
             // Create AI Bubble
             const aiRow = createMessageElement('model', '');
             chatContainer.appendChild(aiRow);
             const aiBubble = aiRow.querySelector('.message-bubble');
-            let currentAiText = "";
 
-            // Remove any existing status indicator
-            removeStatusIndicator();
-            scrollToBottom();
-
-            source.onmessage = function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    currentAiText += data;
-                    aiBubble.dataset.raw = currentAiText;
-                    aiBubble.innerHTML = marked.parse(currentAiText);
-
-                    // Check for Jules Prompt marker
-                    if (currentAiText.includes("## Jules Prompt")) {
-                        addDeployButton(aiBubble);
-                    }
-
-                    // We received text, so probably tool is done if it was running (or concurrent)
-                    removeStatusIndicator();
-                    scrollToBottom();
-
-                } catch (e) {
-                    console.error("Error parsing message JSON:", e);
-                }
-            };
-
-            source.addEventListener("tool", function(event) {
-                 showStatusIndicator(event.data || "Executing tools...");
-            });
-
-            source.addEventListener("error", function(event) {
-                // If it's a connection error, logs it.
-                // We'll close the source.
-                console.error("EventSource error:", event);
-                source.close();
-                removeStatusIndicator();
-            });
-
-            source.addEventListener("done", function(event) {
-                source.close();
-                removeStatusIndicator();
-            });
+            streamEvents(streamUrl, aiBubble);
         }
 
         function showStatusIndicator(text) {

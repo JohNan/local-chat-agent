@@ -217,6 +217,20 @@ async def stream_active():
     return JSONResponse(status_code=404, content={"active": False})
 
 
+@app.get("/chat/status")
+def chat_status():
+    """Returns the status of the current task."""
+    # Check if there is an active task state
+    is_active = agent_engine.CURRENT_STATE is not None
+    return {"active": is_active}
+
+
+@app.get("/chat/stream_active")
+async def chat_stream_active():
+    """Returns the active stream if one exists (chat path)."""
+    return await stream_active()
+
+
 @app.get("/api/models")
 def api_models():
     """Returns a list of available Gemini models."""
