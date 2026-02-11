@@ -108,6 +108,13 @@ def _format_history(history):
                             response=p["functionResponse"]["response"],
                         )
                     )
+                elif "functionCall" in p:
+                    parts.append(
+                        types.Part.from_function_call(
+                            name=p["functionCall"]["name"],
+                            args=p["functionCall"]["args"],
+                        )
+                    )
                 elif "text" in p:
                     parts.append(types.Part(text=p["text"]))
             elif isinstance(p, str):
