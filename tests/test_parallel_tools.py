@@ -61,11 +61,13 @@ def test_parallel_tool_execution(client):
         part2.function_call = fc2
 
         chunk1.parts = [part1, part2]
+        chunk1.function_calls = [fc1, fc2]
 
         # Final response chunk
         chunk2 = MagicMock()
         chunk2.text = "Here is the content and list"
         chunk2.parts = []
+        chunk2.function_calls = []
 
         # Mock send_message_stream
         mock_chat.send_message_stream = AsyncMock(

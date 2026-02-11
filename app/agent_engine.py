@@ -132,13 +132,17 @@ async def run_agent_task(queue: asyncio.Queue, chat_session, user_msg: str):
 
                     # Tool call processing
                     try:
-                        if hasattr(chunk, "parts"):
+                        # 1. Primary check: chunk.function_calls (Gemini SDK v0.3+)
+                        if hasattr(chunk, "function_calls") and chunk.function_calls:
+                            tool_calls.extend(chunk.function_calls)
+                        # 2. Fallback check: chunk.parts (Legacy)
+                        elif hasattr(chunk, "parts"):
                             for part in chunk.parts:
                                 if part.function_call:
                                     tool_calls.append(part.function_call)
                     except Exception as e:  # pylint: disable=broad-exception-caught
                         logger.error(
-                            "[TURN %d] Error processing chunk parts: %s", turn, e
+                            "[TURN %d] Error processing chunk tool calls: %s", turn, e
                         )
 
                 # End of stream for this turn.

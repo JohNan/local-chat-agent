@@ -52,6 +52,7 @@ def test_chat_get_stream_basic(client):
         mock_chunk = MagicMock()
         mock_chunk.text = "Hello world"
         mock_chunk.parts = []
+        mock_chunk.function_calls = []
 
         # Mock the stream iterator
         # send_message_stream must be awaitable and return an async iterator
@@ -94,11 +95,13 @@ def test_chat_tool_execution(client):
         part1 = MagicMock()
         part1.function_call = fc
         chunk1.parts = [part1]
+        chunk1.function_calls = [fc]
 
         # Turn 2: Final Response
         chunk2 = MagicMock()
         chunk2.text = "Here are the files"
         chunk2.parts = []
+        chunk2.function_calls = []
 
         # Mock the stream iterator for two calls
         # We need side_effect behavior for async function
