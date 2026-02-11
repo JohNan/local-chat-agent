@@ -1,33 +1,39 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 interface InputAreaProps {
+    value: string;
+    onChange: (value: string) => void;
     onSendMessage: (text: string) => void;
     disabled?: boolean;
     isGenerating?: boolean;
     onStop?: () => void;
 }
 
-export const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, disabled, isGenerating, onStop }) => {
-    const [input, setInput] = useState("");
-
+export const InputArea: React.FC<InputAreaProps> = ({
+    value,
+    onChange,
+    onSendMessage,
+    disabled,
+    isGenerating,
+    onStop
+}) => {
     const handleSend = () => {
-        if (input.trim()) {
-            onSendMessage(input.trim());
-            setInput("");
+        if (value.trim()) {
+            onSendMessage(value.trim());
         }
     };
 
     return (
         <div className="input-area">
             <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
                 placeholder="Ask about your code..."
                 disabled={disabled || isGenerating}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                         e.preventDefault();
-                        if (!disabled && !isGenerating && input.trim()) {
+                        if (!disabled && !isGenerating && value.trim()) {
                             handleSend();
                         }
                     }
@@ -38,7 +44,7 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, disabled, i
                     Stop
                 </button>
             ) : (
-                <button className="primary-btn" onClick={handleSend} disabled={disabled || !input.trim()}>
+                <button className="primary-btn" onClick={handleSend} disabled={disabled || !value.trim()}>
                     Send
                 </button>
             )}
