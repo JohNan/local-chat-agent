@@ -12,7 +12,7 @@ from google import genai
 logger = logging.getLogger(__name__)
 
 # Constants
-CHROMA_DB_PATH = "./chroma_db"
+CHROMA_DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
 COLLECTION_NAME = "codebase"
 # Try 004 first, fallback to 001 if needed.
 EMBEDDING_MODEL_PRIMARY = "models/text-embedding-004"
