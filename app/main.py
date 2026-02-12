@@ -7,7 +7,6 @@ import logging
 import traceback
 import sys
 import asyncio
-import base64
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query
@@ -76,24 +75,13 @@ CACHE_STATE = {}
 # --- Models ---
 
 
-class MediaItem(BaseModel):
-    """Model for media items (e.g. images)."""
-
-    mime_type: str
-    data: str
-
-
 class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
 
     message: str
     model: str = "gemini-3-pro-preview"
     include_web_search: bool | None = None
-<<<<<<< feature/multimodal-chat-13908568756612529080
     media: list[dict] | None = None
-=======
-    media: list[MediaItem] | None = None
->>>>>>> main
 
 
 class DeployRequest(BaseModel):
@@ -144,7 +132,10 @@ def _get_tool_config(client, enable_search):
 
 
 def _prepare_messages(user_msg, media):
-    """Prepares messages for storage and Gemini API."""
+    """
+    Prepares messages for storage and Gemini API.
+    Splits media into inline data for JSON storage and Blob objects for the SDK.
+    """
     storage_parts = [{"text": user_msg}]
     gemini_msg = [types.Part(text=user_msg)]
 
@@ -207,17 +198,11 @@ def _format_history(history):
                     parts.append(types.Part(text=p["text"]))
                 elif "inline_data" in p:
                     parts.append(
-<<<<<<< feature/multimodal-chat-13908568756612529080
                         types.Part(
                             inline_data=types.Blob(
                                 mime_type=p["inline_data"]["mime_type"],
                                 data=p["inline_data"]["data"],
                             )
-=======
-                        types.Part.from_bytes(
-                            data=base64.b64decode(p["inline_data"]["data"]),
-                            mime_type=p["inline_data"]["mime_type"],
->>>>>>> main
                         )
                     )
             elif isinstance(p, str):
@@ -504,58 +489,19 @@ async def get_jules_session_status(session_name: str):
 @app.post("/chat")
 async def chat(request: ChatRequest):
     """Handles chat messages (POST)."""
-    # pylint: disable=too-many-locals
     if not CLIENT:
         return JSONResponse(
             status_code=500, content={"error": "Gemini client not initialized"}
         )
 
-    user_msg_content = request.message
-
-    # Handle media
-    history_parts = []
-    gemini_parts = []
-
-    if request.media:
-        for media_item in request.media:
-            # 1. For history persistence (base64 string)
-            history_parts.append(
-                {
-                    "inline_data": {
-                        "mime_type": media_item.mime_type,
-                        "data": media_item.data,
-                    }
-                }
-            )
-            # 2. For Gemini API (decoded bytes)
-            gemini_parts.append(
-                types.Part.from_bytes(
-                    data=base64.b64decode(media_item.data),
-                    mime_type=media_item.mime_type,
-                )
-            )
-
-    # Add text part
-    if request.message:
-        # History format uses simple structure or parts list
-        # If we have media, we MUST use parts list for consistency in this message
-        history_parts.append({"text": request.message})
-        gemini_parts.append(types.Part(text=request.message))
+    user_msg = request.message
 
     # Construct parts with media if present
     storage_parts, gemini_msg = _prepare_messages(user_msg, request.media)
 
     # Save user message first
-<<<<<<< feature/multimodal-chat-13908568756612529080
     await asyncio.to_thread(
         chat_manager.save_message, "user", user_msg, parts=storage_parts
-=======
-    # If media is present, use the complex parts structure.
-    # Otherwise fallback to simple text saving (handled by chat_manager logic,
-    # but we can explicitly pass parts).
-    await asyncio.to_thread(
-        chat_manager.save_message, "user", user_msg_content, parts=history_parts
->>>>>>> main
     )
 
     # Load history including the message we just saved
@@ -610,20 +556,12 @@ async def chat(request: ChatRequest):
         history=history_arg,
     )
 
-    # If we have media, user_msg for agent_task should be the list of parts.
-    # Otherwise it can be the string (or list of parts, agent_engine handles both).
-    task_input = gemini_parts if request.media else user_msg_content
-
     queue = asyncio.Queue()
-<<<<<<< feature/multimodal-chat-13908568756612529080
     asyncio.create_task(
         agent_engine.run_agent_task(
             queue, chat_session, gemini_msg if request.media else user_msg
         )
     )
-=======
-    asyncio.create_task(agent_engine.run_agent_task(queue, chat_session, task_input))
->>>>>>> main
 
     return StreamingResponse(
         stream_generator(queue),
