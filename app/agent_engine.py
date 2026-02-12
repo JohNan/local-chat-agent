@@ -175,11 +175,11 @@ async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: s
                             for part in chunk.parts:
                                 if part.text:
                                     chunk_text += part.text
-                        # Fallback for simple text responses (if parts is missing/empty but text exists)
+                        # Fallback for simple text responses (if parts is missing/empty)
                         elif hasattr(chunk, "text"):
                             try:
                                 chunk_text = chunk.text
-                            except Exception:
+                            except Exception:  # pylint: disable=broad-exception-caught
                                 pass
 
                         if chunk_text:
