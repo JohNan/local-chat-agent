@@ -192,6 +192,92 @@
         .deploy-btn:hover {
             background-color: #2c974b;
         }
+
+        /* Tasks Drawer */
+        #tasks-drawer {
+            position: fixed;
+            top: 0;
+            right: -350px;
+            width: 350px;
+            height: 100vh;
+            background-color: var(--chat-bg);
+            border-left: 1px solid var(--border-color);
+            transition: right 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.5);
+        }
+        #tasks-drawer.open {
+            right: 0;
+        }
+        .drawer-header {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            cursor: pointer;
+            font-size: 1.2em;
+        }
+        .tasks-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        .task-card {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        .task-status {
+            font-weight: bold;
+        }
+        .status-pending { color: #d4d4d4; }
+        .status-running { color: #3498db; }
+        .status-success, .status-succeeded { color: #2ecc71; }
+        .status-failed { color: #e74c3c; }
+
+        .task-preview {
+            font-size: 0.9em;
+            color: #ccc;
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .task-meta {
+            font-size: 0.8em;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .refresh-btn {
+            background: none;
+            border: none;
+            color: #3498db;
+            cursor: pointer;
+            padding: 2px 5px;
+            font-size: 0.9em;
+        }
+        .refresh-btn:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -207,6 +293,12 @@
             <span style="font-size: 0.9em; color: #aaa;">
                 📂 <span id="repo-status">Loading...</span>
             </span>
+            <button onclick="toggleTasksDrawer()" class="icon-btn" title="Tasks">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 11l3 3L22 4"></path>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+            </button>
             <button onclick="gitPull()" class="icon-btn" title="Git Pull">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2v-4"></path>
@@ -220,6 +312,16 @@
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 </svg>
             </button>
+        </div>
+    </div>
+
+    <div id="tasks-drawer">
+        <div class="drawer-header">
+            <span>Jules Tasks</span>
+            <button class="close-btn" onclick="toggleTasksDrawer()">×</button>
+        </div>
+        <div class="tasks-list" id="tasks-list">
+            <div style="text-align: center; color: #888; margin-top: 20px;">Loading tasks...</div>
         </div>
     </div>
 
@@ -527,6 +629,93 @@
         // Call on load
         updateStatus();
         loadHistory(false);
+
+        // Tasks Logic
+        const tasksDrawer = document.getElementById('tasks-drawer');
+        const tasksList = document.getElementById('tasks-list');
+        let tasksPollInterval = null;
+
+        function toggleTasksDrawer() {
+            tasksDrawer.classList.toggle('open');
+            if (tasksDrawer.classList.contains('open')) {
+                loadTasks();
+                // Start polling
+                if (tasksPollInterval) clearInterval(tasksPollInterval);
+                tasksPollInterval = setInterval(refreshRunningTasks, 5000);
+            } else {
+                if (tasksPollInterval) clearInterval(tasksPollInterval);
+                tasksPollInterval = null;
+            }
+        }
+
+        async function loadTasks() {
+            try {
+                const res = await fetch('/api/tasks');
+                const tasks = await res.json();
+                renderTasks(tasks);
+            } catch (e) {
+                console.error("Failed to load tasks:", e);
+                tasksList.innerHTML = '<div style="color: #e74c3c; padding: 10px;">Failed to load tasks.</div>';
+            }
+        }
+
+        function renderTasks(tasks) {
+            if (!tasks || tasks.length === 0) {
+                tasksList.innerHTML = '<div style="text-align: center; color: #888; margin-top: 20px;">No tasks found.</div>';
+                return;
+            }
+
+            tasksList.innerHTML = tasks.map(task => {
+                const statusClass = `status-${(task.status || 'pending').toLowerCase()}`;
+                const dateStr = new Date(task.created_at).toLocaleString();
+
+                return `
+                    <div class="task-card">
+                        <div class="task-header">
+                            <span class="task-status ${statusClass}">${task.status}</span>
+                            <span style="font-family: monospace; font-size: 0.8em; color: #666;">${task.session_name.split('/').pop()}</span>
+                        </div>
+                        <div class="task-preview" title="${task.prompt_preview}">
+                            ${task.prompt_preview}
+                        </div>
+                        <div class="task-meta">
+                            <span>${dateStr}</span>
+                            <button class="refresh-btn" onclick="syncTask('${task.session_name}')">🔄 Sync</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function syncTask(sessionName) {
+            try {
+                const res = await fetch(`/api/tasks/${sessionName}/sync`, { method: 'POST' });
+                if (res.ok) {
+                    loadTasks();
+                } else {
+                    console.error("Sync failed");
+                }
+            } catch (e) {
+                console.error("Sync error:", e);
+            }
+        }
+
+        async function refreshRunningTasks() {
+            try {
+                const res = await fetch('/api/tasks');
+                const tasks = await res.json();
+
+                const runningTasks = tasks.filter(t => (t.status || '').toLowerCase() === 'running' || (t.status || '').toLowerCase() === 'pending');
+                if (runningTasks.length > 0) {
+                    for (const task of runningTasks) {
+                         await fetch(`/api/tasks/${task.session_name}/sync`, { method: 'POST' });
+                    }
+                    loadTasks();
+                }
+            } catch (e) {
+                console.error("Polling error:", e);
+            }
+        }
     </script>
 </body>
 </html>
