@@ -53,17 +53,49 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
     const isAi = message.role === 'model' || message.role === 'ai';
     const text = message.text || message.parts?.[0]?.text || "";
 
-    const handleCopy = async () => {
-        try {
-            await navigator.clipboard.writeText(text);
-            setCopied(true);
-            setCopyError(false);
-            setTimeout(() => setCopied(false), 2000);
-        } catch (err) {
-            console.error('Failed to copy text: ', err);
-            setCopyError(true);
-            setTimeout(() => setCopyError(false), 2000);
+    const copyToClipboard = (textToCopy: string, onSuccess: () => void, onError: (err: unknown) => void) => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(textToCopy).then(onSuccess).catch(() => {
+                 // If navigator.clipboard fails (e.g. not focused), try fallback
+                 tryFallbackCopy(textToCopy, onSuccess, onError);
+            });
+        } else {
+            tryFallbackCopy(textToCopy, onSuccess, onError);
         }
+    };
+
+    const tryFallbackCopy = (textToCopy: string, onSuccess: () => void, onError: (err: unknown) => void) => {
+         try {
+            const textarea = document.createElement('textarea');
+            textarea.value = textToCopy;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textarea);
+            if (successful) onSuccess();
+            else onError(new Error("execCommand copy failed"));
+        } catch (err) {
+            onError(err);
+        }
+    };
+
+    const handleCopy = () => {
+        copyToClipboard(
+            text,
+            () => {
+                setCopied(true);
+                setCopyError(false);
+                setTimeout(() => setCopied(false), 2000);
+            },
+            (err) => {
+                console.error('Failed to copy text: ', err);
+                setCopyError(true);
+                setTimeout(() => setCopyError(false), 2000);
+            }
+        );
     };
 
     const renderMarkdown = (content: string) => {
@@ -77,7 +109,14 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
     };
 
     const handleCodeCopy = (e: React.MouseEvent<HTMLDivElement>) => {
-        const target = e.target as HTMLElement;
+        let target = e.target as HTMLElement;
+        // Handle text nodes safely
+        if (target.nodeType === 3 && target.parentElement) {
+            target = target.parentElement;
+        }
+
+        if (!target.closest) return;
+
         const btn = target.closest('.copy-code-btn');
         if (!btn) return;
 
@@ -89,18 +128,22 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
 
         const codeText = codeElement.textContent || "";
 
-        navigator.clipboard.writeText(codeText).then(() => {
-            btn.textContent = 'Copied!';
-            setTimeout(() => {
-                btn.textContent = 'Copy';
-            }, 2000);
-        }).catch(err => {
-            console.error('Failed to copy code: ', err);
-            btn.textContent = 'Error';
-            setTimeout(() => {
-                btn.textContent = 'Copy';
-            }, 2000);
-        });
+        copyToClipboard(
+            codeText,
+            () => {
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                }, 2000);
+            },
+            (err) => {
+                console.error('Failed to copy code: ', err);
+                btn.textContent = 'Error';
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                }, 2000);
+            }
+        );
     };
 
     const hasJulesPrompt = text.includes("## Jules Prompt");
