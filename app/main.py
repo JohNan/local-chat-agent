@@ -7,6 +7,7 @@ import logging
 import traceback
 import sys
 import asyncio
+import base64
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query
@@ -75,12 +76,20 @@ CACHE_STATE = {}
 # --- Models ---
 
 
+class MediaItem(BaseModel):
+    """Model for media items (e.g. images)."""
+
+    mime_type: str
+    data: str
+
+
 class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
 
     message: str
     model: str = "gemini-3-pro-preview"
     include_web_search: bool | None = None
+    media: list[MediaItem] | None = None
 
 
 class DeployRequest(BaseModel):
@@ -132,6 +141,13 @@ def _format_history(history):
                     )
                 elif "text" in p:
                     parts.append(types.Part(text=p["text"]))
+                elif "inline_data" in p:
+                    parts.append(
+                        types.Part.from_bytes(
+                            data=base64.b64decode(p["inline_data"]["data"]),
+                            mime_type=p["inline_data"]["mime_type"],
+                        )
+                    )
             elif isinstance(p, str):
                 parts.append(types.Part(text=p))
 
@@ -416,15 +432,51 @@ async def get_jules_session_status(session_name: str):
 @app.post("/chat")
 async def chat(request: ChatRequest):
     """Handles chat messages (POST)."""
+    # pylint: disable=too-many-locals
     if not CLIENT:
         return JSONResponse(
             status_code=500, content={"error": "Gemini client not initialized"}
         )
 
-    user_msg = request.message
+    user_msg_content = request.message
+
+    # Handle media
+    history_parts = []
+    gemini_parts = []
+
+    if request.media:
+        for media_item in request.media:
+            # 1. For history persistence (base64 string)
+            history_parts.append(
+                {
+                    "inline_data": {
+                        "mime_type": media_item.mime_type,
+                        "data": media_item.data,
+                    }
+                }
+            )
+            # 2. For Gemini API (decoded bytes)
+            gemini_parts.append(
+                types.Part.from_bytes(
+                    data=base64.b64decode(media_item.data),
+                    mime_type=media_item.mime_type,
+                )
+            )
+
+    # Add text part
+    if request.message:
+        # History format uses simple structure or parts list
+        # If we have media, we MUST use parts list for consistency in this message
+        history_parts.append({"text": request.message})
+        gemini_parts.append(types.Part(text=request.message))
 
     # Save user message first
-    await asyncio.to_thread(chat_manager.save_message, "user", user_msg)
+    # If media is present, use the complex parts structure.
+    # Otherwise fallback to simple text saving (handled by chat_manager logic,
+    # but we can explicitly pass parts).
+    await asyncio.to_thread(
+        chat_manager.save_message, "user", user_msg_content, parts=history_parts
+    )
 
     # Load history including the message we just saved
     full_history = await asyncio.to_thread(chat_manager.load_chat_history)
@@ -512,8 +564,12 @@ async def chat(request: ChatRequest):
         history=history_arg,
     )
 
+    # If we have media, user_msg for agent_task should be the list of parts.
+    # Otherwise it can be the string (or list of parts, agent_engine handles both).
+    task_input = gemini_parts if request.media else user_msg_content
+
     queue = asyncio.Queue()
-    asyncio.create_task(agent_engine.run_agent_task(queue, chat_session, user_msg))
+    asyncio.create_task(agent_engine.run_agent_task(queue, chat_session, task_input))
 
     return StreamingResponse(
         stream_generator(queue),
