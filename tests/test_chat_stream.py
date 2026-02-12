@@ -51,7 +51,10 @@ def test_chat_get_stream_basic(client):
         # Mock chunk
         mock_chunk = MagicMock()
         mock_chunk.text = "Hello world"
-        mock_chunk.parts = []
+        part = MagicMock()
+        part.text = "Hello world"
+        part.function_call = None
+        mock_chunk.parts = [part]
         mock_chunk.function_calls = []
 
         # Mock the stream iterator
@@ -93,6 +96,7 @@ def test_chat_tool_execution(client):
         fc.name = "list_files"
         fc.args = {"directory": "."}
         part1 = MagicMock()
+        part1.text = None  # Ensure text is None/Empty so it's not a MagicMock
         part1.function_call = fc
         chunk1.parts = [part1]
         chunk1.function_calls = [fc]
@@ -100,7 +104,10 @@ def test_chat_tool_execution(client):
         # Turn 2: Final Response
         chunk2 = MagicMock()
         chunk2.text = "Here are the files"
-        chunk2.parts = []
+        part2 = MagicMock()
+        part2.text = "Here are the files"
+        part2.function_call = None
+        chunk2.parts = [part2]
         chunk2.function_calls = []
 
         # Mock the stream iterator for two calls

@@ -169,10 +169,23 @@ async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: s
                 async for chunk in stream:
                     # Text processing
                     try:
-                        if chunk.text:
-                            turn_text_parts.append(chunk.text)
+                        chunk_text = ""
+                        # Safely extract text from parts if available
+                        if hasattr(chunk, "parts"):
+                            for part in chunk.parts:
+                                if part.text:
+                                    chunk_text += part.text
+                        # Fallback for simple text responses (if parts is missing/empty but text exists)
+                        elif hasattr(chunk, "text"):
+                            try:
+                                chunk_text = chunk.text
+                            except Exception:
+                                pass
+
+                        if chunk_text:
+                            turn_text_parts.append(chunk_text)
                             await task_state.broadcast(
-                                f"event: message\ndata: {json.dumps(chunk.text)}\n\n"
+                                f"event: message\ndata: {json.dumps(chunk_text)}\n\n"
                             )
                     except Exception as e:  # pylint: disable=broad-exception-caught
                         logger.error(

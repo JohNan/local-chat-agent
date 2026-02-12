@@ -56,8 +56,10 @@ def test_parallel_tool_execution(client):
         fc2.args = {"directory": "."}
 
         part1 = MagicMock()
+        part1.text = None
         part1.function_call = fc1
         part2 = MagicMock()
+        part2.text = None
         part2.function_call = fc2
 
         chunk1.parts = [part1, part2]
@@ -66,7 +68,10 @@ def test_parallel_tool_execution(client):
         # Final response chunk
         chunk2 = MagicMock()
         chunk2.text = "Here is the content and list"
-        chunk2.parts = []
+        part3 = MagicMock()
+        part3.text = "Here is the content and list"
+        part3.function_call = None
+        chunk2.parts = [part3]
         chunk2.function_calls = []
 
         # Mock send_message_stream
