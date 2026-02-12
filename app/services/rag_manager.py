@@ -29,7 +29,7 @@ class RAGManager:
                 name=COLLECTION_NAME
             )
             logger.info("ChromaDB initialized at %s", CHROMA_DB_PATH)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Failed to initialize ChromaDB: %s", e)
             self.chroma_client = None
             self.collection = None
@@ -41,7 +41,7 @@ class RAGManager:
         else:
             try:
                 self.genai_client = genai.Client(api_key=api_key)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Failed to initialize Gemini Client: %s", e)
                 self.genai_client = None
 
@@ -62,7 +62,7 @@ class RAGManager:
             if hasattr(result, "embeddings") and result.embeddings:
                 return result.embeddings[0].values
             return None
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(
                 "Failed to embed with %s: %s. Trying fallback.",
                 EMBEDDING_MODEL_PRIMARY,
@@ -77,7 +77,7 @@ class RAGManager:
                 if hasattr(result, "embeddings") and result.embeddings:
                     return result.embeddings[0].values
                 return None
-            except Exception as e2:
+            except Exception as e2:  # pylint: disable=broad-exception-caught
                 logger.error(
                     "Failed to embed with fallback %s: %s", EMBEDDING_MODEL_FALLBACK, e2
                 )
@@ -182,7 +182,7 @@ class RAGManager:
                         )
                         files_indexed += 1
 
-                except Exception as e:
+                except Exception as e:  # pylint: disable=broad-exception-caught
                     logger.error("Error indexing file %s: %s", filepath, e)
 
         logger.info("Indexing complete. Indexed %d files.", files_indexed)
@@ -240,7 +240,7 @@ class RAGManager:
 
             return "\n".join(formatted_results)
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Error retrieving context: %s", e)
             return f"Error during retrieval: {e}"
 
