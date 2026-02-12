@@ -68,6 +68,13 @@ def test_index_codebase(mock_chroma, mock_genai):
 
                 assert result["status"] == "success"
                 assert result["files_indexed"] == 1
+
+                # Verify embed_content called with list
+                manager.genai_client.models.embed_content.assert_called()
+                call_args = manager.genai_client.models.embed_content.call_args
+                assert isinstance(call_args.kwargs['contents'], list)
+                assert call_args.kwargs['contents'] == ["print('hello')"]
+
                 mock_collection.upsert.assert_called_once()
 
 
@@ -93,6 +100,11 @@ def test_retrieve_context(mock_chroma, mock_genai):
         }
 
         context = manager.retrieve_context("query")
+
+        # Verify embed_content called with list
+        call_args = manager.genai_client.models.embed_content.call_args
+        assert call_args.kwargs['contents'] == ["query"]
+
         assert "File: test.py" in context
         assert "content" in context
 
@@ -147,3 +159,39 @@ def test_index_codebase_optimization(mock_chroma, mock_genai):
                     )
                     mock_collection.upsert.assert_called_once()
                     assert result["files_indexed"] == 1
+
+def test_index_codebase_batching(mock_chroma, mock_genai):
+    """Test batch processing in index_codebase."""
+    with patch.dict(os.environ, {"GOOGLE_API_KEY": "test_key"}):
+        manager = RAGManager()
+
+        # Mock collection
+        mock_collection = MagicMock()
+        manager.collection = mock_collection
+
+        # Mock genai response
+        mock_embedding = MagicMock()
+        mock_embedding.embeddings = [MagicMock(values=[0.1]), MagicMock(values=[0.2])]
+        manager.genai_client.models.embed_content.return_value = mock_embedding
+
+        # Mock os.walk returning 2 files
+        with patch("os.walk") as mock_walk:
+            mock_walk.return_value = [(".", [], ["test1.py", "test2.py"])]
+
+            with patch("builtins.open") as mock_open:
+                f1 = MagicMock()
+                f1.__enter__.return_value.read.return_value = "content1"
+                f2 = MagicMock()
+                f2.__enter__.return_value.read.return_value = "content2"
+                mock_open.side_effect = [f1, f2]
+
+                mock_collection.get.return_value = {"metadatas": []}
+
+                result = manager.index_codebase()
+
+                assert result["files_indexed"] == 2
+
+                # Verify embed_content called once with 2 contents (batch)
+                manager.genai_client.models.embed_content.assert_called_once()
+                call_args = manager.genai_client.models.embed_content.call_args
+                assert call_args.kwargs['contents'] == ["content1", "content2"]
