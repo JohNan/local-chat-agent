@@ -81,6 +81,7 @@ class ChatRequest(BaseModel):
     message: str
     model: str = "gemini-3-pro-preview"
     include_web_search: bool | None = None
+    media: list[dict] | None = None
 
 
 class DeployRequest(BaseModel):
@@ -90,6 +91,66 @@ class DeployRequest(BaseModel):
 
 
 # --- Logic ---
+
+
+def _get_tool_config(client, enable_search):
+    """Configures tools for the agent."""
+    function_declarations = [
+        types.FunctionDeclaration.from_callable(
+            client=client, callable=git_ops.list_files
+        ),
+        types.FunctionDeclaration.from_callable(
+            client=client, callable=git_ops.read_file
+        ),
+        types.FunctionDeclaration.from_callable(
+            client=client, callable=git_ops.get_file_history
+        ),
+        types.FunctionDeclaration.from_callable(
+            client=client, callable=git_ops.get_recent_commits
+        ),
+        types.FunctionDeclaration.from_callable(
+            client=client, callable=git_ops.grep_code
+        ),
+        types.FunctionDeclaration.from_callable(
+            client=client, callable=git_ops.get_file_outline
+        ),
+        types.FunctionDeclaration.from_callable(
+            client=client, callable=git_ops.read_android_manifest
+        ),
+        types.FunctionDeclaration.from_callable(
+            client=client, callable=rag_manager.retrieve_context
+        ),
+    ]
+
+    google_search_tool = types.GoogleSearch() if enable_search else None
+
+    return types.Tool(
+        function_declarations=function_declarations,
+        google_search=google_search_tool,
+        code_execution=types.ToolCodeExecution(),
+    )
+
+
+def _prepare_messages(user_msg, media):
+    """Prepares messages for storage and Gemini API."""
+    storage_parts = [{"text": user_msg}]
+    gemini_msg = [types.Part(text=user_msg)]
+
+    if media:
+        for item in media:
+            # For JSON storage
+            storage_parts.append(
+                {"inline_data": {"mime_type": item["mime_type"], "data": item["data"]}}
+            )
+            # For Gemini API
+            gemini_msg.append(
+                types.Part(
+                    inline_data=types.Blob(
+                        mime_type=item["mime_type"], data=item["data"]
+                    )
+                )
+            )
+    return storage_parts, gemini_msg
 
 
 def _format_history(history):
@@ -132,6 +193,15 @@ def _format_history(history):
                     )
                 elif "text" in p:
                     parts.append(types.Part(text=p["text"]))
+                elif "inline_data" in p:
+                    parts.append(
+                        types.Part(
+                            inline_data=types.Blob(
+                                mime_type=p["inline_data"]["mime_type"],
+                                data=p["inline_data"]["data"],
+                            )
+                        )
+                    )
             elif isinstance(p, str):
                 parts.append(types.Part(text=p))
 
@@ -423,8 +493,13 @@ async def chat(request: ChatRequest):
 
     user_msg = request.message
 
+    # Construct parts with media if present
+    storage_parts, gemini_msg = _prepare_messages(user_msg, request.media)
+
     # Save user message first
-    await asyncio.to_thread(chat_manager.save_message, "user", user_msg)
+    await asyncio.to_thread(
+        chat_manager.save_message, "user", user_msg, parts=storage_parts
+    )
 
     # Load history including the message we just saved
     full_history = await asyncio.to_thread(chat_manager.load_chat_history)
@@ -437,41 +512,7 @@ async def chat(request: ChatRequest):
         enable_search = ENABLE_GOOGLE_SEARCH
 
     # Configure tools
-    function_declarations = [
-        types.FunctionDeclaration.from_callable(
-            client=CLIENT, callable=git_ops.list_files
-        ),
-        types.FunctionDeclaration.from_callable(
-            client=CLIENT, callable=git_ops.read_file
-        ),
-        types.FunctionDeclaration.from_callable(
-            client=CLIENT, callable=git_ops.get_file_history
-        ),
-        types.FunctionDeclaration.from_callable(
-            client=CLIENT, callable=git_ops.get_recent_commits
-        ),
-        types.FunctionDeclaration.from_callable(
-            client=CLIENT, callable=git_ops.grep_code
-        ),
-        types.FunctionDeclaration.from_callable(
-            client=CLIENT, callable=git_ops.get_file_outline
-        ),
-        types.FunctionDeclaration.from_callable(
-            client=CLIENT, callable=git_ops.read_android_manifest
-        ),
-        types.FunctionDeclaration.from_callable(
-            client=CLIENT, callable=rag_manager.retrieve_context
-        ),
-    ]
-
-    google_search_tool = types.GoogleSearch() if enable_search else None
-
-    # Construct tool list
-    tool = types.Tool(
-        function_declarations=function_declarations,
-        google_search=google_search_tool,
-        code_execution=types.ToolCodeExecution(),
-    )
+    tool = _get_tool_config(CLIENT, enable_search)
 
     # Configure system instruction
     system_instruction = agent_engine.SYSTEM_INSTRUCTION
@@ -513,7 +554,11 @@ async def chat(request: ChatRequest):
     )
 
     queue = asyncio.Queue()
-    asyncio.create_task(agent_engine.run_agent_task(queue, chat_session, user_msg))
+    asyncio.create_task(
+        agent_engine.run_agent_task(
+            queue, chat_session, gemini_msg if request.media else user_msg
+        )
+    )
 
     return StreamingResponse(
         stream_generator(queue),

@@ -260,6 +260,18 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                 )}
             </div>
             <div className="message-bubble">
+                 {message.media && message.media.length > 0 && (
+                     <div className="message-media" style={{ marginBottom: '10px', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                         {message.media.map((item, index) => (
+                             <img
+                                 key={index}
+                                 src={`data:${item.mime_type};base64,${item.data}`}
+                                 alt="attachment"
+                                 style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}
+                             />
+                         ))}
+                     </div>
+                 )}
                  <div dangerouslySetInnerHTML={renderMarkdown(text)} onClick={handleCodeCopy} />
                  <button
                     onClick={handleCopy}
