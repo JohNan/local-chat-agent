@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from google import genai
 from google.genai import types
 
-from app.services import git_ops, jules_api, chat_manager, rag_manager
+from app.services import git_ops, jules_api, chat_manager, rag_manager, task_manager
 from app import agent_engine
 
 # Configure logging
@@ -342,6 +342,17 @@ async def deploy_to_jules_route(request: DeployRequest):
 
         repo_info = await asyncio.to_thread(git_ops.get_repo_info)
         result = await jules_api.deploy_to_jules(prompt_text, repo_info)
+
+        # Save task
+        if result and "name" in result:
+            task_data = {
+                "session_name": result["name"],
+                "prompt_preview": prompt_text[:50]
+                + ("..." if len(prompt_text) > 50 else ""),
+                "status": "pending",  # Initial status
+            }
+            await asyncio.to_thread(task_manager.add_task, task_data)
+
         return {"success": True, "result": result}
 
     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -349,6 +360,27 @@ async def deploy_to_jules_route(request: DeployRequest):
         return JSONResponse(
             status_code=500, content={"success": False, "error": str(e)}
         )
+
+
+@app.get("/api/tasks")
+def api_tasks():
+    """Returns list of tasks."""
+    return task_manager.load_tasks()
+
+
+@app.post("/api/tasks/{session_name:path}/sync")
+async def api_tasks_sync(session_name: str):
+    """Syncs status with Jules API."""
+    try:
+        status_result = await jules_api.get_session_status(session_name)
+        new_status = status_result.get("state", "unknown")
+        updated_task = await asyncio.to_thread(
+            task_manager.update_task_status, session_name, new_status
+        )
+        return updated_task
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Failed to sync task: %s", e)
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @app.get("/api/jules_session/{session_name:path}")
