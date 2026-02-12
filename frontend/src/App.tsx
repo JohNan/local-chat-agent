@@ -3,6 +3,7 @@ import './index.css';
 import { Header } from './components/Header';
 import { ChatInterface } from './components/ChatInterface';
 import { InputArea } from './components/InputArea';
+import { PromptLibrary } from './components/PromptLibrary';
 import type { Message } from './types';
 
 const generateId = () => {
@@ -24,6 +25,8 @@ function App() {
     const [hasMore, setHasMore] = useState(true);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+    const [inputValue, setInputValue] = useState("");
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const loadHistory = useCallback(async () => {
@@ -224,6 +227,21 @@ function App() {
     };
 
     const sendMessage = async (text: string) => {
+        setInputValue(""); // Clear input immediately
+
+        // Auto-save prompt if it starts with ## Jules Prompt
+        if (text.trim().toLowerCase().startsWith("## jules prompt")) {
+            try {
+                fetch('/prompts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: text.trim() })
+                });
+            } catch (e) {
+                console.error("Failed to auto-save prompt:", e);
+            }
+        }
+
         // Add user message
         const userMsg: Message = { id: generateId(), role: 'user', text, parts: [{text}] };
         setMessages(prev => [...prev, userMsg]);
@@ -301,6 +319,7 @@ function App() {
                 setModel={setModel}
                 webSearchEnabled={webSearchEnabled}
                 setWebSearchEnabled={setWebSearchEnabled}
+                onToggleLibrary={() => setIsLibraryOpen(!isLibraryOpen)}
             />
             <ChatInterface
                 messages={filteredMessages}
@@ -309,9 +328,16 @@ function App() {
                 isLoadingHistory={loadingHistory}
             />
             <InputArea
+                value={inputValue}
+                onChange={setInputValue}
                 onSendMessage={sendMessage}
                 isGenerating={isGenerating}
                 onStop={handleStop}
+            />
+            <PromptLibrary
+                isOpen={isLibraryOpen}
+                onClose={() => setIsLibraryOpen(false)}
+                onSelectPrompt={(prompt) => setInputValue(prompt)}
             />
         </>
     );
