@@ -1,18 +1,25 @@
+"""
+Tests for summary injection.
+"""
+
+# pylint: disable=no-else-return, too-many-statements, unused-argument
+
 import sys
 import os
+import asyncio
+from unittest.mock import MagicMock
+import pytest
+from google.genai import types
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import pytest
-import asyncio
-import json
-from unittest.mock import AsyncMock, MagicMock
+# pylint: disable=wrong-import-position
 from app import agent_engine
-from google.genai import types
 
 
 @pytest.mark.asyncio
 async def test_summary_injection():
+    """Test that summary markdown is injected correctly."""
     # Mock queue
     queue = asyncio.Queue()
 

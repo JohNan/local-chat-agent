@@ -1,28 +1,37 @@
-import pytest
-from unittest.mock import MagicMock, patch
+"""
+Tests for RAG manager.
+"""
+
+# pylint: disable=redefined-outer-name, unused-argument
+
 import os
+import sys
+from unittest.mock import MagicMock, patch
+import pytest
 
 # We need to ensure we can import app
-import sys
 
 sys.path.append(os.getcwd())
 
-from app.services.rag_manager import RAGManager, get_rag_manager
+from app.services.rag_manager import RAGManager  # pylint: disable=wrong-import-position
 
 
 @pytest.fixture
 def mock_chroma():
+    """Mock chroma client."""
     with patch("app.services.rag_manager.chromadb.PersistentClient") as mock:
         yield mock
 
 
 @pytest.fixture
 def mock_genai():
+    """Mock genai client."""
     with patch("app.services.rag_manager.genai.Client") as mock:
         yield mock
 
 
 def test_rag_manager_initialization(mock_chroma, mock_genai):
+    """Test RAG Manager initialization."""
     # Ensure env var is set for test
     with patch.dict(os.environ, {"GOOGLE_API_KEY": "test_key"}):
         manager = RAGManager()
@@ -31,6 +40,7 @@ def test_rag_manager_initialization(mock_chroma, mock_genai):
 
 
 def test_index_codebase(mock_chroma, mock_genai):
+    """Test indexing codebase."""
     with patch.dict(os.environ, {"GOOGLE_API_KEY": "test_key"}):
         manager = RAGManager()
 
@@ -62,6 +72,7 @@ def test_index_codebase(mock_chroma, mock_genai):
 
 
 def test_retrieve_context(mock_chroma, mock_genai):
+    """Test retrieving context."""
     with patch.dict(os.environ, {"GOOGLE_API_KEY": "test_key"}):
         manager = RAGManager()
 
@@ -87,6 +98,7 @@ def test_retrieve_context(mock_chroma, mock_genai):
 
 
 def test_index_codebase_optimization(mock_chroma, mock_genai):
+    """Test indexing optimization (skipping unchanged files)."""
     with patch.dict(os.environ, {"GOOGLE_API_KEY": "test_key"}):
         manager = RAGManager()
 

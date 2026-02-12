@@ -1,16 +1,23 @@
+"""
+Tests for git config parsing.
+"""
+
+# pylint: disable=protected-access
+
 import os
 import sys
-import pytest
 from unittest.mock import mock_open
+import pytest
 
 # Ensure we can import app from the root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.services import git_ops
+from app.services import git_ops  # pylint: disable=wrong-import-position
 
 
 @pytest.fixture(autouse=True)
 def clear_cache():
+    """Clear the lru_cache of _get_remote_url before and after each test."""
     git_ops._get_remote_url.cache_clear()
     yield
     git_ops._get_remote_url.cache_clear()

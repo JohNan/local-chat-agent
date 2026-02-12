@@ -1,15 +1,19 @@
+"""
+Tests for Android-related tools.
+"""
+
 import sys
 import os
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # Ensure we can import app from the root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.services import git_ops
+from app.services import git_ops  # pylint: disable=wrong-import-position
 
 
 def test_get_file_outline_python():
+    """Test getting outline for Python file."""
     content = """
 class MyClass:
     def method_one(self):
@@ -26,6 +30,7 @@ def global_function():
 
 
 def test_get_file_outline_kotlin():
+    """Test getting outline for Kotlin file."""
     content = """
 package com.example
 
@@ -44,6 +49,7 @@ class ViewModel : ViewModel() {
 
 
 def test_get_file_outline_js():
+    """Test getting outline for JS file."""
     content = """
 export const myConst = 1;
 
@@ -61,6 +67,7 @@ class MyComponent extends React.Component {
 
 
 def test_read_android_manifest():
+    """Test reading Android manifest."""
     content = """
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.app">
     <uses-permission android:name="android.permission.INTERNET" />

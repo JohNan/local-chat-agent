@@ -1,15 +1,23 @@
-import asyncio
+"""
+Tests for RAG startup.
+"""
+
+# pylint: disable=redefined-outer-name, unused-variable
+
+import time
+from unittest.mock import patch
 import pytest
-from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from app.main import app
-from app.services import rag_manager
+
 
 # Ensure we don't actually run the task
 @pytest.fixture(autouse=True)
 def mock_rag_task():
+    """Mock the RAG indexing task."""
     with patch("app.services.rag_manager.index_codebase_task") as mock:
         yield mock
+
 
 def test_rag_startup_trigger(mock_rag_task):
     """Verifies that RAG indexing is triggered on app startup."""
@@ -34,7 +42,7 @@ def test_rag_startup_trigger(mock_rag_task):
     # although mocks usually record calls immediately if the thread starts.
 
     # Wait for a brief moment for the thread to be spawned and the function called
-    import time
+
     time.sleep(0.1)
 
     assert mock_rag_task.called, "RAG indexing task should be called on startup"

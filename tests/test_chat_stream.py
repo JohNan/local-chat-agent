@@ -2,42 +2,9 @@
 Tests for the chat streaming functionality.
 """
 
-import sys
-import os
-import asyncio
 from unittest.mock import MagicMock, patch, AsyncMock
-import pytest
-from fastapi.testclient import TestClient
-
-# Ensure app is importable
-sys.path.append(os.getcwd())
-
-# Import app directly from main
 from google.genai import types
-from app.main import app  # pylint: disable=wrong-import-position
-
-
-@pytest.fixture(name="client")
-def fixture_client():
-    """Fixture to provide a TestClient instance."""
-    return TestClient(app)
-
-
-class AsyncIterator:
-    """Helper to create an async iterator from a list."""
-
-    def __init__(self, items):
-        self.items = items
-
-    def __aiter__(self):
-        self.iter = iter(self.items)
-        return self
-
-    async def __anext__(self):
-        try:
-            return next(self.iter)
-        except StopIteration:
-            raise StopAsyncIteration
+from tests.utils import AsyncIterator
 
 
 def test_chat_get_stream_basic(client):
