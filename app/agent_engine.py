@@ -139,7 +139,9 @@ def cancel_current_task():
     return False
 
 
-async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: str):
+async def run_agent_task(
+    initial_queue: asyncio.Queue, chat_session, user_msg: str | list[types.Part]
+):
     """
     Background worker that runs the agent loop and pushes events to the queue.
     Decoupled from the HTTP response to ensure completion even if client disconnects.
