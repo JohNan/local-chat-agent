@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, Book } from 'lucide-react';
+import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X } from 'lucide-react';
 import type { RepoStatus } from '../types';
 
 interface HeaderProps {
@@ -7,7 +7,6 @@ interface HeaderProps {
     setModel: (model: string) => void;
     webSearchEnabled: boolean;
     setWebSearchEnabled: (enabled: boolean) => void;
-    onToggleLibrary: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -15,7 +14,6 @@ export const Header: React.FC<HeaderProps> = ({
     setModel,
     webSearchEnabled,
     setWebSearchEnabled,
-    onToggleLibrary,
 }) => {
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [loading, setLoading] = useState(false);
@@ -106,9 +104,6 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>Gemini Agent</span>
                 </div>
                 <div className="header-controls">
-                    <button onClick={onToggleLibrary} className="icon-btn" title="Prompt Library">
-                        <Book size={20} />
-                    </button>
                     <button onClick={clearContext} className="icon-btn" title="Reset Context">
                         <Eraser size={20} />
                     </button>

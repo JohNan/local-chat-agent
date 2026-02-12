@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from google import genai
 from google.genai import types
 
-from app.services import git_ops, jules_api, chat_manager, rag_manager, prompt_manager 
+from app.services import git_ops, jules_api, chat_manager, rag_manager
 from app import agent_engine
 
 # Configure logging
@@ -75,12 +75,6 @@ class DeployRequest(BaseModel):
     """Request model for deployment endpoint."""
 
     prompt: str
-
-
-class PromptRequest(BaseModel):
-    """Request model for saving a prompt."""
-
-    content: str
 
 
 # --- Logic ---
@@ -332,43 +326,6 @@ def api_models():
         return {"models": models}
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Failed to fetch models: %s", e)
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@app.get("/prompts")
-def get_prompts():
-    """Returns the list of saved prompts."""
-    try:
-        prompts = prompt_manager.load_prompts()
-        return {"prompts": prompts}
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("Error loading prompts: %s", e)
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@app.post("/prompts")
-def save_prompt(request: PromptRequest):
-    """Saves a new prompt."""
-    try:
-        success = prompt_manager.save_prompt(request.content)
-        if success:
-            return {"status": "success", "message": "Prompt saved"}
-        return {"status": "error", "message": "Prompt already exists or error saving"}
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("Error saving prompt: %s", e)
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@app.delete("/prompts/{prompt_index}")
-def delete_prompt(prompt_index: int):
-    """Deletes a prompt by index."""
-    try:
-        success = prompt_manager.delete_prompt(prompt_index)
-        if success:
-            return {"status": "success", "message": "Prompt deleted"}
-        return JSONResponse(status_code=404, content={"error": "Prompt not found"})
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("Error deleting prompt: %s", e)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
