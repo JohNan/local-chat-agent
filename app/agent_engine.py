@@ -73,8 +73,10 @@ SYSTEM_INSTRUCTION = (
     '4. **Jules Prompt:** When the user asks to "write a prompt", "deploy", '
     'or "create instructions", you must generate a structured block starting with '
     "`## Jules Prompt` containing the specific context and acceptance criteria. "
+    "The prompt MUST start with a short text that summarize the task. No longer than "
+    "one sentence and should NOT contain any markdown.\n"
     "Every Jules Prompt MUST explicitly instruct the agent to: "
-    "'First, read the `AGENTS.md` file to understand the project architecture "
+    "'First, first read the `AGENTS.md` file to understand the project architecture "
     "and development rules before starting any implementation.'\n"
     "5. **Visualizing Compose UI:** When analyzing Jetpack Compose code, use `get_file_outline` to "
     "identify `@Composable` functions. Treat the nesting of these function calls "
