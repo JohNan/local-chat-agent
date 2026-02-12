@@ -12,3 +12,4 @@ app/static/dist
 logs/
 *.log
 node_modules/
+chroma_db/

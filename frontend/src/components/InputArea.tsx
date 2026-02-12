@@ -1,39 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface InputAreaProps {
-    value: string;
-    onChange: (value: string) => void;
     onSendMessage: (text: string) => void;
     disabled?: boolean;
     isGenerating?: boolean;
     onStop?: () => void;
 }
 
-export const InputArea: React.FC<InputAreaProps> = ({
-    value,
-    onChange,
-    onSendMessage,
-    disabled,
-    isGenerating,
-    onStop
-}) => {
+export const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, disabled, isGenerating, onStop }) => {
+    const [input, setInput] = useState("");
+
     const handleSend = () => {
-        if (value.trim()) {
-            onSendMessage(value.trim());
+        if (input.trim()) {
+            onSendMessage(input.trim());
+            setInput("");
         }
     };
 
     return (
         <div className="input-area">
             <textarea
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask about your code..."
                 disabled={disabled || isGenerating}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                         e.preventDefault();
-                        if (!disabled && !isGenerating && value.trim()) {
+                        if (!disabled && !isGenerating && input.trim()) {
                             handleSend();
                         }
                     }
@@ -44,7 +38,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                     Stop
                 </button>
             ) : (
-                <button className="primary-btn" onClick={handleSend} disabled={disabled || !value.trim()}>
+                <button className="primary-btn" onClick={handleSend} disabled={disabled || !input.trim()}>
                     Send
                 </button>
             )}
