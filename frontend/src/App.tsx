@@ -3,6 +3,7 @@ import './index.css';
 import { Header } from './components/Header';
 import { ChatInterface } from './components/ChatInterface';
 import { InputArea } from './components/InputArea';
+import { TasksDrawer } from './components/TasksDrawer';
 import type { Message } from './types';
 
 const generateId = () => {
@@ -24,6 +25,7 @@ function App() {
     const [hasMore, setHasMore] = useState(true);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isTasksOpen, setIsTasksOpen] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const loadHistory = useCallback(async () => {
@@ -301,7 +303,9 @@ function App() {
                 setModel={setModel}
                 webSearchEnabled={webSearchEnabled}
                 setWebSearchEnabled={setWebSearchEnabled}
+                onToggleTasks={() => setIsTasksOpen(!isTasksOpen)}
             />
+            <TasksDrawer isOpen={isTasksOpen} onClose={() => setIsTasksOpen(false)} />
             <ChatInterface
                 messages={filteredMessages}
                 onLoadHistory={loadHistory}
