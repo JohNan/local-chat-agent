@@ -7,6 +7,7 @@ import logging
 import traceback
 import sys
 import asyncio
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
@@ -28,7 +29,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Lifespan context manager for the FastAPI app."""
+    # Startup
+    logger.info("Starting background RAG indexing...")
+    asyncio.create_task(asyncio.to_thread(rag_manager.index_codebase_task))
+    yield
+    # Shutdown (if needed)
+
+
+app = FastAPI(lifespan=lifespan)
 
 # CORS
 app.add_middleware(
@@ -224,9 +236,14 @@ def api_status():
 
 
 @app.post("/api/git_pull")
-def api_git_pull():
+async def api_git_pull():
     """Performs a git pull."""
-    result = git_ops.perform_git_pull()
+    result = await asyncio.to_thread(git_ops.perform_git_pull)
+
+    if result.get("success"):
+        logger.info("Git pull successful. Triggering background re-indexing...")
+        asyncio.create_task(asyncio.to_thread(rag_manager.index_codebase_task))
+
     return result
 
 

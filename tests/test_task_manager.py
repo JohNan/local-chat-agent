@@ -1,5 +1,9 @@
-import os
-import json
+"""
+Tests for task manager.
+"""
+
+# pylint: disable=redefined-outer-name, unused-argument
+
 import pytest
 from app.services import task_manager
 

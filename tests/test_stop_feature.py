@@ -1,3 +1,7 @@
+"""
+Tests for the stop feature.
+"""
+
 import sys
 import os
 import asyncio
@@ -7,6 +11,7 @@ from httpx import AsyncClient, ASGITransport
 # Ensure app is importable
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# pylint: disable=wrong-import-position
 from app.main import app
 from app import agent_engine
 
@@ -53,7 +58,8 @@ async def test_api_stop_with_active_task():
         assert response.json() == {"status": "stopped"}
 
         # Verify task is cancelled
-        # Give it a moment to process cancellation if needed, though cancel() is synchronous in scheduling
+        # Give it a moment to process cancellation if needed,
+        # though cancel() is synchronous in scheduling
         await asyncio.sleep(0)
         assert task.cancelled() or task.done()
 

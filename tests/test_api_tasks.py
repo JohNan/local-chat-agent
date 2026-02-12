@@ -1,11 +1,16 @@
+"""
+Tests for API tasks.
+"""
+
+from unittest.mock import AsyncMock
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock, AsyncMock
 
 
 @pytest.fixture(name="client")
 def fixture_client():
     """Fixture to provide a TestClient instance."""
+    # pylint: disable=import-outside-toplevel
     from app.main import app
 
     return TestClient(app)

@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 # Ensure we can import app from the root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# pylint: disable=protected-access
 from app.services import git_ops, chat_manager  # pylint: disable=wrong-import-position
 
 
@@ -106,11 +107,27 @@ def test_git_status(client, mock_check_output, mocker):
 
 def test_git_pull_success(client, mock_run):
     """Test successful git pull."""
+
     # Mock perform_git_pull subprocess.run
-    mock_result = MagicMock()
-    mock_result.stdout = "Already up to date."
-    mock_result.returncode = 0
-    mock_run.return_value = mock_result
+    def side_effect(args, **kwargs):
+        if args == ["git", "pull"]:
+            mock_result = MagicMock()
+            mock_result.stdout = "Already up to date."
+            mock_result.returncode = 0
+            return mock_result
+        # Return default mock for other calls (e.g., lsb_release)
+        # Ensure stdout/stderr are bytes if text=True isn't set, or str if it is
+        default_mock = MagicMock()
+        if kwargs.get("text"):
+            default_mock.stdout = ""
+            default_mock.stderr = ""
+        else:
+            default_mock.stdout = b""
+            default_mock.stderr = b""
+        default_mock.returncode = 0
+        return default_mock
+
+    mock_run.side_effect = side_effect
 
     response = client.post("/api/git_pull")
     data = response.json()
@@ -120,7 +137,7 @@ def test_git_pull_success(client, mock_run):
     assert "Already up to date" in data["output"]
 
     # Verify subprocess.run was called correctly
-    mock_run.assert_called_with(
+    mock_run.assert_any_call(
         ["git", "pull"],
         cwd=git_ops.CODEBASE_ROOT,
         capture_output=True,
@@ -131,11 +148,25 @@ def test_git_pull_success(client, mock_run):
 
 def test_git_pull_failure(client, mock_run):
     """Test failed git pull."""
+
     # Mock subprocess.run raising CalledProcessError
-    error = subprocess.CalledProcessError(
-        1, ["git", "pull"], output="", stderr="Merge conflict"
-    )
-    mock_run.side_effect = error
+    def side_effect(args, **kwargs):
+        if args == ["git", "pull"]:
+            raise subprocess.CalledProcessError(
+                1, ["git", "pull"], output="", stderr="Merge conflict"
+            )
+        # Return default mock for other calls
+        default_mock = MagicMock()
+        if kwargs.get("text"):
+            default_mock.stdout = ""
+            default_mock.stderr = ""
+        else:
+            default_mock.stdout = b""
+            default_mock.stderr = b""
+        default_mock.returncode = 0
+        return default_mock
+
+    mock_run.side_effect = side_effect
 
     response = client.post("/api/git_pull")
     data = response.json()
