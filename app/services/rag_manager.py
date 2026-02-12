@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 CHROMA_DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
 COLLECTION_NAME = "codebase"
 # Try 004 first, fallback to 001 if needed.
-EMBEDDING_MODEL_PRIMARY = "models/text-embedding-004"
-EMBEDDING_MODEL_FALLBACK = "models/gemini-embedding-001"
+EMBEDDING_MODEL_PRIMARY = "gemini-embedding-001"
+EMBEDDING_MODEL_FALLBACK = "text-embedding-001"
 
 
 class RAGManager:
