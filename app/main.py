@@ -29,8 +29,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """Lifespan context manager for the FastAPI app."""
     # Startup
     logger.info("Starting background RAG indexing...")

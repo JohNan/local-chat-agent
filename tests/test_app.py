@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 # Ensure we can import app from the root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# pylint: disable=protected-access
 from app.services import git_ops, chat_manager  # pylint: disable=wrong-import-position
 
 
@@ -106,6 +107,7 @@ def test_git_status(client, mock_check_output, mocker):
 
 def test_git_pull_success(client, mock_run):
     """Test successful git pull."""
+
     # Mock perform_git_pull subprocess.run
     def side_effect(args, **kwargs):
         if args == ["git", "pull"]:
@@ -146,6 +148,7 @@ def test_git_pull_success(client, mock_run):
 
 def test_git_pull_failure(client, mock_run):
     """Test failed git pull."""
+
     # Mock subprocess.run raising CalledProcessError
     def side_effect(args, **kwargs):
         if args == ["git", "pull"]:

@@ -2,39 +2,8 @@
 Tests for parallel tool execution in agent engine.
 """
 
-import sys
-import os
 from unittest.mock import MagicMock, patch, AsyncMock
-import pytest
-from fastapi.testclient import TestClient
-
-# Ensure app is importable
-sys.path.append(os.getcwd())
-
-from app.main import app  # pylint: disable=wrong-import-position
-
-
-@pytest.fixture(name="client")
-def fixture_client():
-    """Fixture to provide a TestClient instance."""
-    return TestClient(app)
-
-
-class AsyncIterator:
-    """Helper to create an async iterator from a list."""
-
-    def __init__(self, items):
-        self.items = items
-
-    def __aiter__(self):
-        self.iter = iter(self.items)  # pylint: disable=attribute-defined-outside-init
-        return self
-
-    async def __anext__(self):
-        try:
-            return next(self.iter)
-        except StopIteration as e:
-            raise StopAsyncIteration from e
+from tests.utils import AsyncIterator
 
 
 def test_parallel_tool_execution(client):

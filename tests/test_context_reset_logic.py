@@ -1,14 +1,21 @@
+"""
+Tests for context reset logic.
+"""
+
 import sys
 import os
-import pytest
 
 # Add app to path
 sys.path.append(os.getcwd())
 
-from app.main import _format_history
+# pylint: disable=wrong-import-position, protected-access
+from app.main import (
+    _format_history,
+)
 
 
 def test_format_history_no_marker():
+    """Test formatting history without reset marker."""
     history = [
         {"role": "user", "parts": [{"text": "Hello"}]},
         {"role": "model", "parts": [{"text": "Hi"}]},
@@ -22,6 +29,7 @@ def test_format_history_no_marker():
 
 
 def test_format_history_with_marker():
+    """Test formatting history with reset marker."""
     history = [
         {"role": "user", "parts": [{"text": "Old 1"}]},
         {"role": "model", "parts": [{"text": "Old 2"}]},
@@ -40,6 +48,7 @@ def test_format_history_with_marker():
 
 
 def test_format_history_marker_at_end():
+    """Test formatting history with marker at end."""
     history = [
         {"role": "user", "parts": [{"text": "Old 1"}]},
         {"role": "system", "parts": [{"text": "--- Context Reset ---"}]},
@@ -51,6 +60,7 @@ def test_format_history_marker_at_end():
 
 
 def test_format_history_marker_then_one_msg():
+    """Test formatting history with marker then one message."""
     history = [
         {"role": "system", "parts": [{"text": "--- Context Reset ---"}]},
         {"role": "user", "parts": [{"text": "New 1"}]},
@@ -62,6 +72,7 @@ def test_format_history_marker_then_one_msg():
 
 
 def test_format_history_multiple_markers():
+    """Test formatting history with multiple markers."""
     history = [
         {"role": "user", "parts": [{"text": "Old 1"}]},
         {"role": "system", "parts": [{"text": "Reset 1"}]},
