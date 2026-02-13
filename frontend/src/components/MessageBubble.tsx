@@ -29,13 +29,25 @@ marked.use({
 interface MessageBubbleProps {
     message: Message;
     toolStatus?: string | null;
+    deployedSessionId?: string | null;
 }
 
-const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolStatus }) => {
+const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolStatus, deployedSessionId }) => {
     const [deploying, setDeploying] = useState(false);
-    const [deployResult, setDeployResult] = useState<string | null>(null);
+    const [deployResult, setDeployResult] = useState<string | null>(
+        deployedSessionId ? `Started! (${deployedSessionId})` : null
+    );
     const [isError, setIsError] = useState(false);
-    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [sessionId, setSessionId] = useState<string | null>(deployedSessionId || null);
+
+    React.useEffect(() => {
+        if (deployedSessionId) {
+            setSessionId(deployedSessionId);
+            setDeployResult(`Started! (${deployedSessionId})`);
+            setIsError(false);
+        }
+    }, [deployedSessionId]);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [statusData, setStatusData] = useState<any>(null);
     const [checkingStatus, setCheckingStatus] = useState(false);
