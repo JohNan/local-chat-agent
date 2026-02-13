@@ -7,6 +7,7 @@ import logging
 import traceback
 import sys
 import asyncio
+import base64
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query
@@ -136,8 +137,12 @@ def _prepare_messages(user_msg, media):
     Prepares messages for storage and Gemini API.
     Splits media into inline data for JSON storage and Blob objects for the SDK.
     """
-    storage_parts = [{"text": user_msg}]
-    gemini_msg = [types.Part(text=user_msg)]
+    storage_parts = []
+    gemini_msg = []
+
+    if user_msg:
+        storage_parts.append({"text": user_msg})
+        gemini_msg.append(types.Part(text=user_msg))
 
     if media:
         for item in media:
@@ -149,7 +154,8 @@ def _prepare_messages(user_msg, media):
             gemini_msg.append(
                 types.Part(
                     inline_data=types.Blob(
-                        mime_type=item["mime_type"], data=item["data"]
+                        mime_type=item["mime_type"],
+                        data=base64.b64decode(item["data"]),
                     )
                 )
             )
@@ -201,7 +207,7 @@ def _format_history(history):
                         types.Part(
                             inline_data=types.Blob(
                                 mime_type=p["inline_data"]["mime_type"],
-                                data=p["inline_data"]["data"],
+                                data=base64.b64decode(p["inline_data"]["data"]),
                             )
                         )
                     )
