@@ -4,7 +4,7 @@ import { Header } from './components/Header';
 import { ChatInterface } from './components/ChatInterface';
 import { InputArea } from './components/InputArea';
 import { TasksDrawer } from './components/TasksDrawer';
-import type { Message } from './types';
+import type { Message, MediaItem } from './types';
 
 const generateId = () => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -39,11 +39,23 @@ function App() {
             if (data.messages && data.messages.length > 0) {
                 // Ensure text property exists
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const formattedMessages = data.messages.map((m: any) => ({
-                    ...m,
-                    id: m.id || generateId(),
-                    text: m.parts?.[0]?.text || m.text || ""
-                }));
+                const formattedMessages = data.messages.map((m: any) => {
+                    const media: MediaItem[] = [];
+                    if (m.parts) {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        m.parts.forEach((p: any) => {
+                            if (p.inline_data) {
+                                media.push(p.inline_data);
+                            }
+                        });
+                    }
+                    return {
+                        ...m,
+                        id: m.id || generateId(),
+                        text: m.parts?.[0]?.text || m.text || "",
+                        media: media.length > 0 ? media : undefined
+                    };
+                });
 
                 setMessages(prev => [...formattedMessages, ...prev]);
                 setOffset(prev => prev + data.messages.length);
@@ -173,11 +185,23 @@ function App() {
 
             if (data.messages) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const formattedMessages = data.messages.map((m: any) => ({
-                    ...m,
-                    id: m.id || generateId(),
-                    text: m.parts?.[0]?.text || m.text || ""
-                }));
+                const formattedMessages = data.messages.map((m: any) => {
+                    const media: MediaItem[] = [];
+                    if (m.parts) {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        m.parts.forEach((p: any) => {
+                            if (p.inline_data) {
+                                media.push(p.inline_data);
+                            }
+                        });
+                    }
+                    return {
+                        ...m,
+                        id: m.id || generateId(),
+                        text: m.parts?.[0]?.text || m.text || "",
+                        media: media.length > 0 ? media : undefined
+                    };
+                });
 
                 // Replace messages
                 setMessages(formattedMessages);
@@ -225,9 +249,15 @@ function App() {
         }
     };
 
-    const sendMessage = async (text: string) => {
+    const sendMessage = async (text: string, media?: MediaItem[]) => {
         // Add user message
-        const userMsg: Message = { id: generateId(), role: 'user', text, parts: [{text}] };
+        const userMsg: Message = {
+            id: generateId(),
+            role: 'user',
+            text,
+            parts: [{text}],
+            media: media
+        };
         setMessages(prev => [...prev, userMsg]);
         setOffset(prev => prev + 1);
 
@@ -246,7 +276,8 @@ function App() {
                 body: JSON.stringify({
                     message: text,
                     model,
-                    include_web_search: webSearchEnabled
+                    include_web_search: webSearchEnabled,
+                    media: media
                 }),
                 signal: controller.signal
             });
