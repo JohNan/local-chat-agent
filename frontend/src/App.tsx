@@ -1,74 +1,74 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import type { InfiniteData } from '@tanstack/react-query';
 import './index.css';
 import { Header } from './components/Header';
 import { ChatInterface } from './components/ChatInterface';
 import { InputArea } from './components/InputArea';
 import { TasksDrawer } from './components/TasksDrawer';
-import type { Message, MediaItem } from './types';
-
-const generateId = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-};
+import { useChatHistory } from './hooks/useChatHistory';
+import { generateId } from './utils';
+import type { Message, MediaItem, HistoryResponse } from './types';
 
 function App() {
-    const [messages, setMessages] = useState<Message[]>([]);
+    const {
+        data,
+        fetchNextPage,
+        isFetchingNextPage,
+        queryClient
+    } = useChatHistory();
+
     const [model, setModel] = useState("gemini-3-pro-preview");
     const [webSearchEnabled, setWebSearchEnabled] = useState(() => {
         const saved = localStorage.getItem("webSearchEnabled");
         return saved !== null ? JSON.parse(saved) : false;
     });
     const [currentToolStatus, setCurrentToolStatus] = useState<string | null>(null);
-    const [offset, setOffset] = useState(0);
-    const [hasMore, setHasMore] = useState(true);
-    const [loadingHistory, setLoadingHistory] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isTasksOpen, setIsTasksOpen] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
 
-    const loadHistory = useCallback(async () => {
-        if (loadingHistory || !hasMore) return;
-        setLoadingHistory(true);
-        try {
-            const limit = 20;
-            const res = await fetch(`/api/history?limit=${limit}&offset=${offset}`);
-            const data = await res.json();
+    // Derived messages state
+    const messages = useMemo(() => {
+        if (!data) return [];
+        // Flatten pages: [Page1 (Older), Page0 (Newer)] -> [OlderMsgs, NewerMsgs]
+        // data.pages is [Page0 (Newer), Page1 (Older)]
+        return data.pages.slice().reverse().flatMap(page => page.messages);
+    }, [data]);
 
-            if (data.messages && data.messages.length > 0) {
-                // Ensure text property exists
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const formattedMessages = data.messages.map((m: any) => {
-                    const media: MediaItem[] = [];
-                    if (m.parts) {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        m.parts.forEach((p: any) => {
-                            if (p.inline_data) {
-                                media.push(p.inline_data);
-                            }
-                        });
-                    }
-                    return {
-                        ...m,
-                        id: m.id || generateId(),
-                        text: m.parts?.[0]?.text || m.text || "",
-                        media: media.length > 0 ? media : undefined
-                    };
-                });
-
-                setMessages(prev => [...formattedMessages, ...prev]);
-                setOffset(prev => prev + data.messages.length);
-                setHasMore(data.has_more);
-            } else {
-                setHasMore(false);
+    const addMessage = (msg: Message) => {
+        queryClient.setQueryData<InfiniteData<HistoryResponse>>(['chat-history'], (oldData) => {
+            if (!oldData) {
+                return {
+                    pages: [{ messages: [msg], has_more: false }],
+                    pageParams: [0]
+                } as InfiniteData<HistoryResponse>;
             }
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoadingHistory(false);
-        }
-    }, [offset, hasMore, loadingHistory]);
+            const newPages = [...oldData.pages];
+            if (newPages.length > 0) {
+                 const firstPage = { ...newPages[0] };
+                 firstPage.messages = [...firstPage.messages, msg];
+                 newPages[0] = firstPage;
+            }
+            return { ...oldData, pages: newPages };
+        });
+    };
+
+    const updateLastMessage = (updater: (msg: Message) => Message) => {
+        queryClient.setQueryData<InfiniteData<HistoryResponse>>(['chat-history'], (oldData) => {
+            if (!oldData) return oldData;
+            const newPages = [...oldData.pages];
+            if (newPages.length > 0) {
+                 const firstPage = { ...newPages[0] };
+                 firstPage.messages = [...firstPage.messages];
+                 const lastIndex = firstPage.messages.length - 1;
+                 if (lastIndex >= 0) {
+                     firstPage.messages[lastIndex] = updater(firstPage.messages[lastIndex]);
+                 }
+                 newPages[0] = firstPage;
+            }
+            return { ...oldData, pages: newPages };
+        });
+    };
 
     const readStream = async (
         response: Response,
@@ -86,15 +86,12 @@ function App() {
         while (true) {
             const { done, value } = await reader.read();
             if (done) {
-                // Final update to ensure we didn't miss anything
-                setMessages(prev => {
-                    const newMsgs = [...prev];
-                    const lastIndex = newMsgs.length - 1;
-                    const last = newMsgs[lastIndex];
+                // Final update
+                updateLastMessage(last => {
                     if (last && (last.role === 'model' || last.role === 'ai')) {
-                        newMsgs[lastIndex] = { ...last, text: currentText, parts: [{ text: currentText }] };
+                        return { ...last, text: currentText, parts: [{ text: currentText }] };
                     }
-                    return newMsgs;
+                    return last;
                 });
                 onComplete(currentText);
                 break;
@@ -110,47 +107,41 @@ function App() {
                 if (!part.trim()) continue;
                 const lines = part.split('\n');
                 let eventType = "";
-                let data = "";
+                let dataStr = "";
 
                 for (const line of lines) {
                     if (line.startsWith('event: ')) {
                         eventType = line.slice(7).trim();
                     } else if (line.startsWith('data: ')) {
-                        data = line.slice(6); // Keep raw data string
+                        dataStr = line.slice(6); // Keep raw data string
                     }
                 }
 
                 if (eventType === 'message') {
                     try {
-                        // data is like "Hello", so JSON.parse removes quotes
-                        const parsedText = JSON.parse(data);
+                        const parsedText = JSON.parse(dataStr);
                         currentText += parsedText;
                         hasNewText = true;
                     } catch (e) {
-                        console.error("Failed to parse message data:", data, e);
+                        console.error("Failed to parse message data:", dataStr, e);
                     }
                 } else if (eventType === 'tool') {
                     try {
-                        // Now we expect a JSON string, just like 'message' events
-                        const parsedStatus = JSON.parse(data);
+                        const parsedStatus = JSON.parse(dataStr);
                         setCurrentToolStatus(parsedStatus);
                     } catch (e) {
                         console.warn("Tool status parse error:", e);
-                        // Fallback if something goes wrong, but show the error
                         setCurrentToolStatus("Executing tools...");
                     }
                 } else if (eventType === 'done' || eventType === 'error') {
-                    if (eventType === 'error') console.error("Stream error:", data);
+                    if (eventType === 'error') console.error("Stream error:", dataStr);
                     setCurrentToolStatus(null);
-                    // Final update to ensure we didn't miss anything
-                    setMessages(prev => {
-                        const newMsgs = [...prev];
-                        const lastIndex = newMsgs.length - 1;
-                        const last = newMsgs[lastIndex];
+                    // Final update
+                    updateLastMessage(last => {
                         if (last && (last.role === 'model' || last.role === 'ai')) {
-                            newMsgs[lastIndex] = { ...last, text: currentText, parts: [{ text: currentText }] };
+                            return { ...last, text: currentText, parts: [{ text: currentText }] };
                         }
-                        return newMsgs;
+                        return last;
                     });
                     onComplete(currentText);
                     return; // Exit loop
@@ -160,58 +151,16 @@ function App() {
             if (hasNewText) {
                 const now = Date.now();
                 if (now - lastUpdate > THROTTLE_MS) {
-                    setMessages(prev => {
-                        const newMsgs = [...prev];
-                        const lastIndex = newMsgs.length - 1;
-                        const last = newMsgs[lastIndex];
+                    updateLastMessage(last => {
                         if (last && (last.role === 'model' || last.role === 'ai')) {
-                            newMsgs[lastIndex] = { ...last, text: currentText, parts: [{ text: currentText }] };
+                            return { ...last, text: currentText, parts: [{ text: currentText }] };
                         }
-                        return newMsgs;
+                        return last;
                     });
                     setCurrentToolStatus(null);
                     lastUpdate = now;
                 }
             }
-        }
-    };
-
-    const refreshHistory = async () => {
-        setLoadingHistory(true);
-        try {
-            const limit = 20;
-            const res = await fetch(`/api/history?limit=${limit}&offset=0`);
-            const data = await res.json();
-
-            if (data.messages) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const formattedMessages = data.messages.map((m: any) => {
-                    const media: MediaItem[] = [];
-                    if (m.parts) {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        m.parts.forEach((p: any) => {
-                            if (p.inline_data) {
-                                media.push(p.inline_data);
-                            }
-                        });
-                    }
-                    return {
-                        ...m,
-                        id: m.id || generateId(),
-                        text: m.parts?.[0]?.text || m.text || "",
-                        media: media.length > 0 ? media : undefined
-                    };
-                });
-
-                // Replace messages
-                setMessages(formattedMessages);
-                setOffset(data.messages.length);
-                setHasMore(data.has_more);
-            }
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoadingHistory(false);
         }
     };
 
@@ -221,11 +170,11 @@ function App() {
             if (res.ok) {
                  // Add placeholder for AI message
                 const aiMsg: Message = { id: generateId(), role: 'model', text: "", parts: [{text: ""}] };
-                setMessages(prev => [...prev, aiMsg]);
+                addMessage(aiMsg);
 
                 await readStream(res, () => {
-                     // On complete, reload history to get the full correct message
-                     refreshHistory();
+                     // On complete, ensure sync
+                     queryClient.invalidateQueries({ queryKey: ['chat-history'] });
                 });
             }
         } catch (e) {
@@ -258,12 +207,11 @@ function App() {
             parts: [{text}],
             media: media
         };
-        setMessages(prev => [...prev, userMsg]);
-        setOffset(prev => prev + 1);
+        addMessage(userMsg);
 
         // Add placeholder for AI message
         const aiMsg: Message = { id: generateId(), role: 'model', text: "", parts: [{text: ""}] };
-        setMessages(prev => [...prev, aiMsg]);
+        addMessage(aiMsg);
 
         setIsGenerating(true);
         const controller = new AbortController();
@@ -282,7 +230,9 @@ function App() {
                 signal: controller.signal
             });
 
-            await readStream(response, () => {});
+            await readStream(response, () => {
+                queryClient.invalidateQueries({ queryKey: ['chat-history'] });
+            });
 
         } catch (error) {
             if (error instanceof Error && error.name === 'AbortError') {
@@ -297,13 +247,10 @@ function App() {
         }
     };
 
-    // Initial load
+    // Initial load handled by React Query automatically,
+    // but we need to check for active stream on mount.
     useEffect(() => {
-        const init = async () => {
-            await loadHistory();
-            resumeStream();
-        };
-        init();
+        resumeStream();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -339,9 +286,9 @@ function App() {
             <TasksDrawer isOpen={isTasksOpen} onClose={() => setIsTasksOpen(false)} />
             <ChatInterface
                 messages={filteredMessages}
-                onLoadHistory={loadHistory}
+                onLoadHistory={fetchNextPage}
                 toolStatus={currentToolStatus}
-                isLoadingHistory={loadingHistory}
+                isLoadingHistory={isFetchingNextPage}
             />
             <InputArea
                 onSendMessage={sendMessage}
