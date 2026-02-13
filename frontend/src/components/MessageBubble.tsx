@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js';
-import { Bot, Loader2, Rocket, Check, X, User, GitPullRequestArrow, RefreshCw, Copy } from 'lucide-react';
+import { Bot, Loader2, Rocket, Check, X, User, GitPullRequestArrow, RefreshCw, Copy, FileText } from 'lucide-react';
 import type { Message } from '../types';
 
 // Configure marked with highlight.js
@@ -275,12 +275,30 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                  {message.media && message.media.length > 0 && (
                      <div className="message-media" style={{ marginBottom: '10px', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                          {message.media.map((item, index) => (
-                             <img
-                                 key={index}
-                                 src={`data:${item.mime_type};base64,${item.data}`}
-                                 alt="attachment"
-                                 style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}
-                             />
+                             item.mime_type.startsWith('image/') ? (
+                                 <img
+                                     key={index}
+                                     src={`data:${item.mime_type};base64,${item.data}`}
+                                     alt="attachment"
+                                     style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}
+                                 />
+                             ) : (
+                                 <div key={index} className="file-attachment" style={{
+                                     display: 'flex',
+                                     alignItems: 'center',
+                                     gap: '10px',
+                                     padding: '10px',
+                                     backgroundColor: 'rgba(0,0,0,0.05)',
+                                     border: '1px solid rgba(0,0,0,0.1)',
+                                     borderRadius: '8px',
+                                     maxWidth: '100%'
+                                 }}>
+                                     <FileText size={24} />
+                                     <span style={{ fontSize: '0.9em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                         {item.mime_type}
+                                     </span>
+                                 </div>
+                             )
                          ))}
                      </div>
                  )}
