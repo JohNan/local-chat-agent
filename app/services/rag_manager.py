@@ -49,18 +49,18 @@ class RAGManager:
         """Calculates MD5 hash of content."""
         return hashlib.md5(content.encode("utf-8")).hexdigest()
 
-    def _get_embedding(self, text: str) -> list[float] | None:
-        """Generates an embedding for the given text."""
+    def _get_embeddings(self, texts: list[str]) -> list[list[float]] | None:
+        """Generates embeddings for the given list of texts."""
         if not self.genai_client:
             return None
 
         # Try primary model
         try:
             result = self.genai_client.models.embed_content(
-                model=EMBEDDING_MODEL_PRIMARY, contents=text
+                model=EMBEDDING_MODEL_PRIMARY, contents=texts
             )
             if hasattr(result, "embeddings") and result.embeddings:
-                return result.embeddings[0].values
+                return [e.values for e in result.embeddings]
             return None
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(
@@ -72,10 +72,10 @@ class RAGManager:
             # Try fallback model
             try:
                 result = self.genai_client.models.embed_content(
-                    model=EMBEDDING_MODEL_FALLBACK, contents=text
+                    model=EMBEDDING_MODEL_FALLBACK, contents=texts
                 )
                 if hasattr(result, "embeddings") and result.embeddings:
-                    return result.embeddings[0].values
+                    return [e.values for e in result.embeddings]
                 return None
             except Exception as e2:  # pylint: disable=broad-exception-caught
                 logger.error(
@@ -85,7 +85,7 @@ class RAGManager:
 
     def index_codebase(self):
         """Indexes the codebase by walking through files."""
-        # pylint: disable=too-many-locals
+        # pylint: disable=too-many-locals, too-many-branches
         if not self.collection:
             return {"status": "error", "message": "ChromaDB not initialized"}
 
@@ -106,6 +106,10 @@ class RAGManager:
             ".css",
             ".json",
         }
+
+        pending_documents = []
+        pending_metadatas = []
+        pending_ids = []
 
         for root, _, files in os.walk("."):
             # Skip common ignore directories
@@ -153,37 +157,51 @@ class RAGManager:
                     # Chunking
                     chunks = self._chunk_text(content)
 
-                    ids = []
-                    embeddings = []
-                    documents = []
-                    metadatas = []
-
                     for i, chunk in enumerate(chunks):
-                        embedding = self._get_embedding(chunk)
-                        if embedding:
-                            chunk_id = f"{filepath}:{i}"
-                            ids.append(chunk_id)
-                            embeddings.append(embedding)
-                            documents.append(chunk)
-                            metadatas.append(
-                                {
-                                    "filepath": filepath,
-                                    "chunk_index": i,
-                                    "file_hash": file_hash,
-                                }
-                            )
-
-                    if ids:
-                        self.collection.upsert(
-                            ids=ids,
-                            embeddings=embeddings,
-                            documents=documents,
-                            metadatas=metadatas,
+                        chunk_id = f"{filepath}:{i}"
+                        pending_ids.append(chunk_id)
+                        pending_documents.append(chunk)
+                        pending_metadatas.append(
+                            {
+                                "filepath": filepath,
+                                "chunk_index": i,
+                                "file_hash": file_hash,
+                            }
                         )
-                        files_indexed += 1
+
+                    files_indexed += 1
 
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     logger.error("Error indexing file %s: %s", filepath, e)
+
+        # Process batches
+        batch_size = 100
+        total_chunks = len(pending_documents)
+        logger.info("Processing %d chunks in batches of %d", total_chunks, batch_size)
+
+        for i in range(0, total_chunks, batch_size):
+            batch_docs = pending_documents[i : i + batch_size]
+            batch_ids = pending_ids[i : i + batch_size]
+            batch_metas = pending_metadatas[i : i + batch_size]
+
+            try:
+                embeddings = self._get_embeddings(batch_docs)
+                if embeddings:
+                    # Check if we got correct number of embeddings
+                    if len(embeddings) != len(batch_docs):
+                        logger.error(
+                            "Mismatch in embeddings count for batch starting at %d", i
+                        )
+                        continue
+
+                    self.collection.upsert(
+                        ids=batch_ids,
+                        embeddings=embeddings,
+                        documents=batch_docs,
+                        metadatas=batch_metas,
+                    )
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error("Error processing batch starting at %d: %s", i, e)
 
         logger.info("Indexing complete. Indexed %d files.", files_indexed)
         return {"status": "success", "files_indexed": files_indexed}
@@ -214,9 +232,10 @@ class RAGManager:
         if not self.collection:
             return "Error: ChromaDB not initialized."
 
-        embedding = self._get_embedding(query)
-        if not embedding:
+        embeddings = self._get_embeddings([query])
+        if not embeddings or not embeddings[0]:
             return "Error: Could not generate embedding for query."
+        embedding = embeddings[0]
 
         try:
             results = self.collection.query(
