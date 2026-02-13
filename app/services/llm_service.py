@@ -17,7 +17,6 @@ CACHE_STATE = {}
 
 def clear_cache():
     """Clears the global cache state."""
-    global CACHE_STATE  # pylint: disable=global-statement
     CACHE_STATE.clear()
 
 
