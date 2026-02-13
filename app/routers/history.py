@@ -6,7 +6,7 @@ import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from app.services import chat_manager
+from app.services import chat_manager, prompt_router
 from app.services.llm_service import clear_cache
 
 logger = logging.getLogger(__name__)
@@ -26,6 +26,7 @@ def api_context_reset():
     """Inserts a context reset marker."""
     try:
         chat_manager.add_context_marker()
+        prompt_router.clear_active_persona()
         clear_cache()  # Invalidate cache
         return {"status": "success"}
     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -40,6 +41,7 @@ def api_reset():
     """Resets chat history."""
     try:
         chat_manager.reset_history()
+        prompt_router.clear_active_persona()
         clear_cache()  # Invalidate cache
         return {"status": "success"}
     except Exception as e:  # pylint: disable=broad-exception-caught

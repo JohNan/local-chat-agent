@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, List } from 'lucide-react';
+import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, List, LayoutTemplate, Smartphone, Box, Server, MessageSquare } from 'lucide-react';
 import type { RepoStatus } from '../types';
 
 interface HeaderProps {
@@ -98,12 +98,25 @@ export const Header: React.FC<HeaderProps> = ({
         updateStatus();
     }, []);
 
+    const getPersonaIcon = (persona?: string) => {
+        switch (persona) {
+            case 'UI': return <LayoutTemplate size={20} />;
+            case 'MOBILE': return <Smartphone size={20} />;
+            case 'ARCHITECT': return <Box size={20} />;
+            case 'CI_CD': return <Server size={20} />;
+            default: return <MessageSquare size={20} />;
+        }
+    };
+
     return (
         <>
             <div className="header">
                 <div className="header-title">
                     <Bot size={24} />
                     <span>Gemini Agent</span>
+                    <div title={status?.active_persona || "General"} style={{ display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
+                        {getPersonaIcon(status?.active_persona)}
+                    </div>
                 </div>
                 <div className="header-controls">
                     <button onClick={onToggleTasks} className="icon-btn" title="Tasks">
@@ -111,9 +124,6 @@ export const Header: React.FC<HeaderProps> = ({
                     </button>
                     <button onClick={clearContext} className="icon-btn" title="Reset Context">
                         <Eraser size={20} />
-                    </button>
-                    <button onClick={clearHistory} className="icon-btn" title="Clear History">
-                        <Trash2 size={20} />
                     </button>
                     <button onClick={() => setShowSettings(true)} className="icon-btn" title="Settings">
                         <Settings size={20} />
@@ -167,7 +177,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 </label>
                             </div>
 
-                            <div className="setting-actions" style={{ marginTop: '20px' }}>
+                            <div className="setting-actions" style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                 <button
                                     onClick={gitPull}
                                     className="icon-btn"
@@ -183,6 +193,21 @@ export const Header: React.FC<HeaderProps> = ({
                                 >
                                     <GitPullRequestArrow size={20} />
                                     <span>Git Pull</span>
+                                </button>
+                                <button
+                                    onClick={clearHistory}
+                                    className="icon-btn"
+                                    title="Clear History"
+                                    style={{
+                                        border: '1px solid #454545',
+                                        width: '100%',
+                                        justifyContent: 'center',
+                                        gap: '10px',
+                                        padding: '8px'
+                                    }}
+                                >
+                                    <Trash2 size={20} />
+                                    <span>Clear History</span>
                                 </button>
                             </div>
                         </div>
