@@ -104,16 +104,11 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="header-title">
                     <Bot size={24} />
                     <span>Gemini Agent</span>
+                    {status?.active_persona && <span className="persona-badge">{status.active_persona}</span>}
                 </div>
                 <div className="header-controls">
                     <button onClick={onToggleTasks} className="icon-btn" title="Tasks">
                         <List size={20} />
-                    </button>
-                    <button onClick={clearContext} className="icon-btn" title="Reset Context">
-                        <Eraser size={20} />
-                    </button>
-                    <button onClick={clearHistory} className="icon-btn" title="Clear History">
-                        <Trash2 size={20} />
                     </button>
                     <button onClick={() => setShowSettings(true)} className="icon-btn" title="Settings">
                         <Settings size={20} />
@@ -167,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 </label>
                             </div>
 
-                            <div className="setting-actions" style={{ marginTop: '20px' }}>
+                            <div className="setting-actions" style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                 <button
                                     onClick={gitPull}
                                     className="icon-btn"
@@ -183,6 +178,38 @@ export const Header: React.FC<HeaderProps> = ({
                                 >
                                     <GitPullRequestArrow size={20} />
                                     <span>Git Pull</span>
+                                </button>
+                                <button
+                                    onClick={clearContext}
+                                    className="icon-btn"
+                                    title="Reset Context"
+                                    style={{
+                                        border: '1px solid #454545',
+                                        width: '100%',
+                                        justifyContent: 'center',
+                                        gap: '10px',
+                                        padding: '8px'
+                                    }}
+                                >
+                                    <Eraser size={20} />
+                                    <span>Reset AI Context</span>
+                                </button>
+                                <button
+                                    onClick={clearHistory}
+                                    className="icon-btn"
+                                    title="Clear History"
+                                    style={{
+                                        border: '1px solid #454545',
+                                        width: '100%',
+                                        justifyContent: 'center',
+                                        gap: '10px',
+                                        padding: '8px',
+                                        color: '#ff6b6b',
+                                        borderColor: '#ff6b6b'
+                                    }}
+                                >
+                                    <Trash2 size={20} />
+                                    <span>Clear Chat History</span>
                                 </button>
                             </div>
                         </div>

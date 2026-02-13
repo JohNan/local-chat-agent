@@ -8,7 +8,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from app.config import CLIENT
-from app.services import git_ops, rag_manager
+from app.services import git_ops, rag_manager, prompt_router
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ router = APIRouter()
 def api_status():
     """Returns repository status."""
     info = git_ops.get_repo_info()
+    info["active_persona"] = prompt_router.load_active_persona()
     return info
 
 

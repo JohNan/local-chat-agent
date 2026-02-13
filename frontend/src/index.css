@@ -38,6 +38,15 @@ body {
     align-items: center;
     gap: 10px;
 }
+.persona-badge {
+    background-color: var(--user-msg-bg);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    margin-left: 10px;
+    font-weight: normal;
+}
 .header-controls {
     display: flex;
     align-items: center;

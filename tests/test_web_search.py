@@ -13,7 +13,7 @@ from google.genai import types
 sys.path.append(os.getcwd())
 
 from app.main import app  # pylint: disable=wrong-import-position
-from app import agent_engine
+from app.services import prompt_router
 
 
 @pytest.fixture(name="client")
@@ -53,7 +53,7 @@ def test_web_search_enabled_via_request(client):
         assert isinstance(tool.google_search, types.GoogleSearch)
 
         # Verify system instruction includes search prompt
-        assert agent_engine.SYSTEM_INSTRUCTION in config.system_instruction
+        assert prompt_router.CORE_INSTRUCTION in config.system_instruction
         assert "access to Google Search" in config.system_instruction
 
 
@@ -86,7 +86,7 @@ def test_web_search_disabled_via_request(client):
         assert tool.google_search is None
 
         # Verify system instruction is default
-        assert config.system_instruction == agent_engine.SYSTEM_INSTRUCTION
+        assert config.system_instruction == prompt_router.CORE_INSTRUCTION
 
 
 def test_web_search_default_false(client):

@@ -12,7 +12,7 @@ from google.genai import types
 
 from app import agent_engine
 from app.config import CLIENT, ENABLE_GOOGLE_SEARCH
-from app.services import chat_manager
+from app.services import chat_manager, prompt_router
 from app.services.llm_service import (
     prepare_messages,
     format_history,
@@ -101,7 +101,13 @@ async def chat(request: ChatRequest):
     tool = get_tool_config(CLIENT, enable_search)
 
     # Configure system instruction
-    system_instruction = agent_engine.SYSTEM_INSTRUCTION
+    active_persona = prompt_router.load_active_persona()
+    if not active_persona:
+        active_persona = prompt_router.classify_intent(user_msg)
+        prompt_router.save_active_persona(active_persona)
+
+    system_instruction = prompt_router.get_system_instruction(active_persona)
+
     if enable_search:
         system_instruction += (
             "\n\nYou also have access to Google Search to "
@@ -176,7 +182,9 @@ async def chat_get(message: str = Query(...)):
         model="gemini-3-pro-preview",
         config=types.GenerateContentConfig(
             tools=[tool],
-            system_instruction=agent_engine.SYSTEM_INSTRUCTION,
+            system_instruction=prompt_router.get_system_instruction(
+                prompt_router.load_active_persona()
+            ),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(
                 disable=True
             ),

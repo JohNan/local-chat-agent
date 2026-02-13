@@ -23,4 +23,5 @@ export interface HistoryResponse {
 export interface RepoStatus {
     project: string;
     branch: string;
+    active_persona?: string | null;
 }
