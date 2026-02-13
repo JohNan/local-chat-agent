@@ -44,7 +44,7 @@ def test_api_models(client, mocker):
 
     mock_client.models.list.return_value = [model1, model2, model3, model4]
 
-    mocker.patch("app.main.CLIENT", mock_client)
+    mocker.patch("app.routers.system.CLIENT", mock_client)
 
     response = client.get("/api/models")
     assert response.status_code == 200
@@ -66,7 +66,7 @@ def test_api_models_error(client, mocker):
     """Test the /api/models endpoint when an error occurs."""
     mock_client = MagicMock()
     mock_client.models.list.side_effect = Exception("API Error")
-    mocker.patch("app.main.CLIENT", mock_client)
+    mocker.patch("app.routers.system.CLIENT", mock_client)
 
     response = client.get("/api/models")
     assert response.status_code == 500

@@ -10,7 +10,7 @@ from tests.utils import AsyncIterator
 def test_chat_get_stream_basic(client):
     """Test basic chat streaming with GET request."""
     # Mock the Gemini Client
-    with patch("app.main.CLIENT") as mock_client:
+    with patch("app.routers.chat.CLIENT") as mock_client:
         # Mock CLIENT.aio.chats.create to be synchronous returning mock_chat
         mock_chat = MagicMock()
         mock_client.aio.chats.create.return_value = mock_chat
@@ -51,7 +51,7 @@ def test_chat_get_stream_basic(client):
 
 def test_chat_tool_execution(client):
     """Test chat streaming with tool execution."""
-    with patch("app.main.CLIENT") as mock_client:
+    with patch("app.routers.chat.CLIENT") as mock_client:
         mock_chat = MagicMock()
         mock_client.aio.chats.create.return_value = mock_chat
 

@@ -8,7 +8,7 @@ from tests.utils import AsyncIterator
 
 def test_parallel_tool_execution(client):
     """Test that multiple tools are executed in parallel."""
-    with patch("app.main.CLIENT") as mock_client:
+    with patch("app.routers.chat.CLIENT") as mock_client:
         mock_chat = MagicMock()
         mock_client.aio.chats.create.return_value = mock_chat
 

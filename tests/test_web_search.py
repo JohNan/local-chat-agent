@@ -24,7 +24,7 @@ def fixture_client():
 
 def test_web_search_enabled_via_request(client):
     """Test that include_web_search=True enables google_search."""
-    with patch("app.main.CLIENT") as mock_client:
+    with patch("app.routers.chat.CLIENT") as mock_client:
         mock_chat = MagicMock()
         mock_client.aio.chats.create.return_value = mock_chat
 
@@ -59,7 +59,7 @@ def test_web_search_enabled_via_request(client):
 
 def test_web_search_disabled_via_request(client):
     """Test that include_web_search=False disables google_search."""
-    with patch("app.main.CLIENT") as mock_client:
+    with patch("app.routers.chat.CLIENT") as mock_client:
         mock_chat = MagicMock()
         mock_client.aio.chats.create.return_value = mock_chat
 
@@ -91,8 +91,8 @@ def test_web_search_disabled_via_request(client):
 
 def test_web_search_default_false(client):
     """Test that default (None) falls back to env var (False)."""
-    with patch("app.main.CLIENT") as mock_client, patch(
-        "app.main.ENABLE_GOOGLE_SEARCH", False
+    with patch("app.routers.chat.CLIENT") as mock_client, patch(
+        "app.routers.chat.ENABLE_GOOGLE_SEARCH", False
     ):
 
         mock_chat = MagicMock()
@@ -119,8 +119,8 @@ def test_web_search_default_false(client):
 
 def test_web_search_env_var_true(client):
     """Test that env var ENABLE_GOOGLE_SEARCH=True enables search if request is None."""
-    with patch("app.main.CLIENT") as mock_client, patch(
-        "app.main.ENABLE_GOOGLE_SEARCH", True
+    with patch("app.routers.chat.CLIENT") as mock_client, patch(
+        "app.routers.chat.ENABLE_GOOGLE_SEARCH", True
     ):
 
         mock_chat = MagicMock()
