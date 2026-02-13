@@ -170,7 +170,7 @@ async def chat_get(message: str = Query(...)):
     # The original code hardcoded tool config in GET endpoint.
     # To be cleaner, I will use get_tool_config and ENABLE_GOOGLE_SEARCH.
 
-    tool = get_tool_config(CLIENT, ENABLE_GOOGLE_SEARCH) # Use default search config
+    tool = get_tool_config(CLIENT, ENABLE_GOOGLE_SEARCH)  # Use default search config
 
     chat_session = CLIENT.aio.chats.create(
         model="gemini-3-pro-preview",
