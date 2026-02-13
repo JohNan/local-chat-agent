@@ -57,7 +57,6 @@ TOOL_MAP = {
 }
 
 
-
 def get_active_stream_queue() -> asyncio.Queue | None:
     """Returns a new queue for the active task stream if it exists."""
     if CURRENT_STATE:
