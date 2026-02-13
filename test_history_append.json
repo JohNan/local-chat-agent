@@ -1,6 +1,6 @@
 [
   {
-    "id": "12c7a7ee-71a3-4826-8ad5-1321073907b5",
+    "id": "d76b3be1-9be6-45b3-a161-8bd851d0fb5f",
     "role": "user",
     "parts": [
       {
@@ -8,54 +8,4 @@
       }
     ]
   }
-,
-{
-  "id": "ed566432-9281-4e36-985a-e7b4785edb1b",
-  "role": "model",
-  "parts": [
-    {
-      "text": "Done.\n\n<details><summary>Click to view reasoning and tool usage</summary>\n\n#### Tool Usage\n- **list_files**: 1\n\n#### Reasoning Trace\n1. Thinking...\n\n</details>"
-    }
-  ]
-}
-,
-{
-  "id": "c5d3af7a-31f0-423d-9c5a-986e16562789",
-  "role": "user",
-  "parts": [
-    {
-      "text": "Search for something"
-    }
-  ]
-}
-,
-{
-  "id": "13c7c1f7-4526-4ce6-8646-f3616f6d53a6",
-  "role": "user",
-  "parts": [
-    {
-      "text": "Hello"
-    }
-  ]
-}
-,
-{
-  "id": "e6ab570f-d911-4941-8002-a67f0965afd3",
-  "role": "user",
-  "parts": [
-    {
-      "text": "Hello"
-    }
-  ]
-}
-,
-{
-  "id": "033c832f-2174-4a2c-9101-46cd33444faa",
-  "role": "user",
-  "parts": [
-    {
-      "text": "Hello"
-    }
-  ]
-}
 ]
