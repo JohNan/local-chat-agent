@@ -85,7 +85,7 @@ class RAGManager:
 
     def index_codebase(self):
         """Indexes the codebase by walking through files."""
-        # pylint: disable=too-many-locals
+        # pylint: disable=too-many-locals, too-many-branches
         if not self.collection:
             return {"status": "error", "message": "ChromaDB not initialized"}
 
