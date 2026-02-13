@@ -11,5 +11,6 @@ services:
       - ${SSH_AUTH_SOCK}:/ssh-agent
     environment:
       - GOOGLE_API_KEY
-      - CHAT_HISTORY_FILE=/config/chat_history.json
+      # - CHAT_HISTORY_FILE=/config/chat_history.json
+      # - JULES_TASKS_FILE=/config/tasks.json
       - SSH_AUTH_SOCK=/ssh-agent
