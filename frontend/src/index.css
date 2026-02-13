@@ -105,7 +105,8 @@ body {
     line-height: 1.5;
     position: relative;
     min-width: 0;
-    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 .user .message-bubble {
     background-color: var(--user-msg-bg);
@@ -155,6 +156,8 @@ body {
     align-items: center;
     gap: 8px;
     margin-bottom: 5px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 .tool-usage svg {
     width: 16px;
@@ -271,6 +274,9 @@ pre {
 }
 code {
     font-family: 'Consolas', 'Monaco', monospace;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 @keyframes spin {
     from { transform: rotate(0deg); }
