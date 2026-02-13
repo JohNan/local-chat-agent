@@ -80,7 +80,6 @@ function App() {
         let buffer = "";
         let currentText = "";
 
-        let messageChunkCount = 0;
         let lastUpdate = 0;
         const THROTTLE_MS = 16; // ~60fps
 
@@ -125,8 +124,7 @@ function App() {
                     try {
                         // data is like "Hello", so JSON.parse removes quotes
                         const parsedText = JSON.parse(data);
-                        messageChunkCount++;
-                        currentText += `\n${messageChunkCount}. ${parsedText}`;
+                        currentText += parsedText;
                         hasNewText = true;
                     } catch (e) {
                         console.error("Failed to parse message data:", data, e);
