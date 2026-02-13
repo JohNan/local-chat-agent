@@ -52,8 +52,14 @@ CORE_INSTRUCTION = (
 )
 
 PERSONA_PROMPTS = {
-    "UI": "Focus on visual consistency, responsiveness, and Material Design. Includes Rule 5 (Visualizing Compose UI).",
-    "MOBILE": "Focus on Android best practices, lifecycle, and permissions. Includes Rule 6 (Android Configuration).",
+    "UI": (
+        "Focus on visual consistency, responsiveness, and Material Design. "
+        "Includes Rule 5 (Visualizing Compose UI)."
+    ),
+    "MOBILE": (
+        "Focus on Android best practices, lifecycle, and permissions. "
+        "Includes Rule 6 (Android Configuration)."
+    ),
     "ARCHITECT": "Focus on system design, modularity, and `AGENTS.md` compliance.",
     "CI_CD": "Focus on build stability, Docker, and GitHub Actions.",
     "GENERAL": "",
