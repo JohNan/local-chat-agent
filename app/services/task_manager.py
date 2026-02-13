@@ -8,9 +8,12 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
+from .storage import get_storage_path
 
-TASKS_FILE = "tasks.json"
 _lock = threading.Lock()
+
+
+TASKS_FILE = get_storage_path("JULES_TASKS_FILE", "tasks.json")
 
 
 def _load_tasks_from_file() -> List[Dict]:

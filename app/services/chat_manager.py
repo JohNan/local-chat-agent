@@ -12,9 +12,12 @@ try:
 except ImportError:
     fcntl = None
 
+from .storage import get_storage_path
+
 logger = logging.getLogger(__name__)
 
-CHAT_HISTORY_FILE = os.environ.get("CHAT_HISTORY_FILE", "chat_history.json")
+
+CHAT_HISTORY_FILE = get_storage_path("CHAT_HISTORY_FILE", "chat_history.json")
 # Size of the chunk to read from end of file to find the closing bracket
 SCAN_SIZE = 4096
 
