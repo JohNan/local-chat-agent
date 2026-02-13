@@ -9,9 +9,9 @@ import os
 # Add repo root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Now import app.main
+# Now import app.services.llm_service
 # pylint: disable=wrong-import-position, protected-access
-from app import main
+from app.services import llm_service
 
 
 class TestHistoryFormat(unittest.TestCase):
@@ -26,7 +26,7 @@ class TestHistoryFormat(unittest.TestCase):
             {"role": "user", "parts": [{"text": "current message"}]},
         ]
 
-        formatted = main._format_history(history)
+        formatted = llm_service.format_history(history)
 
         # Expectation: role mapped to 'user', text part preserved
         self.assertEqual(len(formatted), 2)
@@ -53,7 +53,7 @@ class TestHistoryFormat(unittest.TestCase):
             {"role": "user", "parts": [{"text": "current message"}]},
         ]
 
-        formatted = main._format_history(history)
+        formatted = llm_service.format_history(history)
 
         # Expectation: role KEPT as 'function' because it has proper parts
         self.assertEqual(formatted[1]["role"], "function")

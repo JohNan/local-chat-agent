@@ -9,8 +9,8 @@ import os
 sys.path.append(os.getcwd())
 
 # pylint: disable=wrong-import-position, protected-access
-from app.main import (
-    _format_history,
+from app.services.llm_service import (
+    format_history,
 )
 
 
@@ -22,7 +22,7 @@ def test_format_history_no_marker():
         {"role": "user", "parts": [{"text": "How are you?"}]},
     ]
     # Should exclude last user message
-    formatted = _format_history(history)
+    formatted = format_history(history)
     assert len(formatted) == 2
     assert formatted[0]["role"] == "user"
     assert formatted[1]["role"] == "model"
@@ -41,7 +41,7 @@ def test_format_history_with_marker():
     # Should slice after marker, then exclude last message
     # Slice: [New 1, New 2, New 3]
     # Exclude last: [New 1, New 2]
-    formatted = _format_history(history)
+    formatted = format_history(history)
     assert len(formatted) == 2
     assert formatted[0]["parts"][0].text == "New 1"
     assert formatted[1]["parts"][0].text == "New 2"
@@ -55,7 +55,7 @@ def test_format_history_marker_at_end():
     ]
     # Slice: []
     # Exclude last: []
-    formatted = _format_history(history)
+    formatted = format_history(history)
     assert len(formatted) == 0
 
 
@@ -67,7 +67,7 @@ def test_format_history_marker_then_one_msg():
     ]
     # Slice: [New 1]
     # Exclude last: []
-    formatted = _format_history(history)
+    formatted = format_history(history)
     assert len(formatted) == 0
 
 
@@ -84,6 +84,6 @@ def test_format_history_multiple_markers():
     ]
     # Slice: [New 1, New 2, New 3]
     # Exclude last: [New 1, New 2]
-    formatted = _format_history(history)
+    formatted = format_history(history)
     assert len(formatted) == 2
     assert formatted[0]["parts"][0].text == "New 1"

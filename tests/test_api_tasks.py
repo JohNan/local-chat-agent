@@ -19,14 +19,14 @@ def fixture_client():
 @pytest.fixture(name="mock_task_manager")
 def fixture_mock_task_manager(mocker):
     """Fixture to mock task_manager."""
-    return mocker.patch("app.main.task_manager")
+    return mocker.patch("app.routers.jules.task_manager")
 
 
 @pytest.fixture(name="mock_jules_api")
 def fixture_mock_jules_api(mocker):
     """Fixture to mock jules_api."""
     # We need to mock the functions as AsyncMock because they are awaited
-    mock = mocker.patch("app.main.jules_api")
+    mock = mocker.patch("app.routers.jules.jules_api")
     mock.deploy_to_jules = AsyncMock()
     mock.get_session_status = AsyncMock()
     return mock
@@ -35,7 +35,7 @@ def fixture_mock_jules_api(mocker):
 @pytest.fixture(name="mock_git_ops")
 def fixture_mock_git_ops(mocker):
     """Fixture to mock git_ops."""
-    return mocker.patch("app.main.git_ops")
+    return mocker.patch("app.routers.jules.git_ops")
 
 
 def test_deploy_to_jules_creates_task(
