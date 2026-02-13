@@ -72,8 +72,8 @@ def test_index_codebase(mock_chroma, mock_genai):
                 # Verify embed_content called with list
                 manager.genai_client.models.embed_content.assert_called()
                 call_args = manager.genai_client.models.embed_content.call_args
-                assert isinstance(call_args.kwargs['contents'], list)
-                assert call_args.kwargs['contents'] == ["print('hello')"]
+                assert isinstance(call_args.kwargs["contents"], list)
+                assert call_args.kwargs["contents"] == ["print('hello')"]
 
                 mock_collection.upsert.assert_called_once()
 
@@ -103,7 +103,7 @@ def test_retrieve_context(mock_chroma, mock_genai):
 
         # Verify embed_content called with list
         call_args = manager.genai_client.models.embed_content.call_args
-        assert call_args.kwargs['contents'] == ["query"]
+        assert call_args.kwargs["contents"] == ["query"]
 
         assert "File: test.py" in context
         assert "content" in context
@@ -160,6 +160,7 @@ def test_index_codebase_optimization(mock_chroma, mock_genai):
                     mock_collection.upsert.assert_called_once()
                     assert result["files_indexed"] == 1
 
+
 def test_index_codebase_batching(mock_chroma, mock_genai):
     """Test batch processing in index_codebase."""
     with patch.dict(os.environ, {"GOOGLE_API_KEY": "test_key"}):
@@ -194,4 +195,4 @@ def test_index_codebase_batching(mock_chroma, mock_genai):
                 # Verify embed_content called once with 2 contents (batch)
                 manager.genai_client.models.embed_content.assert_called_once()
                 call_args = manager.genai_client.models.embed_content.call_args
-                assert call_args.kwargs['contents'] == ["content1", "content2"]
+                assert call_args.kwargs["contents"] == ["content1", "content2"]
