@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Paperclip, X } from 'lucide-react';
+import { Paperclip, X, FileText } from 'lucide-react';
 import type { MediaItem } from '../types';
 
 interface InputAreaProps {
@@ -65,11 +65,31 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, disabled, i
                 }}>
                     {mediaItems.map((item, index) => (
                         <div key={index} className="media-thumbnail" style={{ position: 'relative', width: '60px', height: '60px' }}>
-                            <img
-                                src={`data:${item.mime_type};base64,${item.data}`}
-                                alt="preview"
-                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }}
-                            />
+                             {item.mime_type.startsWith('image/') ? (
+                                <img
+                                    src={`data:${item.mime_type};base64,${item.data}`}
+                                    alt="preview"
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }}
+                                />
+                            ) : (
+                                <div style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    backgroundColor: 'var(--bg-secondary, #f0f0f0)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '4px',
+                                    color: 'var(--text-primary, #333)',
+                                    border: '1px solid var(--border-color)'
+                                }}>
+                                    <FileText size={24} />
+                                    <span style={{ fontSize: '8px', marginTop: '2px', maxWidth: '55px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {item.mime_type.split('/')[1].toUpperCase()}
+                                    </span>
+                                </div>
+                            )}
                             <button
                                 onClick={() => removeMedia(index)}
                                 style={{
@@ -86,7 +106,8 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, disabled, i
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     cursor: 'pointer',
-                                    padding: 0
+                                    padding: 0,
+                                    zIndex: 10
                                 }}
                             >
                                 <X size={12} />
@@ -99,7 +120,7 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, disabled, i
                 <input
                     type="file"
                     multiple
-                    accept="image/*"
+                    accept="image/*,application/pdf,text/plain,text/csv,audio/*,video/*"
                     ref={fileInputRef}
                     style={{ display: 'none' }}
                     onChange={handleFileSelect}
@@ -108,7 +129,7 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, disabled, i
                     className="icon-btn"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={disabled || isGenerating}
-                    title="Attach images"
+                    title="Attach files"
                 >
                     <Paperclip size={20} />
                 </button>
