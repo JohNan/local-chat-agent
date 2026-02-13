@@ -59,13 +59,28 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHi
 
     return (
         <div className="chat-container" ref={containerRef} onScroll={handleScroll}>
-            {messages.map((msg, index) => (
-                <MessageBubble
-                    key={msg.id}
-                    message={msg}
-                    toolStatus={index === messages.length - 1 ? toolStatus : null}
-                />
-            ))}
+            {messages.map((msg, index) => {
+                let deployedSessionId = null;
+                const nextMsg = messages[index + 1];
+                if (nextMsg && nextMsg.role === 'model') {
+                    const text = nextMsg.text || nextMsg.parts?.[0]?.text || "";
+                    if (text.startsWith("Started Jules task:")) {
+                        const match = text.match(/Started Jules task: ([^\n]+)/);
+                        if (match) {
+                            deployedSessionId = match[1].trim();
+                        }
+                    }
+                }
+
+                return (
+                    <MessageBubble
+                        key={msg.id}
+                        message={msg}
+                        toolStatus={index === messages.length - 1 ? toolStatus : null}
+                        deployedSessionId={deployedSessionId}
+                    />
+                );
+            })}
         </div>
     );
 };

@@ -443,9 +443,19 @@ async def deploy_to_jules_route(request: DeployRequest):
             }
             await asyncio.to_thread(task_manager.add_task, task_data)
 
+            # Save confirmation message to chat
+            message = (
+                f"Started Jules task: {result['name']}\nPrompt: {prompt_text[:50]}..."
+            )
+            await asyncio.to_thread(chat_manager.save_message, "model", message)
+
         return {"success": True, "result": result}
 
     except Exception as e:  # pylint: disable=broad-exception-caught
+        # Save error message to chat
+        message = f"Failed to start Jules task. Error: {str(e)}"
+        await asyncio.to_thread(chat_manager.save_message, "model", message)
+
         logger.error(traceback.format_exc())
         return JSONResponse(
             status_code=500, content={"success": False, "error": str(e)}

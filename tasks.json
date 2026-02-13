@@ -1,0 +1,50 @@
+[
+  {
+    "session_name": "sessions/mock-session-123",
+    "prompt_preview": "List all files in the repository.",
+    "status": "pending",
+    "id": "a82a6230-ca0e-4903-a01f-7495b43306dc",
+    "created_at": "2026-02-13T05:43:18.753705+00:00",
+    "updated_at": "2026-02-13T05:43:18.753705+00:00"
+  },
+  {
+    "session_name": "sessions/mock-session-123",
+    "prompt_preview": "List all files in the repository.",
+    "status": "pending",
+    "id": "709c4583-1112-44c0-a0a6-08ce9210b377",
+    "created_at": "2026-02-13T05:44:06.571720+00:00",
+    "updated_at": "2026-02-13T05:44:06.571720+00:00"
+  },
+  {
+    "session_name": "sessions/mock-session-123",
+    "prompt_preview": "List all files in the repository.",
+    "status": "pending",
+    "id": "d0a03119-c715-4d2f-9827-38445f0c44b9",
+    "created_at": "2026-02-13T05:44:54.685785+00:00",
+    "updated_at": "2026-02-13T05:44:54.685785+00:00"
+  },
+  {
+    "session_name": "sessions/mock-session-123",
+    "prompt_preview": "List all files in the repository.",
+    "status": "pending",
+    "id": "b2175e89-56b6-4616-8741-a8c2870df968",
+    "created_at": "2026-02-13T05:45:25.883770+00:00",
+    "updated_at": "2026-02-13T05:45:25.883770+00:00"
+  },
+  {
+    "session_name": "sessions/mock-session-123",
+    "prompt_preview": "List all files in the repository.",
+    "status": "pending",
+    "id": "e4e2ae13-9f44-4e48-9f12-ae1625517aea",
+    "created_at": "2026-02-13T05:46:23.964367+00:00",
+    "updated_at": "2026-02-13T05:46:23.964367+00:00"
+  },
+  {
+    "session_name": "sessions/mock-session-123",
+    "prompt_preview": "List all files in the repository.",
+    "status": "pending",
+    "id": "0fa256ba-0911-4033-b4a2-77ccfad7136e",
+    "created_at": "2026-02-13T05:47:18.518687+00:00",
+    "updated_at": "2026-02-13T05:47:18.518687+00:00"
+  }
+]
