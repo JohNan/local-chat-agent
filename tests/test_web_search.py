@@ -17,12 +17,6 @@ from app import agent_engine
 from app.services import prompt_router
 
 
-@pytest.fixture(name="client")
-def fixture_client():
-    """Fixture to provide a TestClient instance."""
-    return TestClient(app)
-
-
 def test_web_search_enabled_via_request(client):
     """Test that include_web_search=True enables google_search."""
     with patch("app.routers.chat.CLIENT") as mock_client:

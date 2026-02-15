@@ -19,6 +19,8 @@ def test_rag_git_pull_trigger():
         mock_git_pull.return_value = {"success": True, "output": "Updated"}
 
         with TestClient(app) as client:
+            # Wait for startup task to likely complete
+            time.sleep(0.5)
             # Reset mock to ignore startup call
             mock_rag_task.reset_mock()
 
@@ -45,6 +47,8 @@ def test_rag_git_pull_fail_no_trigger():
         mock_git_pull.return_value = {"success": False, "output": "Failed"}
 
         with TestClient(app) as client:
+            # Wait for startup task to likely complete
+            time.sleep(0.5)
             # Reset mock to ignore startup call
             mock_rag_task.reset_mock()
 

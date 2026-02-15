@@ -12,14 +12,6 @@ from fastapi.testclient import TestClient
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
-@pytest.fixture(name="client")
-def fixture_client():
-    """Fixture to provide a TestClient instance."""
-    from app.main import app  # pylint: disable=import-outside-toplevel
-
-    return TestClient(app)
-
-
 def test_api_models(client, mocker):
     """Test the /api/models endpoint."""
     # Mock the CLIENT in app.main

@@ -7,15 +7,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-@pytest.fixture(name="client")
-def fixture_client():
-    """Fixture to provide a TestClient instance."""
-    # pylint: disable=import-outside-toplevel
-    from app.main import app
-
-    return TestClient(app)
-
-
 @pytest.fixture(name="mock_task_manager")
 def fixture_mock_task_manager(mocker):
     """Fixture to mock task_manager."""
