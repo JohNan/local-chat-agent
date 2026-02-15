@@ -227,7 +227,7 @@ class RAGManager:
 
         return chunks
 
-    def retrieve_context(self, query: str, n_results: int = 5) -> str:
+    def search_codebase_semantic(self, query: str, n_results: int = 5) -> str:
         """Retrieves relevant code snippets for a query."""
         if not self.collection:
             return "Error: ChromaDB not initialized."
@@ -283,7 +283,7 @@ def index_codebase_task():
     return manager.index_codebase()
 
 
-def retrieve_context(query: str):
+def search_codebase_semantic(query: str):
     """Wrapper for tool call."""
     manager = get_rag_manager()
-    return manager.retrieve_context(query)
+    return manager.search_codebase_semantic(query)
