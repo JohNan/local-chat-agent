@@ -11,7 +11,9 @@ A lightweight, self-hosted web interface that acts as a "Prompt Architect" for a
 -   **Lazy Loading**: The frontend efficiently handles large chat histories by lazy loading messages as you scroll up, ensuring high performance.
 -   **Context Reset**: Insert a "Context Reset" marker to start a fresh logical session without deleting your entire history.
 -   **Git Integration**: Perform `git pull` operations directly from the UI to keep your local codebase up-to-date.
--   **No Vector DB**: Uses real-time file exploration (`list_files`, `read_file`) instead of stale embeddings.
+-   **RAG System**: Uses ChromaDB and Gemini Embeddings for semantic search and code retrieval.
+-   **Direct Jules Deployment**: Deploy prompts directly to Jules (creating sessions/PRs) from the UI.
+-   **Task Management**: View and track Jules tasks via the UI.
 -   **Lightweight**: Runs on older hardware (no AVX required).
 
 ## Available Tools
@@ -32,13 +34,18 @@ The backend exposes several key endpoints:
 
 -   `GET /api/history`: Retrieves paginated chat history.
 -   `GET /api/models`: Lists available Gemini models.
+-   `GET /api/tasks`: Retrieves list of Jules tasks.
+-   `GET /api/status`: Retrieves repository status and active persona.
 -   `POST /api/context_reset`: Inserts a context reset marker into the history.
 -   `POST /api/git_pull`: Executes a `git pull` command.
+-   `POST /api/deploy_to_jules`: Deploys current prompt to Jules.
+-   `POST /api/stop`: Stops the current generation.
 
 ## Prerequisites
 
 - Docker and Docker Compose
 - Google Gemini API Key (requires `gemini-3-pro-preview` access)
+- Jules API Key (optional, for deployment features)
 
 ## Setup
 
