@@ -2,58 +2,84 @@
 Tests for the chat manager service.
 """
 
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position, redefined-outer-name
 
 import json
 import os
 import sys
+import pytest
+from unittest.mock import patch
+from datetime import datetime, timezone
 
 # Ensure we can import app from the root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.services import chat_manager
+from app.services.database import DatabaseManager
 
 
-def test_load_history_normal(mocker):
+@pytest.fixture
+def test_db(tmp_path):
+    """Fixture to mock the database."""
+    db_path = tmp_path / "test.db"
+
+    # Reset singleton to force re-initialization with new path
+    DatabaseManager._instance = None
+
+    with patch("app.services.database.DATABASE_URL", str(db_path)):
+        # Initialize DB
+        db = DatabaseManager()
+        db.init_db()
+        yield db
+
+    # Cleanup
+    DatabaseManager._instance = None
+
+
+def insert_message(db, role, parts, created_at=None):
+    if created_at is None:
+        created_at = datetime.now(timezone.utc).isoformat()
+
+    import uuid
+
+    msg_id = str(uuid.uuid4())
+    content = ""  # Simplified
+
+    db.execute_query(
+        """
+        INSERT INTO messages (id, role, content, parts, created_at)
+        VALUES (?, ?, ?, ?, ?)
+    """,
+        (msg_id, role, content, json.dumps(parts), created_at),
+    )
+
+
+def test_load_history_normal(test_db):
     """
     Test loading a normal history file without any issues.
     """
-    normal_history = [
-        {"role": "user", "parts": [{"text": "Hello"}]},
-        {"role": "model", "parts": [{"text": "Hi there"}]},
-    ]
-
-    mocker.patch("os.path.exists", return_value=True)
-    mocker.patch(
-        "builtins.open", mocker.mock_open(read_data=json.dumps(normal_history))
-    )
+    insert_message(test_db, "user", [{"text": "Hello"}])
+    insert_message(test_db, "model", [{"text": "Hi there"}])
 
     history = chat_manager.load_chat_history()
     assert len(history) == 2
 
     # Check content matches and IDs are present
-    assert history[0]["role"] == normal_history[0]["role"]
-    assert history[0]["parts"] == normal_history[0]["parts"]
+    assert history[0]["role"] == "user"
+    assert history[0]["parts"][0]["text"] == "Hello"
     assert "id" in history[0]
 
-    assert history[1]["role"] == normal_history[1]["role"]
-    assert history[1]["parts"] == normal_history[1]["parts"]
+    assert history[1]["role"] == "model"
+    assert history[1]["parts"][0]["text"] == "Hi there"
     assert "id" in history[1]
 
 
-def test_load_history_dangling_function_call(mocker):
+def test_load_history_dangling_function_call(test_db, mocker):
     """
     Test that a history ending with a function call is sanitized.
     """
-    dangling_history = [
-        {"role": "user", "parts": [{"text": "Do something"}]},
-        {"role": "model", "parts": [{"function_call": {"name": "foo", "args": {}}}]},
-    ]
-
-    mocker.patch("os.path.exists", return_value=True)
-    mocker.patch(
-        "builtins.open", mocker.mock_open(read_data=json.dumps(dangling_history))
-    )
+    insert_message(test_db, "user", [{"text": "Do something"}])
+    insert_message(test_db, "model", [{"function_call": {"name": "foo", "args": {}}}])
 
     # Mock logger to verify warning
     mock_logger = mocker.patch("app.services.chat_manager.logger")
@@ -69,22 +95,14 @@ def test_load_history_dangling_function_call(mocker):
     )
 
 
-def test_load_history_orphaned_function_response(mocker):
+def test_load_history_orphaned_function_response(test_db, mocker):
     """
     Test that a history starting with a function response is sanitized.
     """
-    orphaned_history = [
-        {
-            "role": "function",
-            "parts": [{"function_response": {"name": "foo", "response": {}}}],
-        },
-        {"role": "model", "parts": [{"text": "Ok"}]},
-    ]
-
-    mocker.patch("os.path.exists", return_value=True)
-    mocker.patch(
-        "builtins.open", mocker.mock_open(read_data=json.dumps(orphaned_history))
+    insert_message(
+        test_db, "function", [{"function_response": {"name": "foo", "response": {}}}]
     )
+    insert_message(test_db, "model", [{"text": "Ok"}])
 
     # Mock logger
     mock_logger = mocker.patch("app.services.chat_manager.logger")
@@ -97,25 +115,19 @@ def test_load_history_orphaned_function_response(mocker):
     mock_logger.warning.assert_called()
 
 
-def test_load_history_complex_parts(mocker):
+def test_load_history_complex_parts(test_db, mocker):
     """
     Test sanitization when function calls are embedded in complex parts.
     """
     # Test with multiple parts where one might be function call
-    dangling_history = [
-        {"role": "user", "parts": [{"text": "check this"}]},
-        {
-            "role": "model",
-            "parts": [
-                {"text": "thinking..."},
-                {"function_call": {"name": "foo", "args": {}}},
-            ],
-        },
-    ]
-
-    mocker.patch("os.path.exists", return_value=True)
-    mocker.patch(
-        "builtins.open", mocker.mock_open(read_data=json.dumps(dangling_history))
+    insert_message(test_db, "user", [{"text": "check this"}])
+    insert_message(
+        test_db,
+        "model",
+        [
+            {"text": "thinking..."},
+            {"function_call": {"name": "foo", "args": {}}},
+        ],
     )
 
     mock_logger = mocker.patch("app.services.chat_manager.logger")

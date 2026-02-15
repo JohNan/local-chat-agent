@@ -11,10 +11,8 @@ sys.path.append(os.getcwd())
 class TestStorageConfig(unittest.TestCase):
     def setUp(self):
         # Clean up env vars before each test
-        if "JULES_TASKS_FILE" in os.environ:
-            del os.environ["JULES_TASKS_FILE"]
-        if "CHAT_HISTORY_FILE" in os.environ:
-            del os.environ["CHAT_HISTORY_FILE"]
+        if "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
 
     def test_get_storage_path_priority_1_env_var(self):
         with patch.dict(os.environ, {"MY_VAR": "/custom/path.json"}):
@@ -70,21 +68,13 @@ class TestStorageConfig(unittest.TestCase):
             path = storage.get_storage_path("MY_VAR", "default.json")
             self.assertEqual(path, "default.json")
 
-    def test_task_manager_integration(self):
-        """Verify task_manager uses the configured path."""
-        with patch.dict(os.environ, {"JULES_TASKS_FILE": "/env/tasks.json"}):
-            from app.services import task_manager
+    def test_database_integration(self):
+        """Verify database uses the configured path."""
+        with patch.dict(os.environ, {"DATABASE_URL": "/env/app.db"}):
+            from app.services import database
 
-            importlib.reload(task_manager)
-            self.assertEqual(task_manager.TASKS_FILE, "/env/tasks.json")
-
-    def test_chat_manager_integration(self):
-        """Verify chat_manager uses the configured path."""
-        with patch.dict(os.environ, {"CHAT_HISTORY_FILE": "/env/chat.json"}):
-            from app.services import chat_manager
-
-            importlib.reload(chat_manager)
-            self.assertEqual(chat_manager.CHAT_HISTORY_FILE, "/env/chat.json")
+            importlib.reload(database)
+            self.assertEqual(database.DATABASE_URL, "/env/app.db")
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.services import rag_manager
+from app.services.database import DatabaseManager
 from app.routers import chat, system, history, jules
 
 # Configure logging
@@ -28,6 +29,12 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Lifespan context manager for the FastAPI app."""
+    # Database Initialization
+    logger.info("Initializing database...")
+    db = DatabaseManager()
+    await asyncio.to_thread(db.init_db)
+    await asyncio.to_thread(db.migrate_from_json)
+
     # Startup
     logger.info("Starting background RAG indexing...")
     asyncio.create_task(asyncio.to_thread(rag_manager.index_codebase_task))
