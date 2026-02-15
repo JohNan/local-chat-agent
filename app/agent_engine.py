@@ -53,7 +53,7 @@ TOOL_MAP = {
     "grep_code": git_ops.grep_code,
     "get_file_outline": git_ops.get_file_outline,
     "read_android_manifest": git_ops.read_android_manifest,
-    "search_codebase_semantic": rag_manager.retrieve_context,
+    "search_codebase_semantic": rag_manager.search_codebase_semantic,
 }
 
 
@@ -124,8 +124,46 @@ async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: s
             turn_text_parts = []
 
             try:
-                # Use native async method for streaming
-                stream = await chat_session.send_message_stream(current_msg)
+                # Use native async method for streaming with retry logic
+                max_retries = 3
+                retry_delay = 2
+                stream = None
+
+                for attempt in range(max_retries + 1):
+                    try:
+                        stream = await chat_session.send_message_stream(current_msg)
+                        break  # Success
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        error_str = str(e)
+                        is_retryable = (
+                            "503" in error_str
+                            or "Service Unavailable" in error_str
+                            or "high demand" in error_str
+                        )
+
+                        if is_retryable and attempt < max_retries:
+                            logger.warning(
+                                "[TURN %d] Gemini 503/Busy. Retrying in %ds (Attempt %d/%d)...",
+                                turn,
+                                retry_delay,
+                                attempt + 1,
+                                max_retries,
+                            )
+                            # Notify frontend via tool status
+                            msg = (
+                                f"Gemini API is busy. Retrying in {retry_delay} seconds... "
+                                f"(Attempt {attempt + 1}/{max_retries})"
+                            )
+                            await task_state.broadcast(
+                                f"event: tool\ndata: {json.dumps(msg)}\n\n"
+                            )
+                            await asyncio.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                        else:
+                            raise e  # Re-raise if not retryable or max retries reached
+
+                if not stream:
+                    raise RuntimeError("Failed to establish stream after retries.")
 
                 async for chunk in stream:
                     # Text processing

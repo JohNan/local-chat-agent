@@ -45,7 +45,7 @@ def get_tool_config(client, enable_search):
             client=client, callable=git_ops.read_android_manifest
         ),
         types.FunctionDeclaration.from_callable(
-            client=client, callable=rag_manager.retrieve_context
+            client=client, callable=rag_manager.search_codebase_semantic
         ),
     ]
 

@@ -78,7 +78,7 @@ def test_index_codebase(mock_chroma, mock_genai):
                 mock_collection.upsert.assert_called_once()
 
 
-def test_retrieve_context(mock_chroma, mock_genai):
+def test_search_codebase_semantic(mock_chroma, mock_genai):
     """Test retrieving context."""
     with patch.dict(os.environ, {"GOOGLE_API_KEY": "test_key"}):
         manager = RAGManager()
@@ -99,7 +99,7 @@ def test_retrieve_context(mock_chroma, mock_genai):
             "metadatas": [[{"filepath": "test.py"}]],
         }
 
-        context = manager.retrieve_context("query")
+        context = manager.search_codebase_semantic("query")
 
         # Verify embed_content called with list
         call_args = manager.genai_client.models.embed_content.call_args
