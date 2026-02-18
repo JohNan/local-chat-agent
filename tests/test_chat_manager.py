@@ -15,25 +15,6 @@ from datetime import datetime, timezone
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.services import chat_manager
-from app.services.database import DatabaseManager
-
-
-@pytest.fixture
-def test_db(tmp_path):
-    """Fixture to mock the database."""
-    db_path = tmp_path / "test.db"
-
-    # Reset singleton to force re-initialization with new path
-    DatabaseManager._instance = None
-
-    with patch("app.services.database.DATABASE_URL", str(db_path)):
-        # Initialize DB
-        db = DatabaseManager()
-        db.init_db()
-        yield db
-
-    # Cleanup
-    DatabaseManager._instance = None
 
 
 def insert_message(db, role, parts, created_at=None):
@@ -54,12 +35,12 @@ def insert_message(db, role, parts, created_at=None):
     )
 
 
-def test_load_history_normal(test_db):
+def test_load_history_normal(clean_db):
     """
     Test loading a normal history file without any issues.
     """
-    insert_message(test_db, "user", [{"text": "Hello"}])
-    insert_message(test_db, "model", [{"text": "Hi there"}])
+    insert_message(clean_db, "user", [{"text": "Hello"}])
+    insert_message(clean_db, "model", [{"text": "Hi there"}])
 
     history = chat_manager.load_chat_history()
     assert len(history) == 2
@@ -74,12 +55,12 @@ def test_load_history_normal(test_db):
     assert "id" in history[1]
 
 
-def test_load_history_dangling_function_call(test_db, mocker):
+def test_load_history_dangling_function_call(clean_db, mocker):
     """
     Test that a history ending with a function call is sanitized.
     """
-    insert_message(test_db, "user", [{"text": "Do something"}])
-    insert_message(test_db, "model", [{"function_call": {"name": "foo", "args": {}}}])
+    insert_message(clean_db, "user", [{"text": "Do something"}])
+    insert_message(clean_db, "model", [{"function_call": {"name": "foo", "args": {}}}])
 
     # Mock logger to verify warning
     mock_logger = mocker.patch("app.services.chat_manager.logger")
@@ -95,14 +76,14 @@ def test_load_history_dangling_function_call(test_db, mocker):
     )
 
 
-def test_load_history_orphaned_function_response(test_db, mocker):
+def test_load_history_orphaned_function_response(clean_db, mocker):
     """
     Test that a history starting with a function response is sanitized.
     """
     insert_message(
-        test_db, "function", [{"function_response": {"name": "foo", "response": {}}}]
+        clean_db, "function", [{"function_response": {"name": "foo", "response": {}}}]
     )
-    insert_message(test_db, "model", [{"text": "Ok"}])
+    insert_message(clean_db, "model", [{"text": "Ok"}])
 
     # Mock logger
     mock_logger = mocker.patch("app.services.chat_manager.logger")
@@ -115,14 +96,14 @@ def test_load_history_orphaned_function_response(test_db, mocker):
     mock_logger.warning.assert_called()
 
 
-def test_load_history_complex_parts(test_db, mocker):
+def test_load_history_complex_parts(clean_db, mocker):
     """
     Test sanitization when function calls are embedded in complex parts.
     """
     # Test with multiple parts where one might be function call
-    insert_message(test_db, "user", [{"text": "check this"}])
+    insert_message(clean_db, "user", [{"text": "check this"}])
     insert_message(
-        test_db,
+        clean_db,
         "model",
         [
             {"text": "thinking..."},

@@ -24,11 +24,22 @@ class DatabaseManager:
     _instance = None
     db_path: str  # Type hint for pylint
 
-    def __new__(cls):
+    def __new__(cls, db_url: Optional[str] = None):
         if cls._instance is None:
             cls._instance = object.__new__(cls)
-            cls._instance.db_path = DATABASE_URL
+            if db_url:
+                cls._instance.db_path = db_url
+            else:
+                cls._instance.db_path = DATABASE_URL
         return cls._instance
+
+    def __init__(self, db_url: Optional[str] = None):
+        """Initialize the DatabaseManager.
+
+        Args:
+            db_url: Optional path to the database file. If provided, it overrides
+                    the default configuration. This is primarily used for testing.
+        """
 
     @contextmanager
     def get_connection(self):
