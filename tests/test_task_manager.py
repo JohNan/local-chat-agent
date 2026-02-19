@@ -7,34 +7,15 @@ Tests for task manager.
 import pytest
 from unittest.mock import patch
 from app.services import task_manager
-from app.services.database import DatabaseManager
 
 
-@pytest.fixture
-def test_db(tmp_path):
-    """Fixture to mock the database."""
-    db_path = tmp_path / "test.db"
-
-    # Reset singleton to force re-initialization with new path
-    DatabaseManager._instance = None
-
-    with patch("app.services.database.DATABASE_URL", str(db_path)):
-        # Initialize DB
-        db = DatabaseManager()
-        db.init_db()
-        yield db
-
-    # Cleanup
-    DatabaseManager._instance = None
-
-
-def test_load_tasks_empty(test_db):
+def test_load_tasks_empty():
     """Test loading tasks when DB is empty."""
     tasks = task_manager.load_tasks()
     assert tasks == []
 
 
-def test_add_and_load_task(test_db):
+def test_add_and_load_task():
     """Test adding a task and then loading it."""
     task_data = {
         "session_name": "session/1",
@@ -55,7 +36,7 @@ def test_add_and_load_task(test_db):
     assert loaded_tasks[0]["prompt_preview"] == "test prompt"
 
 
-def test_update_task_status(test_db):
+def test_update_task_status():
     """Test updating task status."""
     task_data = {
         "session_name": "session/2",
@@ -72,7 +53,7 @@ def test_update_task_status(test_db):
     assert loaded_tasks[0]["status"] == "running"
 
 
-def test_get_task_by_session(test_db):
+def test_get_task_by_session():
     """Test getting a task by session name."""
     task_data = {
         "session_name": "session/3",
