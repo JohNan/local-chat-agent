@@ -134,7 +134,19 @@ function App() {
                         setCurrentToolStatus("Executing tools...");
                     }
                 } else if (eventType === 'done' || eventType === 'error') {
-                    if (eventType === 'error') console.error("Stream error:", dataStr);
+                    if (eventType === 'error') {
+                        console.error("Stream error:", dataStr);
+                        try {
+                            const errorMsg = JSON.parse(dataStr);
+                            if (errorMsg) {
+                                currentText += `\n\n> **Error**: ${errorMsg}`;
+                            }
+                        } catch {
+                            if (dataStr) {
+                                currentText += `\n\n> **Error**: ${dataStr}`;
+                            }
+                        }
+                    }
                     setCurrentToolStatus(null);
                     // Final update
                     updateLastMessage(last => {
