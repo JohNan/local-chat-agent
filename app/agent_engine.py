@@ -340,9 +340,7 @@ async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: s
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Worker Error: %s", traceback.format_exc())
         error_msg = _extract_error_message(str(e))
-        await task_state.broadcast(
-            f"event: error\ndata: {json.dumps(error_msg)}\n\n"
-        )
+        await task_state.broadcast(f"event: error\ndata: {json.dumps(error_msg)}\n\n")
     finally:
         CURRENT_STATE = None
         # Signal end of queue
