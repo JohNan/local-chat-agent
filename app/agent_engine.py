@@ -7,6 +7,7 @@ import json
 import logging
 import traceback
 import asyncio
+import re
 from collections import defaultdict
 
 from google.genai import types
@@ -64,6 +65,17 @@ def get_active_stream_queue() -> asyncio.Queue | None:
         CURRENT_STATE.add_listener(queue)
         return queue
     return None
+
+
+def _extract_error_message(error_text: str) -> str:
+    """Extracts a clean error message from a verbose exception string."""
+    # Try to find the inner JSON message key "message"
+    # Matches "message": "..." inside the string.
+    # Note: This is a heuristic for Gemini API errors wrapped in string reprs.
+    match = re.search(r'"message":\s*"(.*?)"', error_text)
+    if match:
+        return match.group(1)
+    return error_text
 
 
 async def _execute_tool(fc):
@@ -214,8 +226,9 @@ async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: s
 
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Turn %d Error: %s", turn, traceback.format_exc())
+                error_msg = _extract_error_message(str(e))
                 await task_state.broadcast(
-                    f"event: error\ndata: {json.dumps(str(e))}\n\n"
+                    f"event: error\ndata: {json.dumps(error_msg)}\n\n"
                 )
                 return
 
@@ -326,7 +339,10 @@ async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: s
         )
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Worker Error: %s", traceback.format_exc())
-        await task_state.broadcast(f"event: error\ndata: {json.dumps(str(e))}\n\n")
+        error_msg = _extract_error_message(str(e))
+        await task_state.broadcast(
+            f"event: error\ndata: {json.dumps(error_msg)}\n\n"
+        )
     finally:
         CURRENT_STATE = None
         # Signal end of queue
