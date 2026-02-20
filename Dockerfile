@@ -15,7 +15,29 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y git openssh-client && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    git \
+    openssh-client \
+    openjdk-17-jre-headless \
+    nodejs \
+    npm \
+    unzip \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Language Servers
+# Python
+RUN pip install python-lsp-server
+
+# TypeScript
+RUN npm install -g typescript typescript-language-server
+
+# Kotlin
+RUN wget -q https://github.com/fwcd/kotlin-language-server/releases/download/1.3.12/server.zip -O /tmp/kotlin-ls.zip \
+    && unzip /tmp/kotlin-ls.zip -d /opt/kotlin-ls \
+    && ln -s /opt/kotlin-ls/server/bin/kotlin-language-server /usr/local/bin/kotlin-language-server \
+    && rm /tmp/kotlin-ls.zip
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/

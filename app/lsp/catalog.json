@@ -1,0 +1,20 @@
+{
+  "python": {
+    "bin": "pylsp",
+    "args": [],
+    "extensions": [".py"],
+    "root_markers": ["pyproject.toml", "setup.py", "requirements.txt"]
+  },
+  "typescript": {
+    "bin": "typescript-language-server",
+    "args": ["--stdio"],
+    "extensions": [".ts", ".tsx", ".js", ".jsx"],
+    "root_markers": ["package.json", "tsconfig.json"]
+  },
+  "kotlin": {
+    "bin": "kotlin-language-server",
+    "args": [],
+    "extensions": [".kt", ".kts"],
+    "root_markers": ["build.gradle", "pom.xml", "settings.gradle"]
+  }
+}
