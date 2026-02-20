@@ -54,6 +54,7 @@ TOOL_MAP = {
     "grep_code": git_ops.grep_code,
     "get_file_outline": git_ops.get_file_outline,
     "read_android_manifest": git_ops.read_android_manifest,
+    "get_definition": git_ops.get_definition,
     "search_codebase_semantic": rag_manager.search_codebase_semantic,
 }
 
