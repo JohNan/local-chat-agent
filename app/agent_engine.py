@@ -12,7 +12,7 @@ from collections import defaultdict
 
 from google.genai import types
 
-from app.services import git_ops, chat_manager, rag_manager
+from app.services import git_ops, chat_manager, rag_manager, llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -92,9 +92,32 @@ async def _execute_tool(fc):
             return await asyncio.to_thread(tool_func, **fc.args)
         except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error executing {fc.name}: {e}"
-    else:
-        logger.warning("Unknown tool call: %s", fc.name)
-        return f"Error: Tool {fc.name} not found."
+
+    # Check MCP tools
+    session = llm_service.MCP_TOOL_TO_SESSION_MAP.get(fc.name)
+    if session:
+        try:
+            result = await session.call_tool(fc.name, arguments=fc.args)
+            # Extract content from MCP result
+            output_text = []
+            if hasattr(result, "content"):
+                for content in result.content:
+                    if content.type == "text":
+                        output_text.append(content.text)
+                    elif content.type == "image":
+                        output_text.append(f"[Image: {content.mimeType}]")
+                    else:
+                        output_text.append(str(content))
+            else:
+                output_text.append(str(result))
+
+            return "\n".join(output_text)
+
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            return f"Error executing MCP tool {fc.name}: {e}"
+
+    logger.warning("Unknown tool call: %s", fc.name)
+    return f"Error: Tool {fc.name} not found."
 
 
 def cancel_current_task():

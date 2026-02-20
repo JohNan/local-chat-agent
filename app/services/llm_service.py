@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 # Global cache state
 CACHE_STATE = {}
 
+# Global MCP State
+MCP_SESSIONS = {}
+MCP_TOOL_DEFINITIONS = []
+MCP_TOOL_TO_SESSION_MAP = {}
+
 
 def clear_cache():
     """Clears the global cache state."""
@@ -48,6 +53,9 @@ def get_tool_config(client, enable_search):
             client=client, callable=rag_manager.search_codebase_semantic
         ),
     ]
+
+    # Append MCP tools
+    function_declarations.extend(MCP_TOOL_DEFINITIONS)
 
     google_search_tool = types.GoogleSearch() if enable_search else None
 
