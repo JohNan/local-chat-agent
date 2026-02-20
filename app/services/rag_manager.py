@@ -287,7 +287,8 @@ def search_codebase_semantic(query: str):
     """
     Searches the codebase using semantic vector embeddings.
     Use this tool to find relevant code snippets based on natural language queries,
-    high-level concepts, or functionality descriptions (e.g., 'how does auth work', 'user login logic').
+    high-level concepts, or functionality descriptions (e.g., 'how does auth work',
+    'user login logic').
     """
     manager = get_rag_manager()
     return manager.search_codebase_semantic(query)
