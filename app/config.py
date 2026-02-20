@@ -18,6 +18,10 @@ ENABLE_GOOGLE_SEARCH = os.environ.get("ENABLE_GOOGLE_SEARCH", "false").lower() i
     "yes",
 )
 
+# Application Constants
+HISTORY_LIMIT = 20
+DEFAULT_MODEL = "gemini-3-pro-preview"
+
 if not GOOGLE_API_KEY:
     logger.warning("Warning: GOOGLE_API_KEY environment variable not set.")
 

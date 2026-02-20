@@ -82,6 +82,14 @@ class DatabaseManager:
                     created_at DATETIME
                 )
             """)
+
+            # Settings table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """)
             logger.info("Database initialized at %s", self.db_path)
 
     def migrate_from_json(self):
