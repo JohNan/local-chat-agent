@@ -6,6 +6,7 @@ Handles indexing and retrieval of code snippets using ChromaDB and Gemini Embedd
 import os
 import logging
 import hashlib
+import json
 import chromadb
 from google import genai
 
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Constants
 CHROMA_DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
+METADATA_PATH = ".rag/rag_metadata.json"
 COLLECTION_NAME = "codebase"
 # Try 004 first, fallback to 001 if needed.
 EMBEDDING_MODEL_PRIMARY = "gemini-embedding-001"
@@ -85,11 +87,20 @@ class RAGManager:
 
     def index_codebase(self):
         """Indexes the codebase by walking through files."""
-        # pylint: disable=too-many-locals, too-many-branches
+        # pylint: disable=too-many-locals, too-many-branches, too-many-statements
         if not self.collection:
             return {"status": "error", "message": "ChromaDB not initialized"}
 
         logger.info("Starting codebase indexing...")
+
+        # Load metadata
+        file_timestamps = {}
+        if os.path.exists(METADATA_PATH):
+            try:
+                with open(METADATA_PATH, "r", encoding="utf-8") as f:
+                    file_timestamps = json.load(f)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error("Failed to load metadata: %s", e)
 
         files_indexed = 0
 
@@ -110,6 +121,7 @@ class RAGManager:
         pending_documents = []
         pending_metadatas = []
         pending_ids = []
+        updated_timestamps = {}
 
         for root, _, files in os.walk("."):
             # Skip common ignore directories
@@ -122,6 +134,7 @@ class RAGManager:
                     "__pycache__",
                     "chroma_db",
                     "site-packages",
+                    ".rag",
                 ]
             ):
                 continue
@@ -135,12 +148,24 @@ class RAGManager:
                 filepath = os.path.relpath(filepath, ".")
 
                 try:
+                    current_mtime = os.path.getmtime(filepath)
+
+                    # Check if file unchanged based on timestamp
+                    if (
+                        filepath in file_timestamps
+                        and file_timestamps[filepath] == current_mtime
+                    ):
+                        updated_timestamps[filepath] = current_mtime
+                        logger.debug("Skipping unchanged file: %s", filepath)
+                        continue
+
+                    # File changed (timestamp diff)
                     with open(filepath, "r", encoding="utf-8") as f:
                         content = f.read()
 
                     file_hash = self._calculate_hash(content)
 
-                    # Check if file already indexed with same hash
+                    # Check if file already indexed with same hash (content check optimization)
                     # We query for any chunk of this file to check its metadata
                     existing_docs = self.collection.get(
                         where={"filepath": filepath}, limit=1
@@ -149,7 +174,9 @@ class RAGManager:
                     if existing_docs and existing_docs["metadatas"]:
                         existing_metadata = existing_docs["metadatas"][0]
                         if existing_metadata.get("file_hash") == file_hash:
-                            continue  # Skip unchanged file
+                            # Content same, just update timestamp
+                            updated_timestamps[filepath] = current_mtime
+                            continue
 
                     # File changed or new. Delete existing chunks.
                     self.collection.delete(where={"filepath": filepath})
@@ -170,6 +197,7 @@ class RAGManager:
                         )
 
                     files_indexed += 1
+                    updated_timestamps[filepath] = current_mtime
 
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     logger.error("Error indexing file %s: %s", filepath, e)
@@ -202,6 +230,14 @@ class RAGManager:
                     )
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Error processing batch starting at %d: %s", i, e)
+
+        # Save metadata
+        try:
+            os.makedirs(os.path.dirname(METADATA_PATH), exist_ok=True)
+            with open(METADATA_PATH, "w", encoding="utf-8") as f:
+                json.dump(updated_timestamps, f, indent=2)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Failed to save metadata: %s", e)
 
         logger.info("Indexing complete. Indexed %d files.", files_indexed)
         return {"status": "success", "files_indexed": files_indexed}
