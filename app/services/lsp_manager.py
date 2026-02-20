@@ -145,7 +145,7 @@ class LSPServer:
             self.process.stdin.write(message.encode("utf-8"))
             self.process.stdin.flush()
             return True
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Failed to write to LSP %s: %s", self.language, e)
             return False
 
@@ -234,53 +234,55 @@ class LSPManager:
                 logger.error("Failed to start LSP server for %s: %s", language, e)
                 return None
 
-    def get_definition(
-        self, file_path: str, line: int, col: int
-    ) -> Dict[str, Any]:  # pylint: disable=too-many-locals, too-many-return-statements
+    def get_definition(self, file_path: str, line: int, col: int) -> Dict[str, Any]:
         """
         Finds the definition of the symbol at the given location.
         line and col are 1-based.
         """
         abs_path = os.path.abspath(file_path)
 
-        # Determine language
-        ext = os.path.splitext(file_path)[1]
+        # Determine language and config
         registry = LSPRegistry()
+        ext = os.path.splitext(file_path)[1]
         config = registry.get_config_by_extension(ext)
         if not config:
             return {"error": f"No LSP support for extension {ext}"}
 
-        # Find language name
-        language = None
-        # pylint: disable=protected-access
-        for lang, cfg in registry._config.items():
-            if cfg == config:
-                language = lang
-                break
-
+        language = self._get_language_name(registry, config)
         if not language:
             return {"error": "Language unknown"}
 
-        # Find root
-        root_path = self._find_root(abs_path, config.get("root_markers", []))
-        if not root_path:
-            # Fallback to file dir
-            root_path = os.path.dirname(abs_path)
-
+        # Find root and start server
+        root_path = self._find_root(
+            abs_path, config.get("root_markers", [])
+        ) or os.path.dirname(abs_path)
         server = self.start_server(language, root_path)
         if not server:
             return {"error": "Failed to start LSP server"}
 
+        return self._request_definition(server, abs_path, language, line, col)
+
+    def _get_language_name(
+        self, registry: LSPRegistry, config: Dict[str, Any]
+    ) -> Optional[str]:
+        # pylint: disable=protected-access
+        for lang, cfg in registry._config.items():
+            if cfg == config:
+                return lang
+        return None
+
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    def _request_definition(
+        self, server: LSPServer, abs_path: str, language: str, line: int, col: int
+    ) -> Dict[str, Any]:
+        """Helper to send didOpen and definition request."""
         # Read file content
         try:
             with open(abs_path, "r", encoding="utf-8") as f:
                 content = f.read()
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return {"error": f"Failed to read file: {e}"}
 
-        # Send didOpen (it's safe to send even if already open, usually)
-        # In a real server we track open files, but here we just send it every time for simplicity
-        # or we could track it in LSPServer.
         server.send_notification(
             "textDocument/didOpen",
             {
@@ -293,8 +295,7 @@ class LSPManager:
             },
         )
 
-        # Request Definition
-        # Convert 1-based to 0-based
+        # Request Definition (Convert 1-based to 0-based)
         response = server.send_request(
             "textDocument/definition",
             {
