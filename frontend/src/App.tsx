@@ -70,6 +70,46 @@ function App() {
         });
     };
 
+    const handleStreamError = (errorMessage: string) => {
+        setCurrentToolStatus(null);
+        queryClient.setQueryData<InfiniteData<HistoryResponse>>(['chat-history'], (oldData) => {
+            if (!oldData) return oldData;
+            const newPages = [...oldData.pages];
+            if (newPages.length > 0) {
+                 const firstPage = { ...newPages[0] };
+                 const msgs = [...firstPage.messages];
+
+                 // 1. Remove the last message if it's the model placeholder/partial response
+                 if (msgs.length > 0) {
+                     const lastMsg = msgs[msgs.length - 1];
+                     if (lastMsg.role === 'model' || lastMsg.role === 'ai') {
+                         msgs.pop();
+                     }
+                 }
+
+                 // 2. Append error to the new last message (which should be User)
+                 if (msgs.length > 0) {
+                     const lastMsg = msgs[msgs.length - 1];
+                     if (lastMsg.role === 'user') {
+                         const errorText = `\n\n> **Error**: ${errorMessage}`;
+                         const newText = (lastMsg.text || "") + errorText;
+                         msgs[msgs.length - 1] = {
+                             ...lastMsg,
+                             text: newText,
+                             parts: lastMsg.parts ?
+                                 [...lastMsg.parts, { text: errorText }] :
+                                 [{ text: newText }]
+                         };
+                     }
+                 }
+
+                 firstPage.messages = msgs;
+                 newPages[0] = firstPage;
+            }
+            return { ...oldData, pages: newPages };
+        });
+    };
+
     const readStream = async (
         response: Response,
         onComplete: (currentText: string) => void
@@ -136,16 +176,15 @@ function App() {
                 } else if (eventType === 'done' || eventType === 'error') {
                     if (eventType === 'error') {
                         console.error("Stream error:", dataStr);
+                        let errorMsg = dataStr;
                         try {
-                            const errorMsg = JSON.parse(dataStr);
-                            if (errorMsg) {
-                                currentText += `\n\n> **Error**: ${errorMsg}`;
-                            }
+                            const parsed = JSON.parse(dataStr);
+                            if (parsed) errorMsg = parsed;
                         } catch {
-                            if (dataStr) {
-                                currentText += `\n\n> **Error**: ${dataStr}`;
-                            }
+                            // Use raw string
                         }
+                        handleStreamError(errorMsg);
+                        return; // Exit loop and skip onComplete
                     }
                     setCurrentToolStatus(null);
                     // Final update
@@ -242,6 +281,19 @@ function App() {
                 signal: controller.signal
             });
 
+            if (!response.ok) {
+                let errorMsg = `HTTP Error ${response.status}`;
+                try {
+                    const errBody = await response.json();
+                    if (errBody.error) errorMsg = errBody.error;
+                    else if (errBody.detail) errorMsg = errBody.detail;
+                } catch {
+                    // ignore
+                }
+                handleStreamError(errorMsg);
+                return;
+            }
+
             await readStream(response, () => {
                 queryClient.invalidateQueries({ queryKey: ['chat-history'] });
             });
@@ -251,6 +303,8 @@ function App() {
                 console.log("Generation stopped by user");
             } else {
                 console.error("Fetch failed:", error);
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                handleStreamError(errorMsg);
             }
             setCurrentToolStatus(null);
         } finally {
