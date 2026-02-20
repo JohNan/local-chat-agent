@@ -11,6 +11,8 @@ import xml.etree.ElementTree as ET
 from functools import lru_cache
 import pathspec
 
+from app.services.lsp_manager import LSPManager
+
 logger = logging.getLogger(__name__)
 
 # Default to /codebase inside Docker, but fallback to current directory for local testing
@@ -583,3 +585,65 @@ def read_android_manifest(manifest_path: str = None) -> str:
 
     except ET.ParseError as e:
         return f"Error parsing AndroidManifest.xml: {e}"
+
+
+def get_definition(file_path: str, line: int, col: int) -> dict:
+    """
+    Finds the definition of a symbol using LSP.
+
+    Args:
+        file_path: Relative path to the file.
+        line: 1-based line number.
+        col: 1-based column number.
+
+    Returns:
+        A dictionary containing the definition location and content preview.
+    """
+    # Sanitize path
+    if file_path.startswith("/"):
+        file_path = file_path.lstrip("/")
+
+    full_path = os.path.join(CODEBASE_ROOT, file_path)
+
+    manager = LSPManager()
+    result = manager.get_definition(full_path, line, col)
+
+    if "error" in result:
+        return result
+
+    # Result usually contains a list of Location or a single Location
+    # Location: { uri: str, range: Range }
+    definitions = result.get("result")
+
+    if not definitions:
+        return {"message": "No definition found."}
+
+    if isinstance(definitions, list):
+        # Taking the first one if multiple
+        target = definitions[0]
+    else:
+        target = definitions
+
+    uri = target.get("uri", "")
+    if uri.startswith("file://"):
+        target_path = uri[7:]
+    else:
+        target_path = uri
+
+    # Get relative path for display
+    try:
+        rel_target_path = os.path.relpath(target_path, CODEBASE_ROOT)
+    except ValueError:
+        rel_target_path = target_path
+
+    target_range = target.get("range", {})
+    start_line = target_range.get("start", {}).get("line", 0) + 1
+
+    # Read snippet
+    content_snippet = read_file(rel_target_path, start_line, start_line + 5)
+
+    return {
+        "file": rel_target_path,
+        "line": start_line,
+        "content": content_snippet
+    }
