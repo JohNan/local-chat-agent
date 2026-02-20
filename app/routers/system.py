@@ -7,8 +7,8 @@ import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from app.config import CLIENT
-from app.services import git_ops, rag_manager, prompt_router
+from app.config import CLIENT, DEFAULT_MODEL
+from app.services import git_ops, rag_manager, prompt_router, chat_manager
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,13 @@ async def rag_reindex():
     # Run in background
     asyncio.create_task(asyncio.to_thread(rag_manager.index_codebase_task))
     return {"status": "indexing started"}
+
+
+@router.get("/api/settings")
+def api_settings():
+    """Returns system settings."""
+    model = chat_manager.get_setting("default_model", DEFAULT_MODEL)
+    return {"model": model}
 
 
 @router.get("/api/models")

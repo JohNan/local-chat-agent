@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from google.genai import types
 
 from app import agent_engine
-from app.config import CLIENT, ENABLE_GOOGLE_SEARCH
+from app.config import CLIENT, ENABLE_GOOGLE_SEARCH, HISTORY_LIMIT
 from app.services import chat_manager, prompt_router
 from app.services.llm_service import (
     prepare_messages,
@@ -87,8 +87,13 @@ async def chat(request: ChatRequest):
         chat_manager.save_message, "user", user_msg, parts=storage_parts
     )
 
+    # Save model preference
+    await asyncio.to_thread(chat_manager.save_setting, "default_model", request.model)
+
     # Load history including the message we just saved
-    full_history = await asyncio.to_thread(chat_manager.load_chat_history)
+    full_history = await asyncio.to_thread(
+        chat_manager.load_chat_history, limit=HISTORY_LIMIT
+    )
     formatted_history = await asyncio.to_thread(format_history, full_history)
 
     # Determine if search is enabled

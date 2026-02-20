@@ -33,12 +33,20 @@ def _row_to_message(row: dict) -> dict:
     return msg
 
 
-def load_chat_history():
+def load_chat_history(limit: int = None):
     """
-    Loads full chat history from the database.
+    Loads chat history from the database, optionally limited to the most recent messages.
     """
     db = DatabaseManager()
-    rows = db.fetch_all("SELECT * FROM messages ORDER BY created_at ASC")
+    if limit:
+        rows = db.fetch_all(
+            "SELECT * FROM messages ORDER BY created_at DESC LIMIT ?", (limit,)
+        )
+        # Reverse to restore chronological order
+        rows.reverse()
+    else:
+        rows = db.fetch_all("SELECT * FROM messages ORDER BY created_at ASC")
+
     history = [_row_to_message(row) for row in rows]
 
     # Sanitization: Remove dangling function calls
@@ -124,6 +132,25 @@ def get_history_page(limit=20, offset=0):
     has_more = total > (offset + limit)
 
     return {"messages": messages, "has_more": has_more, "total": total}
+
+
+def get_setting(key: str, default: str = None) -> str:
+    """
+    Retrieves a setting value by key.
+    """
+    db = DatabaseManager()
+    row = db.fetch_one("SELECT value FROM settings WHERE key = ?", (key,))
+    return row["value"] if row else default
+
+
+def save_setting(key: str, value: str):
+    """
+    Saves a setting value (upsert).
+    """
+    db = DatabaseManager()
+    db.execute_query(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value)
+    )
 
 
 def reset_history():
