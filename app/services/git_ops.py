@@ -642,8 +642,4 @@ def get_definition(file_path: str, line: int, col: int) -> dict:
     # Read snippet
     content_snippet = read_file(rel_target_path, start_line, start_line + 5)
 
-    return {
-        "file": rel_target_path,
-        "line": start_line,
-        "content": content_snippet
-    }
+    return {"file": rel_target_path, "line": start_line, "content": content_snippet}

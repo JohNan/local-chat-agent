@@ -1,6 +1,7 @@
 """
 Service for managing LSP server configurations.
 """
+
 import json
 import logging
 import os
@@ -11,7 +12,10 @@ logger = logging.getLogger(__name__)
 
 CATALOG_PATH = os.path.join(os.path.dirname(__file__), "../lsp/catalog.json")
 
+
 class LSPRegistry:
+    """Singleton registry for managing Language Server configurations."""
+
     _instance = None
     _config: Dict[str, Any] = {}
 
@@ -41,11 +45,13 @@ class LSPRegistry:
                     self._config[lang] = config
                     logger.info("LSP server for %s found: %s", lang, bin_name)
                 else:
-                    logger.warning("LSP binary '%s' for %s not found in PATH", bin_name, lang)
+                    logger.warning(
+                        "LSP binary '%s' for %s not found in PATH", bin_name, lang
+                    )
 
         except json.JSONDecodeError as e:
             logger.error("Failed to parse LSP catalog: %s", e)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Error loading LSP registry: %s", e)
 
     def get_config_by_extension(self, ext: str) -> Optional[Dict[str, Any]]:

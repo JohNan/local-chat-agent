@@ -1,6 +1,7 @@
 """
 Service for managing Language Server Protocol (LSP) processes.
 """
+
 import json
 import logging
 import os
@@ -12,8 +13,11 @@ from app.services.lsp_registry import LSPRegistry
 
 logger = logging.getLogger(__name__)
 
+
 class LSPServer:
     """Helper class to manage a single LSP process and its I/O."""
+
+    # pylint: disable=too-many-instance-attributes
     def __init__(self, process: subprocess.Popen, language: str, root_path: str):
         self.process = process
         self.language = language
@@ -33,8 +37,12 @@ class LSPServer:
                 line = self.process.stderr.readline()
                 if not line:
                     break
-                logger.debug("[%s] stderr: %s", self.language, line.decode('utf-8', errors='ignore').strip())
-            except Exception:
+                logger.debug(
+                    "[%s] stderr: %s",
+                    self.language,
+                    line.decode("utf-8", errors="ignore").strip(),
+                )
+            except Exception:  # pylint: disable=broad-exception-caught
                 break
 
     def _read_loop(self):
@@ -48,7 +56,7 @@ class LSPServer:
                     if not line:
                         return  # EOF or process died
 
-                    line_str = line.decode('utf-8', errors='ignore').strip()
+                    line_str = line.decode("utf-8", errors="ignore").strip()
                     if not line_str:
                         break  # End of headers
 
@@ -78,21 +86,20 @@ class LSPServer:
                         #    logger.debug("LSP Notification: %s", msg)
 
                     except json.JSONDecodeError as e:
-                        logger.error("Failed to decode JSON from LSP %s: %s", self.language, e)
+                        logger.error(
+                            "Failed to decode JSON from LSP %s: %s", self.language, e
+                        )
 
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Error in LSP reader loop for %s: %s", self.language, e)
                 break
 
-    def send_request(self, method: str, params: Any, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
+    def send_request(
+        self, method: str, params: Any, timeout: float = 5.0
+    ) -> Optional[Dict[str, Any]]:
         """Sends a request and waits for a response."""
         req_id = int(time.time() * 1000000) % 10000000
-        payload = {
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "method": method,
-            "params": params
-        }
+        payload = {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
 
         condition = threading.Condition()
         with self.lock:
@@ -113,7 +120,11 @@ class LSPServer:
                     if req_id in self.responses:
                         del self.responses[req_id]
             else:
-                logger.warning("Timeout waiting for LSP response id %s from %s", req_id, self.language)
+                logger.warning(
+                    "Timeout waiting for LSP response id %s from %s",
+                    req_id,
+                    self.language,
+                )
 
         with self.lock:
             if req_id in self.conditions:
@@ -123,11 +134,7 @@ class LSPServer:
 
     def send_notification(self, method: str, params: Any):
         """Sends a notification (no response expected)."""
-        payload = {
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params
-        }
+        payload = {"jsonrpc": "2.0", "method": method, "params": params}
         self._send_payload(payload)
 
     def _send_payload(self, payload: Dict[str, Any]) -> bool:
@@ -135,7 +142,7 @@ class LSPServer:
         try:
             body = json.dumps(payload)
             message = f"Content-Length: {len(body)}\r\n\r\n{body}"
-            self.process.stdin.write(message.encode('utf-8'))
+            self.process.stdin.write(message.encode("utf-8"))
             self.process.stdin.flush()
             return True
         except Exception as e:
@@ -144,6 +151,8 @@ class LSPServer:
 
 
 class LSPManager:
+    """Singleton manager for LSP server processes."""
+
     _instance = None
     _servers: Dict[str, LSPServer] = {}
     _lock = threading.Lock()
@@ -166,11 +175,12 @@ class LSPManager:
                 server = self._servers[key]
                 if server.process.poll() is None:
                     return server
-                else:
-                    logger.warning("LSP server for %s died, restarting...", language)
-                    del self._servers[key]
+
+                logger.warning("LSP server for %s died, restarting...", language)
+                del self._servers[key]
 
             registry = LSPRegistry()
+            # pylint: disable=protected-access
             config = registry._config.get(language)
 
             if not config:
@@ -182,14 +192,20 @@ class LSPManager:
             cmd = [bin_name] + args
 
             try:
-                logger.info("Starting LSP server for %s at %s with cmd: %s", language, root_path, cmd)
+                logger.info(
+                    "Starting LSP server for %s at %s with cmd: %s",
+                    language,
+                    root_path,
+                    cmd,
+                )
+                # pylint: disable=consider-using-with
                 process = subprocess.Popen(
                     cmd,
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE, # Capture stderr to keep it clean
+                    stderr=subprocess.PIPE,  # Capture stderr to keep it clean
                     cwd=root_path,
-                    bufsize=0
+                    bufsize=0,
                 )
 
                 server = LSPServer(process, language, root_path)
@@ -198,23 +214,29 @@ class LSPManager:
                 init_params = {
                     "processId": os.getpid(),
                     "rootUri": f"file://{root_path}",
-                    "capabilities": {}
+                    "capabilities": {},
                 }
                 resp = server.send_request("initialize", init_params)
                 if resp and "error" not in resp:
                     server.send_notification("initialized", {})
                     self._servers[key] = server
                     return server
-                else:
-                    logger.error("Failed to initialize LSP server for %s. Response: %s", language, resp)
-                    process.terminate()
-                    return None
 
-            except Exception as e:
+                logger.error(
+                    "Failed to initialize LSP server for %s. Response: %s",
+                    language,
+                    resp,
+                )
+                process.terminate()
+                return None
+
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Failed to start LSP server for %s: %s", language, e)
                 return None
 
-    def get_definition(self, file_path: str, line: int, col: int) -> Dict[str, Any]:
+    def get_definition(
+        self, file_path: str, line: int, col: int
+    ) -> Dict[str, Any]:  # pylint: disable=too-many-locals, too-many-return-statements
         """
         Finds the definition of the symbol at the given location.
         line and col are 1-based.
@@ -230,6 +252,7 @@ class LSPManager:
 
         # Find language name
         language = None
+        # pylint: disable=protected-access
         for lang, cfg in registry._config.items():
             if cfg == config:
                 language = lang
@@ -258,28 +281,33 @@ class LSPManager:
         # Send didOpen (it's safe to send even if already open, usually)
         # In a real server we track open files, but here we just send it every time for simplicity
         # or we could track it in LSPServer.
-        server.send_notification("textDocument/didOpen", {
-            "textDocument": {
-                "uri": f"file://{abs_path}",
-                "languageId": language,
-                "version": 1,
-                "text": content
-            }
-        })
+        server.send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": f"file://{abs_path}",
+                    "languageId": language,
+                    "version": 1,
+                    "text": content,
+                }
+            },
+        )
 
         # Request Definition
         # Convert 1-based to 0-based
-        response = server.send_request("textDocument/definition", {
-            "textDocument": {"uri": f"file://{abs_path}"},
-            "position": {"line": line - 1, "character": col - 1}
-        })
+        response = server.send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": f"file://{abs_path}"},
+                "position": {"line": line - 1, "character": col - 1},
+            },
+        )
 
         if response and "result" in response:
             return {"result": response["result"]}
-        elif response and "error" in response:
-             return {"error": response["error"]}
-        else:
-            return {"error": "Request failed or timed out"}
+        if response and "error" in response:
+            return {"error": response["error"]}
+        return {"error": "Request failed or timed out"}
 
     def _find_root(self, file_path: str, markers: list[str]) -> Optional[str]:
         """Finds project root by looking for markers."""
