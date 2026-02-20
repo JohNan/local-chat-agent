@@ -20,6 +20,7 @@ export const Header: React.FC<HeaderProps> = ({
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [loading, setLoading] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [showPersonaName, setShowPersonaName] = useState(false);
     const [availableModels, setAvailableModels] = useState<string[]>([
         "gemini-3-pro-preview",
         "gemini-2.0-flash-exp",
@@ -114,8 +115,37 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="header-title">
                     <Bot size={24} />
                     <span>Gemini Agent</span>
-                    <div title={status?.active_persona || "General"} style={{ display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
+                    <div
+                        title={status?.active_persona || "General"}
+                        onClick={() => setShowPersonaName(!showPersonaName)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            marginLeft: '10px',
+                            cursor: 'pointer',
+                            position: 'relative'
+                        }}
+                    >
                         {getPersonaIcon(status?.active_persona)}
+                        {showPersonaName && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '120%',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                backgroundColor: 'var(--chat-bg)',
+                                border: '1px solid var(--border-color)',
+                                padding: '5px 10px',
+                                borderRadius: '4px',
+                                zIndex: 1000,
+                                whiteSpace: 'nowrap',
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
+                                color: 'var(--text-color)',
+                                fontSize: '0.8rem'
+                            }}>
+                                {status?.active_persona || "General"}
+                            </div>
+                        )}
                     </div>
                 </div>
                 <div className="header-controls">
