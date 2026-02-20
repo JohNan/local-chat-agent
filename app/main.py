@@ -6,14 +6,18 @@ import os
 import sys
 import logging
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, AsyncExitStack
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from google.genai import types
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
-from app.services import rag_manager
+from app.config import get_mcp_servers
+from app.services import rag_manager, llm_service
 from app.services.database import DatabaseManager
 from app.routers import chat, system, history, jules
 
@@ -38,7 +42,53 @@ async def lifespan(_app: FastAPI):
     # Startup
     logger.info("Starting background RAG indexing...")
     asyncio.create_task(asyncio.to_thread(rag_manager.index_codebase_task))
-    yield
+
+    # Initialize MCP Clients
+    async with AsyncExitStack() as stack:
+        mcp_servers = get_mcp_servers()
+        for name, config in mcp_servers.items():
+            try:
+                logger.info("Initializing MCP server: %s", name)
+                server_params = StdioServerParameters(
+                    command=config["command"],
+                    args=config.get("args", []),
+                    env={**os.environ, **config.get("env", {})},
+                )
+
+                read, write = await stack.enter_async_context(
+                    stdio_client(server_params)
+                )
+                session = await stack.enter_async_context(ClientSession(read, write))
+                await session.initialize()
+
+                # List tools
+                result = await session.list_tools()
+
+                # Store session
+                llm_service.MCP_SESSIONS[name] = session
+
+                # Convert and store tools
+                for tool in result.tools:
+                    tool_name = tool.name
+                    # Convert to Gemini FunctionDeclaration
+                    func_decl = types.FunctionDeclaration(
+                        name=tool_name,
+                        description=tool.description,
+                        parameters=tool.inputSchema,
+                    )
+
+                    llm_service.MCP_TOOL_DEFINITIONS.append(func_decl)
+                    llm_service.MCP_TOOL_TO_SESSION_MAP[tool_name] = session
+
+                logger.info(
+                    "MCP server %s initialized with %d tools", name, len(result.tools)
+                )
+
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error("Failed to initialize MCP server %s: %s", name, e)
+
+        yield
+        logger.info("Shutting down MCP sessions...")
     # Shutdown (if needed)
 
 

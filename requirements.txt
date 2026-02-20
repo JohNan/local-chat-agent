@@ -12,3 +12,4 @@ aiohttp==3.11.11
 pytest-asyncio>=0.25.0
 pathspec>=0.11.0
 chromadb
+mcp
