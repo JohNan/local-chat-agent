@@ -21,6 +21,34 @@ MAX_FILES_LIMIT = 500
 MAX_READ_LINES = 2000
 
 
+def _validate_path(path: str) -> str:
+    """
+    Validates that a path is within the codebase root.
+    Returns the absolute path if valid, otherwise raises ValueError.
+    """
+    # Sanitize input path
+    if path.startswith("/"):
+        path = path.lstrip("/")
+
+    # Resolve absolute path
+    full_path = os.path.abspath(os.path.join(CODEBASE_ROOT, path))
+    root_abs = os.path.abspath(CODEBASE_ROOT)
+
+    # Security check: Ensure we are still inside CODEBASE_ROOT using commonpath
+    try:
+        if os.path.commonpath([full_path, root_abs]) != root_abs:
+            raise ValueError(
+                f"Access denied. Cannot access path outside of codebase: {path}"
+            )
+    except ValueError as e:
+        # Can happen on different drives on Windows, essentially outside
+        raise ValueError(
+            f"Access denied. Cannot access path outside of codebase: {path}"
+        ) from e
+
+    return full_path
+
+
 @lru_cache(maxsize=1)
 def _get_remote_url():
     """Attempts to retrieve the git remote origin URL."""
@@ -162,11 +190,10 @@ def list_files(directory: str = ".") -> list[str]:
     logger.debug("Scanning files in: %s", CODEBASE_ROOT)
     files_list = []
 
-    # Sanitize directory input to be relative to root
-    if directory.startswith("/"):
-        directory = directory.lstrip("/")
-
-    base_path = os.path.join(CODEBASE_ROOT, directory)
+    try:
+        base_path = _validate_path(directory)
+    except ValueError as e:
+        return [f"Error: {str(e)}"]
 
     if not os.path.exists(base_path):
         return [f"Error: Directory {directory} does not exist."]
@@ -225,20 +252,10 @@ def read_file(filepath: str, start_line: int = 1, end_line: int = None) -> str:
     Returns:
         The content of the file, potentially truncated or sliced.
     """
-    # Sanitize filepath
-    if filepath.startswith("/"):
-        filepath = filepath.lstrip("/")
-
-    full_path = os.path.abspath(os.path.join(CODEBASE_ROOT, filepath))
-    root_abs = os.path.abspath(CODEBASE_ROOT)
-
-    # Security check: Ensure we are still inside CODEBASE_ROOT using commonpath
     try:
-        if os.path.commonpath([full_path, root_abs]) != root_abs:
-            return "Error: Access denied. Cannot read outside of codebase."
-    except ValueError:
-        # Can happen on different drives on Windows, essentially outside
-        return "Error: Access denied. Cannot read outside of codebase."
+        full_path = _validate_path(filepath)
+    except ValueError as e:
+        return f"Error: {str(e)}"
 
     if not os.path.exists(full_path):
         return f"Error: File {filepath} not found."
@@ -298,22 +315,32 @@ def get_file_history(filepath: str, max_count: int = 10) -> str:
     Returns:
         A string containing the git history, or an error message.
     """
-    # Sanitize filepath
-    if filepath.startswith("/"):
-        filepath = filepath.lstrip("/")
+    try:
+        # Validate path but we need the relative path for git log if we run it from root
+        # _validate_path returns absolute path
+        abs_path = _validate_path(filepath)
+        # Convert back to relative path for git command, or use abs_path if git
+        # supports it inside repo. Git log expects path relative to CWD usually,
+        # or absolute path. But we must be sure we are not passing "../" to git log.
+        # Since _validate_path ensures it's inside CODEBASE_ROOT, we can use the
+        # relative path safely.
+        rel_path = os.path.relpath(abs_path, CODEBASE_ROOT)
+    except ValueError as e:
+        return f"Error: {str(e)}"
 
     try:
         # Use git log to get the history
+        cmd = [
+            "git",
+            "log",
+            "-n",
+            str(max_count),
+            "--pretty=format:%h - %an, %ar : %s",
+            "--",
+            rel_path,
+        ]
         result = subprocess.run(
-            [
-                "git",
-                "log",
-                "-n",
-                str(max_count),
-                "--pretty=format:%h - %an, %ar : %s",
-                "--",
-                filepath,
-            ],
+            cmd,
             cwd=CODEBASE_ROOT,
             capture_output=True,
             text=True,
@@ -587,6 +614,17 @@ def read_android_manifest(manifest_path: str = None) -> str:
         return f"Error parsing AndroidManifest.xml: {e}"
 
 
+def _validate_definition_target(target_path: str) -> None:
+    """Validates that the target definition path is within the codebase."""
+    try:
+        target_path_abs = os.path.abspath(target_path)
+        root_abs = os.path.abspath(CODEBASE_ROOT)
+        if os.path.commonpath([target_path_abs, root_abs]) != root_abs:
+            raise ValueError("Access denied. Definition is outside of codebase.")
+    except ValueError as e:
+        raise ValueError("Access denied. Definition is outside of codebase.") from e
+
+
 def get_definition(file_path: str, line: int, col: int) -> dict:
     """
     Finds the definition of a symbol using the Language Server Protocol (LSP).
@@ -601,11 +639,11 @@ def get_definition(file_path: str, line: int, col: int) -> dict:
     Returns:
         A dictionary containing the definition location and content preview.
     """
-    # Sanitize path
-    if file_path.startswith("/"):
-        file_path = file_path.lstrip("/")
-
-    full_path = os.path.join(CODEBASE_ROOT, file_path)
+    try:
+        # Validate path
+        full_path = _validate_path(file_path)
+    except ValueError as e:
+        return {"error": str(e)}
 
     manager = LSPManager()
     result = manager.get_definition(full_path, line, col)
@@ -631,6 +669,12 @@ def get_definition(file_path: str, line: int, col: int) -> dict:
         target_path = uri[7:]
     else:
         target_path = uri
+
+    # Validate target path
+    try:
+        _validate_definition_target(target_path)
+    except ValueError as e:
+        return {"error": str(e)}
 
     # Get relative path for display
     try:
