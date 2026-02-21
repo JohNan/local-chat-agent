@@ -37,10 +37,14 @@ def _validate_path(path: str) -> str:
     # Security check: Ensure we are still inside CODEBASE_ROOT using commonpath
     try:
         if os.path.commonpath([full_path, root_abs]) != root_abs:
-            raise ValueError(f"Access denied. Cannot access path outside of codebase: {path}")
+            raise ValueError(
+                f"Access denied. Cannot access path outside of codebase: {path}"
+            )
     except ValueError as e:
         # Can happen on different drives on Windows, essentially outside
-        raise ValueError(f"Access denied. Cannot access path outside of codebase: {path}") from e
+        raise ValueError(
+            f"Access denied. Cannot access path outside of codebase: {path}"
+        ) from e
 
     return full_path
 
