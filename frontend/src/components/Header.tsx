@@ -179,6 +179,39 @@ export const Header: React.FC<HeaderProps> = ({
                                 </span>
                             </div>
 
+                            <div className="setting-item">
+                                <label>Language Servers</label>
+                                {status?.lsp_servers && status.lsp_servers.length > 0 ? (
+                                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                                        {status.lsp_servers.map((s, idx) => (
+                                            <li key={idx} style={{
+                                                fontSize: '0.9rem',
+                                                marginBottom: '5px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                backgroundColor: 'var(--bg-secondary)',
+                                                padding: '5px',
+                                                borderRadius: '4px'
+                                            }}>
+                                                <span>{s.language}</span>
+                                                <span title={s.root_path} style={{ opacity: 0.7, fontSize: '0.8rem', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                     {s.root_path.split('/').pop()}
+                                                </span>
+                                                <span style={{
+                                                    color: s.status === 'running' ? '#4caf50' : '#f44336',
+                                                    fontSize: '0.8rem'
+                                                }}>
+                                                    {s.status}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <span style={{ opacity: 0.7, fontSize: '0.9rem' }}>No active servers</span>
+                                )}
+                            </div>
+
                              <div className="setting-item">
                                 <label>Model</label>
                                 <select

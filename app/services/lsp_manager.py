@@ -162,11 +162,31 @@ class LSPManager:
             cls._instance = super(LSPManager, cls).__new__(cls)
         return cls._instance
 
+    def _get_normalized_path(self, path: str) -> str:
+        return os.path.abspath(path)
+
     def _get_server_key(self, language: str, root_path: str) -> str:
         return f"{language}:{root_path}"
 
+    def get_active_servers(self) -> list[Dict[str, Any]]:
+        """Returns a list of active LSP servers."""
+        servers = []
+        with self._lock:
+            for _, server in self._servers.items():
+                status = "running" if server.process.poll() is None else "stopped"
+                servers.append(
+                    {
+                        "language": server.language,
+                        "root_path": server.root_path,
+                        "pid": server.process.pid,
+                        "status": status,
+                    }
+                )
+        return servers
+
     def start_server(self, language: str, root_path: str) -> Optional[LSPServer]:
         """Starts or retrieves an existing LSP server."""
+        root_path = self._get_normalized_path(root_path)
         key = self._get_server_key(language, root_path)
 
         with self._lock:
@@ -239,6 +259,7 @@ class LSPManager:
         """
         Scans the root path for supported files and starts corresponding LSP servers.
         """
+        root_path = self._get_normalized_path(root_path)
         logger.info("Scanning for supported languages to start LSP servers...")
         registry = LSPRegistry()
         # pylint: disable=protected-access

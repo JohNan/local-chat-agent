@@ -23,6 +23,8 @@ class TestLSPBoot(unittest.TestCase):
         self, mock_start_server, mock_walk, mock_registry_cls
     ):
         """Tests that start_supported_servers correctly identifies and starts servers."""
+        import os
+
         # Setup Registry Mock
         mock_registry = mock_registry_cls.return_value
         # pylint: disable=protected-access
@@ -42,12 +44,14 @@ class TestLSPBoot(unittest.TestCase):
         manager = LSPManager()
         manager.start_supported_servers(".")
 
+        expected_path = os.path.abspath(".")
+
         # Check calls
         # Should attempt to start python server (because of main.py)
-        mock_start_server.assert_any_call("python", ".")
+        mock_start_server.assert_any_call("python", expected_path)
 
         # Should attempt to start typescript server (because of app.ts)
-        mock_start_server.assert_any_call("typescript", ".")
+        mock_start_server.assert_any_call("typescript", expected_path)
 
         # Should NOT attempt to start kotlin server
         calls = [args[0] for args, _ in mock_start_server.call_args_list]

@@ -24,4 +24,12 @@ export interface RepoStatus {
     project: string;
     branch: string;
     active_persona?: string;
+    lsp_servers?: LSPServerInfo[];
+}
+
+export interface LSPServerInfo {
+    language: string;
+    root_path: string;
+    pid: number;
+    status: string;
 }
