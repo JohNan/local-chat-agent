@@ -18,7 +18,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     git \
     openssh-client \
-    openjdk-17-jre-headless \
+    openjdk-21-jre-headless \
     nodejs \
     npm \
     unzip \
