@@ -249,7 +249,7 @@ class LSPManager:
 
             found = False
             # Walk the directory to find a matching file
-            for root, dirs, files in os.walk(root_path):
+            for _, dirs, files in os.walk(root_path):
                 # Skip common ignored directories
                 dirs[:] = [
                     d
