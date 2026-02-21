@@ -110,6 +110,7 @@ class RAGManager:
         pending_documents = []
         pending_metadatas = []
         pending_ids = []
+        pending_deletions = []
 
         for root, _, files in os.walk("."):
             # Skip common ignore directories
@@ -143,7 +144,7 @@ class RAGManager:
                     # Check if file already indexed with same hash
                     # We query for any chunk of this file to check its metadata
                     existing_docs = self.collection.get(
-                        where={"filepath": filepath}, limit=1
+                        where={"filepath": filepath}, limit=1, include=["metadatas"]
                     )
 
                     if existing_docs and existing_docs["metadatas"]:
@@ -151,11 +152,23 @@ class RAGManager:
                         if existing_metadata.get("file_hash") == file_hash:
                             continue  # Skip unchanged file
 
-                    # File changed or new. Delete existing chunks.
-                    self.collection.delete(where={"filepath": filepath})
+                    # File changed or new. Find orphaned chunks (existing chunks that won't be overwritten).
+                    all_existing_docs = self.collection.get(
+                        where={"filepath": filepath}, include=["metadatas"]
+                    )
+                    existing_ids = (
+                        set(all_existing_docs["ids"])
+                        if all_existing_docs and all_existing_docs["ids"]
+                        else set()
+                    )
 
                     # Chunking
                     chunks = self._chunk_text(content)
+                    new_ids = {f"{filepath}:{i}" for i in range(len(chunks))}
+
+                    orphaned_ids = list(existing_ids - new_ids)
+                    if orphaned_ids:
+                        pending_deletions.extend(orphaned_ids)
 
                     for i, chunk in enumerate(chunks):
                         chunk_id = f"{filepath}:{i}"
@@ -202,6 +215,17 @@ class RAGManager:
                     )
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Error processing batch starting at %d: %s", i, e)
+
+        # Process deletions
+        total_deletions = len(pending_deletions)
+        if total_deletions > 0:
+            logger.info("Processing %d orphaned chunks for deletion", total_deletions)
+            for i in range(0, total_deletions, batch_size):
+                batch_del_ids = pending_deletions[i : i + batch_size]
+                try:
+                    self.collection.delete(ids=batch_del_ids)
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    logger.error("Error deleting batch starting at %d: %s", i, e)
 
         logger.info("Indexing complete. Indexed %d files.", files_indexed)
         return {"status": "success", "files_indexed": files_indexed}
