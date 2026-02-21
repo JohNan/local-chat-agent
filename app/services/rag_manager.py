@@ -161,23 +161,7 @@ class RAGManager:
             "deletions": [],
         }
 
-        # Fetch all existing metadata to avoid N+1 queries
-        existing_files = {}
-        try:
-            all_docs = self.collection.get(include=["metadatas"])
-            if all_docs and all_docs.get("ids") and all_docs.get("metadatas"):
-                for doc_id, meta in zip(all_docs["ids"], all_docs["metadatas"]):
-                    fp = meta.get("filepath")
-                    if not fp:
-                        continue
-                    if fp not in existing_files:
-                        existing_files[fp] = {
-                            "file_hash": meta.get("file_hash"),
-                            "chunk_ids": set(),
-                        }
-                    existing_files[fp]["chunk_ids"].add(doc_id)
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error("Error fetching existing metadata: %s", e)
+        existing_files = self._fetch_existing_metadata()
 
         for root, _, files in os.walk("."):
             if any(ignore in root for ignore in ignore_dirs):
@@ -234,6 +218,26 @@ class RAGManager:
 
         logger.info("Indexing complete. Indexed %d files.", files_indexed)
         return {"status": "success", "files_indexed": files_indexed}
+
+    def _fetch_existing_metadata(self) -> dict:
+        """Fetches metadata for all existing files to avoid N+1 queries."""
+        existing_files = {}
+        try:
+            all_docs = self.collection.get(include=["metadatas"])
+            if all_docs and all_docs.get("ids") and all_docs.get("metadatas"):
+                for doc_id, meta in zip(all_docs["ids"], all_docs["metadatas"]):
+                    fp = meta.get("filepath")
+                    if not fp:
+                        continue
+                    if fp not in existing_files:
+                        existing_files[fp] = {
+                            "file_hash": meta.get("file_hash"),
+                            "chunk_ids": set(),
+                        }
+                    existing_files[fp]["chunk_ids"].add(doc_id)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error fetching existing metadata: %s", e)
+        return existing_files
 
     def _chunk_text(
         self, text: str, chunk_size: int = 2000, overlap: int = 200
