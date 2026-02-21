@@ -83,6 +83,62 @@ class RAGManager:
                 )
                 return None
 
+    def _process_file_indexing(self, filepath, pending_data):
+        """Processes a single file for indexing."""
+        # pylint: disable=too-many-locals
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            file_hash = self._calculate_hash(content)
+
+            # Check if file already indexed with same hash
+            # We query for any chunk of this file to check its metadata
+            existing_docs = self.collection.get(
+                where={"filepath": filepath}, limit=1, include=["metadatas"]
+            )
+
+            if existing_docs and existing_docs["metadatas"]:
+                existing_metadata = existing_docs["metadatas"][0]
+                if existing_metadata.get("file_hash") == file_hash:
+                    return False  # Skip unchanged file
+
+            # File changed or new. Find orphaned chunks (existing chunks not in new content).
+            all_existing_docs = self.collection.get(
+                where={"filepath": filepath}, include=["metadatas"]
+            )
+            existing_ids = (
+                set(all_existing_docs["ids"])
+                if all_existing_docs and all_existing_docs["ids"]
+                else set()
+            )
+
+            # Chunking
+            chunks = self._chunk_text(content)
+            new_ids = {f"{filepath}:{i}" for i in range(len(chunks))}
+
+            orphaned_ids = list(existing_ids - new_ids)
+            if orphaned_ids:
+                pending_data["deletions"].extend(orphaned_ids)
+
+            for i, chunk in enumerate(chunks):
+                chunk_id = f"{filepath}:{i}"
+                pending_data["ids"].append(chunk_id)
+                pending_data["documents"].append(chunk)
+                pending_data["metadatas"].append(
+                    {
+                        "filepath": filepath,
+                        "chunk_index": i,
+                        "file_hash": file_hash,
+                    }
+                )
+
+            return True
+
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error indexing file %s: %s", filepath, e)
+            return False
+
     def index_codebase(self):
         """Indexes the codebase by walking through files."""
         # pylint: disable=too-many-locals, too-many-branches
@@ -92,8 +148,6 @@ class RAGManager:
         logger.info("Starting codebase indexing...")
 
         files_indexed = 0
-
-        # Basic extensions to include
         valid_extensions = {
             ".py",
             ".js",
@@ -106,96 +160,43 @@ class RAGManager:
             ".css",
             ".json",
         }
+        ignore_dirs = {
+            "venv",
+            ".git",
+            "node_modules",
+            "__pycache__",
+            "chroma_db",
+            "site-packages",
+        }
 
-        pending_documents = []
-        pending_metadatas = []
-        pending_ids = []
-        pending_deletions = []
+        pending_data = {
+            "documents": [],
+            "metadatas": [],
+            "ids": [],
+            "deletions": [],
+        }
 
         for root, _, files in os.walk("."):
-            # Skip common ignore directories
-            if any(
-                ignore in root
-                for ignore in [
-                    "venv",
-                    ".git",
-                    "node_modules",
-                    "__pycache__",
-                    "chroma_db",
-                    "site-packages",
-                ]
-            ):
+            if any(ignore in root for ignore in ignore_dirs):
                 continue
 
             for file in files:
                 if not any(file.endswith(ext) for ext in valid_extensions):
                     continue
 
-                filepath = os.path.join(root, file)
-                # Normalize path
-                filepath = os.path.relpath(filepath, ".")
-
-                try:
-                    with open(filepath, "r", encoding="utf-8") as f:
-                        content = f.read()
-
-                    file_hash = self._calculate_hash(content)
-
-                    # Check if file already indexed with same hash
-                    # We query for any chunk of this file to check its metadata
-                    existing_docs = self.collection.get(
-                        where={"filepath": filepath}, limit=1, include=["metadatas"]
-                    )
-
-                    if existing_docs and existing_docs["metadatas"]:
-                        existing_metadata = existing_docs["metadatas"][0]
-                        if existing_metadata.get("file_hash") == file_hash:
-                            continue  # Skip unchanged file
-
-                    # File changed or new. Find orphaned chunks (existing chunks that won't be overwritten).
-                    all_existing_docs = self.collection.get(
-                        where={"filepath": filepath}, include=["metadatas"]
-                    )
-                    existing_ids = (
-                        set(all_existing_docs["ids"])
-                        if all_existing_docs and all_existing_docs["ids"]
-                        else set()
-                    )
-
-                    # Chunking
-                    chunks = self._chunk_text(content)
-                    new_ids = {f"{filepath}:{i}" for i in range(len(chunks))}
-
-                    orphaned_ids = list(existing_ids - new_ids)
-                    if orphaned_ids:
-                        pending_deletions.extend(orphaned_ids)
-
-                    for i, chunk in enumerate(chunks):
-                        chunk_id = f"{filepath}:{i}"
-                        pending_ids.append(chunk_id)
-                        pending_documents.append(chunk)
-                        pending_metadatas.append(
-                            {
-                                "filepath": filepath,
-                                "chunk_index": i,
-                                "file_hash": file_hash,
-                            }
-                        )
-
+                filepath = os.path.relpath(os.path.join(root, file), ".")
+                if self._process_file_indexing(filepath, pending_data):
                     files_indexed += 1
-
-                except Exception as e:  # pylint: disable=broad-exception-caught
-                    logger.error("Error indexing file %s: %s", filepath, e)
 
         # Process batches
         batch_size = 100
-        total_chunks = len(pending_documents)
+        total_chunks = len(pending_data["documents"])
         logger.info("Processing %d chunks in batches of %d", total_chunks, batch_size)
 
         for i in range(0, total_chunks, batch_size):
-            batch_docs = pending_documents[i : i + batch_size]
-            batch_ids = pending_ids[i : i + batch_size]
-            batch_metas = pending_metadatas[i : i + batch_size]
+            batch_docs = pending_data["documents"][i : i + batch_size]
+            batch_ids = pending_data["ids"][i : i + batch_size]
+            batch_metas = pending_data["metadatas"][i : i + batch_size]
 
             try:
                 embeddings = self._get_embeddings(batch_docs)
@@ -217,11 +218,11 @@ class RAGManager:
                 logger.error("Error processing batch starting at %d: %s", i, e)
 
         # Process deletions
-        total_deletions = len(pending_deletions)
+        total_deletions = len(pending_data["deletions"])
         if total_deletions > 0:
             logger.info("Processing %d orphaned chunks for deletion", total_deletions)
             for i in range(0, total_deletions, batch_size):
-                batch_del_ids = pending_deletions[i : i + batch_size]
+                batch_del_ids = pending_data["deletions"][i : i + batch_size]
                 try:
                     self.collection.delete(ids=batch_del_ids)
                 except Exception as e:  # pylint: disable=broad-exception-caught
