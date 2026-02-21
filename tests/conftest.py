@@ -32,7 +32,7 @@ def clean_db(tmp_path):
     db_path = tmp_path / "test_app.db"
 
     # Reset singleton to ensure a fresh start
-    DatabaseManager._instance = None
+    DatabaseManager.reset_instance()
 
     # Initialize with temp path
     # This will set the singleton instance with the temp path
@@ -42,4 +42,4 @@ def clean_db(tmp_path):
     yield db
 
     # Reset singleton after test so subsequent tests don't use this instance
-    DatabaseManager._instance = None
+    DatabaseManager.reset_instance()

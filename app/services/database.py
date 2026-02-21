@@ -41,6 +41,11 @@ class DatabaseManager:
                     the default configuration. This is primarily used for testing.
         """
 
+    @classmethod
+    def reset_instance(cls):
+        """Resets the singleton instance. Use only for testing."""
+        cls._instance = None
+
     @contextmanager
     def get_connection(self):
         """Yields a SQLite connection."""
