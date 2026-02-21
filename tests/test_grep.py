@@ -77,3 +77,41 @@ def test_grep_code_truncation(temp_codebase):
 
         assert len(result) <= 2100
         assert "... [Output truncated to 2000 chars]" in result
+
+
+def test_grep_code_fallback_commands():
+    """Test grep_code fallback to standard grep when not in a git repo."""
+    # Mock os.path.exists to simulate no .git directory
+    with patch(
+        "app.services.git_ops.os.path.exists", return_value=False
+    ) as mock_exists, patch("app.services.git_ops.subprocess.run") as mock_run:
+
+        # Configure mock_run result
+        mock_result = MagicMock()
+        mock_result.stdout = "matches"
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+
+        # Test 1: Default (Case Insensitive)
+        git_ops.grep_code("test_query")
+
+        # Verify call arguments for default (case insensitive) fallback
+        mock_run.assert_called_with(
+            ["grep", "-r", "-n", "-i", "test_query", "."],
+            cwd=git_ops.CODEBASE_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        # Test 2: Case Sensitive
+        git_ops.grep_code("test_query", case_sensitive=True)
+
+        # Verify call arguments for case sensitive fallback
+        mock_run.assert_called_with(
+            ["grep", "-r", "-n", "test_query", "."],
+            cwd=git_ops.CODEBASE_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
