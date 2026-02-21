@@ -12,6 +12,7 @@ sys.path.append(os.getcwd())
 
 from app.services.database import DatabaseManager
 
+
 def test_init_db_creates_tables(tmp_path):
     """
     Test that init_db creates the necessary tables.
@@ -49,7 +50,14 @@ def test_init_db_creates_tables(tmp_path):
         # Verify schema for tasks
         cursor.execute("PRAGMA table_info(tasks)")
         columns = {row[1] for row in cursor.fetchall()}
-        expected_tasks_columns = {"id", "session_name", "status", "created_at", "updated_at", "data"}
+        expected_tasks_columns = {
+            "id",
+            "session_name",
+            "status",
+            "created_at",
+            "updated_at",
+            "data",
+        }
         assert expected_tasks_columns.issubset(columns)
 
         # Verify schema for messages
@@ -63,6 +71,7 @@ def test_init_db_creates_tables(tmp_path):
         columns = {row[1] for row in cursor.fetchall()}
         expected_settings_columns = {"key", "value"}
         assert expected_settings_columns.issubset(columns)
+
 
 def test_init_db_idempotency(tmp_path):
     """
