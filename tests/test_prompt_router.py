@@ -3,8 +3,8 @@ Tests for prompt_router service.
 """
 
 import json
-from unittest.mock import patch, mock_open
-from app.services.prompt_router import load_active_persona, PERSONA_FILE
+from unittest.mock import patch, mock_open, MagicMock
+from app.services.prompt_router import load_active_persona, PERSONA_FILE, load_core_instruction
 
 
 def test_load_active_persona_file_not_found():
@@ -40,3 +40,62 @@ def test_load_active_persona_io_error():
     with patch("app.services.prompt_router.os.path.exists", return_value=True):
         with patch("builtins.open", side_effect=IOError("Mocked IO Error")):
             assert load_active_persona() is None
+
+
+def test_load_core_instruction_priority():
+    """Test that /config/system_core.md is prioritized."""
+    with patch("app.services.prompt_router.Path") as mock_path:
+        # Create mocks for the two paths
+        config_path = MagicMock()
+        app_path = MagicMock()
+
+        # Configure side_effect to return specific mocks for specific paths
+        def side_effect(path_str):
+            if str(path_str) == "/config/system_core.md":
+                return config_path
+            elif str(path_str) == "app/prompts/system_core.md":
+                return app_path
+            return MagicMock()
+
+        mock_path.side_effect = side_effect
+
+        # Case 1: Config file exists
+        config_path.exists.return_value = True
+        config_path.read_text.return_value = "Config Content"
+        assert load_core_instruction() == "Config Content"
+
+        # Case 2: Config file missing, App file exists
+        config_path.exists.return_value = False
+        app_path.exists.return_value = True
+        app_path.read_text.return_value = "App Content"
+        assert load_core_instruction() == "App Content"
+
+        # Case 3: Both missing
+        config_path.exists.return_value = False
+        app_path.exists.return_value = False
+        assert "Error" in load_core_instruction()
+
+
+def test_load_core_instruction_read_error():
+    """Test fallback when reading fails."""
+    with patch("app.services.prompt_router.Path") as mock_path:
+        config_path = MagicMock()
+        app_path = MagicMock()
+
+        def side_effect(path_str):
+            if str(path_str) == "/config/system_core.md":
+                return config_path
+            elif str(path_str) == "app/prompts/system_core.md":
+                return app_path
+            return MagicMock()
+
+        mock_path.side_effect = side_effect
+
+        # Config exists but read fails
+        config_path.exists.return_value = True
+        config_path.read_text.side_effect = Exception("Read error")
+
+        app_path.exists.return_value = True
+        app_path.read_text.return_value = "App Content"
+
+        assert load_core_instruction() == "App Content"

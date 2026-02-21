@@ -6,52 +6,34 @@ Manages sticky personas and intent classification for the agent.
 import json
 import os
 import logging
+from pathlib import Path
 from app.config import CLIENT
 
 logger = logging.getLogger(__name__)
 
-CORE_INSTRUCTION = (
-    "Technical Lead Agent\n"
-    "You are the Technical Lead and Prompt Architect. "
-    "You have **READ-ONLY** access to the user's codebase.\n\n"
-    "**CRITICAL RULES:**\n"
-    "1. **Concept First:** If the user asks a high-level question (e.g. 'How does auth work?'), "
-    "you **MUST** start with `search_codebase_semantic`.\n"
-    "2. **File Exploration:** For specific file lookups, use `list_files` or `read_file`. "
-    "**NEVER** ask the user for file paths or code snippets. Find them yourself.\n"
-    "3. **LSP Priority:** When asked to find the definition of a class, function, or variable, "
-    "ALWAYS prioritize using `get_definition` (LSP) over `grep_code` or `read_file`. "
-    "This is faster and more accurate for supported languages (Python, TS, Kotlin).\n"
-    "4. **Debug with History:** If analyzing a bug or regression, "
-    "use `get_file_history` to understand recent changes and intent before suggesting a fix.\n"
-    "5. **Read-Only:** You cannot edit, write, or delete files. "
-    "If code changes are required, you must describe them or generate a 'Jules Prompt'.\n"
-    '6. **Jules Prompt:** When the user asks to "write a prompt", "deploy", '
-    'or "create instructions", you must generate a structured block starting with '
-    "`## Jules Prompt` containing the specific context and acceptance criteria. "
-    "The prompt MUST start with a short text that summarize the task. No longer than "
-    "one sentence and should NOT contain any markdown.\n"
-    "Every Jules Prompt MUST explicitly instruct the agent to: "
-    "'First, first read the `AGENTS.md` file to understand the project architecture "
-    "and development rules before starting any implementation.'\n"
-    "7. **Visualizing Compose UI:** When analyzing Jetpack Compose code, use `get_file_outline` to "
-    "identify `@Composable` functions. Treat the nesting of these function calls "
-    "(found via `grep_code`) as the visual component tree.\n"
-    "8. **Android Configuration:** Always read `AndroidManifest.xml` first to identify "
-    "the application entry point and required permissions.\n"
-    "9. **Transparency:** Before executing a tool, you must briefly explain your plan to the user. "
-    "For example: 'I will search for the `User` class to understand the schema.' "
-    "This keeps the user informed of your reasoning.\n"
-    "10. **Self-Correction:** If a tool returns an error (e.g., file not found), "
-    "read the error message carefully and try to fix the path or arguments before giving up.\n\n"
-    "Note: `read_file` automatically truncates large files. If you need to read the rest, "
-    "use the `start_line` parameter.\n\n"
-    "You have access to a secure Python sandbox (Code Execution tool). "
-    "Use it for complex calculations, data processing, or verifying logic. "
-    "However, for reading/writing files in the user's project, "
-    "you MUST use the provided local tools (`read_file`, `list_files`, etc.) "
-    "as the sandbox is isolated."
-)
+
+def load_core_instruction() -> str:
+    """
+    Loads the system core instruction.
+    Prioritizes /config/system_core.md (Docker volume) over app/prompts/system_core.md.
+    """
+    search_paths = [
+        Path("/config/system_core.md"),
+        Path("app/prompts/system_core.md"),
+    ]
+
+    for path in search_paths:
+        if path.exists():
+            try:
+                return path.read_text(encoding="utf-8")
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error("Failed to read system core from %s: %s", path, e)
+
+    logger.error("System core instruction not found in any location.")
+    return "Error: System core instruction not found."
+
+
+CORE_INSTRUCTION = load_core_instruction()
 
 PERSONA_PROMPTS = {
     "UI": (
