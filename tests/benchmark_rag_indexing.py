@@ -18,10 +18,11 @@ def benchmark_indexing(num_files=1000):
     """Benchmark the indexing process."""
 
     # Mock dependencies
-    with patch("app.services.rag_manager.chromadb.PersistentClient"), \
-            patch("app.services.rag_manager.genai.Client"), \
-            patch("os.walk") as mock_walk, \
-            patch("builtins.open", new_callable=MagicMock) as mock_open:
+    with patch("app.services.rag_manager.chromadb.PersistentClient"), patch(
+        "app.services.rag_manager.genai.Client"
+    ), patch("os.walk") as mock_walk, patch(
+        "builtins.open", new_callable=MagicMock
+    ) as mock_open:
 
         # Setup RAG Manager
         with patch.dict(os.environ, {"GOOGLE_API_KEY": "test_key"}):
@@ -38,7 +39,7 @@ def benchmark_indexing(num_files=1000):
             # For this benchmark, let's assume files exist to trigger the check logic
             return {
                 "ids": ["file:0"],
-                "metadatas": [{"file_hash": "old_hash", "filepath": "test.py"}]
+                "metadatas": [{"file_hash": "old_hash", "filepath": "test.py"}],
             }
 
         mock_collection.get.side_effect = delayed_get

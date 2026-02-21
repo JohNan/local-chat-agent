@@ -146,9 +146,7 @@ def test_index_codebase_optimization(mock_chroma, mock_genai):
 
                     # Case 2: File exists but hash mismatch
                     mock_collection.get.return_value = {
-                        "metadatas": [
-                            {"filepath": "test.py", "file_hash": "old_hash"}
-                        ],
+                        "metadatas": [{"filepath": "test.py", "file_hash": "old_hash"}],
                         "ids": ["test.py:0"],
                     }
 
