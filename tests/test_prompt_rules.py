@@ -8,9 +8,9 @@ from app.services.prompt_router import CORE_INSTRUCTION, PERSONA_PROMPTS
 def test_core_instruction_contains_lsp_rule():
     """Test that CORE_INSTRUCTION contains the LSP Priority rule."""
     expected_rule = (
-        "3. **LSP Priority:** When asked to find the definition of a class, function, or variable, "
-        "ALWAYS prioritize using `get_definition` (LSP) over `grep_code` or `read_file`. "
-        "This is faster and more accurate for supported languages (Python, TS, Kotlin)."
+        "3. **Navigate (LSP):**\n"
+        "   - **Found a usage but need the implementation?** -> Use `get_definition`.\n"
+        '   - *Constraint:* Do NOT grep for "def my_function" or "class MyClass". Use LSP on the symbol usage instead.'
     )
     assert expected_rule in CORE_INSTRUCTION
 
