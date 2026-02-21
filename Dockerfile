@@ -34,10 +34,11 @@ RUN pip install python-lsp-server
 RUN npm install -g typescript typescript-language-server
 
 # Kotlin
-RUN wget -q https://github.com/fwcd/kotlin-language-server/releases/download/1.3.12/server.zip -O /tmp/kotlin-ls.zip \
-    && unzip /tmp/kotlin-ls.zip -d /opt/kotlin-ls \
-    && ln -s /opt/kotlin-ls/server/bin/kotlin-language-server /usr/local/bin/kotlin-language-server \
-    && rm /tmp/kotlin-ls.zip
+RUN wget -q https://download-cdn.jetbrains.com/kotlin-lsp/261.13587.0/kotlin-lsp-261.13587.0-linux-x64.zip -O /tmp/kotlin-lsp.zip \
+    && unzip /tmp/kotlin-lsp.zip -d /opt/kotlin-lsp \
+    && chmod +x /opt/kotlin-lsp/kotlin-lsp.sh \
+    && ln -s /opt/kotlin-lsp/kotlin-lsp.sh /usr/local/bin/kotlin-lsp \
+    && rm /tmp/kotlin-lsp.zip
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/

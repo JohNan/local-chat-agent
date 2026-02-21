@@ -12,7 +12,7 @@
     "root_markers": ["package.json", "tsconfig.json"]
   },
   "kotlin": {
-    "bin": "kotlin-language-server",
+    "bin": "kotlin-lsp",
     "args": [],
     "extensions": [".kt", ".kts"],
     "root_markers": ["build.gradle", "pom.xml", "settings.gradle"]
