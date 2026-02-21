@@ -1,6 +1,7 @@
 """
 Tests for main application execution arguments.
 """
+
 import sys
 import runpy
 from unittest.mock import MagicMock
@@ -8,12 +9,14 @@ import pytest
 
 # pylint: disable=redefined-outer-name
 
+
 @pytest.fixture
 def mock_uvicorn(mocker):
     """Mock uvicorn module."""
     mock = MagicMock()
     mocker.patch.dict(sys.modules, {"uvicorn": mock})
     return mock
+
 
 def test_main_execution_default(mocker, mock_uvicorn):
     """Test main execution with default arguments."""
@@ -38,6 +41,7 @@ def test_main_execution_default(mocker, mock_uvicorn):
     _, kwargs = mock_uvicorn.run.call_args
     assert kwargs["host"] == "127.0.0.1"
     assert kwargs["port"] == 5000
+
 
 def test_main_execution_env_vars(mocker, mock_uvicorn):
     """Test main execution with environment variables."""
