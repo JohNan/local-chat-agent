@@ -5,17 +5,21 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.agent_engine import run_agent_task, TaskState
 from google.genai import types
 
+
 # Helper async iterator
 class AsyncIterator:
     def __init__(self, seq):
         self.iter = iter(seq)
+
     def __aiter__(self):
         return self
+
     async def __anext__(self):
         try:
             return next(self.iter)
         except StopIteration:
             raise StopAsyncIteration
+
 
 @pytest.mark.asyncio
 async def test_run_agent_task_basic_flow():
@@ -41,7 +45,9 @@ async def test_run_agent_task_basic_flow():
     mock_chat_session.send_message_stream = get_stream
 
     # Run the task
-    with patch("app.agent_engine.chat_manager.save_message", new_callable=MagicMock) as mock_save:
+    with patch(
+        "app.agent_engine.chat_manager.save_message", new_callable=MagicMock
+    ) as mock_save:
         await run_agent_task(mock_queue, mock_chat_session, "Hi")
 
     # Collect events
@@ -65,6 +71,7 @@ async def test_run_agent_task_basic_flow():
     args, _ = mock_save.call_args
     assert args[0] == "model"
     assert "Hello World" in args[1]
+
 
 @pytest.mark.asyncio
 async def test_run_agent_task_tool_execution():
@@ -100,10 +107,7 @@ async def test_run_agent_task_tool_execution():
         if not hasattr(get_stream_side_effect, "call_count"):
             get_stream_side_effect.call_count = 0
 
-        results = [
-            AsyncIterator([chunk1]),
-            AsyncIterator([chunk2])
-        ]
+        results = [AsyncIterator([chunk1]), AsyncIterator([chunk2])]
         result = results[get_stream_side_effect.call_count]
         get_stream_side_effect.call_count += 1
         return result
@@ -111,8 +115,9 @@ async def test_run_agent_task_tool_execution():
     mock_chat_session.send_message_stream = get_stream_side_effect
 
     # Mock tool execution
-    with patch("app.agent_engine.git_ops.list_files", return_value=["file1.txt"]), \
-         patch("app.agent_engine.chat_manager.save_message") as mock_save:
+    with patch(
+        "app.agent_engine.git_ops.list_files", return_value=["file1.txt"]
+    ), patch("app.agent_engine.chat_manager.save_message") as mock_save:
 
         await run_agent_task(mock_queue, mock_chat_session, "list files")
 
@@ -130,12 +135,12 @@ async def test_run_agent_task_tool_execution():
     message_events = [e for e in events if e and "event: message" in e]
     # One for summary, one for final answer chunk
     assert len(message_events) >= 1
-    assert "Here are files" in message_events[-2] # likely the last chunk
+    assert "Here are files" in message_events[-2]  # likely the last chunk
 
     # Verify summary
-    summary_event = message_events[-1] # likely the summary
+    summary_event = message_events[-1]  # likely the summary
     if "Click to view reasoning" in summary_event:
-        pass # OK
+        pass  # OK
 
     # Verify save_message contains tool usage
     mock_save.assert_called_once()
