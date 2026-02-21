@@ -62,7 +62,7 @@ def test_index_codebase(mock_chroma, mock_genai):
                 mock_open.return_value.__enter__.return_value = mock_file
 
                 # Mock collection.get returning empty (new file)
-                mock_collection.get.return_value = {"metadatas": []}
+                mock_collection.get.return_value = {"metadatas": [], "ids": []}
 
                 result = manager.index_codebase()
 
@@ -130,7 +130,8 @@ def test_index_codebase_optimization(mock_chroma, mock_genai):
 
                     # Case 1: File exists and hash matches
                     mock_collection.get.return_value = {
-                        "metadatas": [{"file_hash": "dummy_hash"}]
+                        "metadatas": [{"file_hash": "dummy_hash"}],
+                        "ids": ["test.py:0"],
                     }
 
                     result = manager.index_codebase()
@@ -141,8 +142,11 @@ def test_index_codebase_optimization(mock_chroma, mock_genai):
                     assert result["files_indexed"] == 0
 
                     # Case 2: File exists but hash mismatch
+                    # Mock return value for both calls (hash check and orphan check)
+                    # Use side_effect if we wanted different responses, but here consistent is fine
                     mock_collection.get.return_value = {
-                        "metadatas": [{"file_hash": "old_hash"}]
+                        "metadatas": [{"file_hash": "old_hash"}],
+                        "ids": ["test.py:0"],
                     }
 
                     # Mock embedding for upsert
@@ -154,9 +158,13 @@ def test_index_codebase_optimization(mock_chroma, mock_genai):
 
                     result = manager.index_codebase()
 
-                    mock_collection.delete.assert_called_with(
-                        where={"filepath": "test.py"}
-                    )
+                    # In this case, new content generates 1 chunk (test.py:0).
+                    # Old content had 1 chunk (test.py:0).
+                    # Orphans = {test.py:0} - {test.py:0} = empty.
+                    # So delete should NOT be called.
+                    mock_collection.delete.assert_not_called()
+
+                    # Upsert should still happen
                     mock_collection.upsert.assert_called_once()
                     assert result["files_indexed"] == 1
 
@@ -186,7 +194,7 @@ def test_index_codebase_batching(mock_chroma, mock_genai):
                 f2.__enter__.return_value.read.return_value = "content2"
                 mock_open.side_effect = [f1, f2]
 
-                mock_collection.get.return_value = {"metadatas": []}
+                mock_collection.get.return_value = {"metadatas": [], "ids": []}
 
                 result = manager.index_codebase()
 
