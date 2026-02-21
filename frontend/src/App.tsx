@@ -5,6 +5,7 @@ import { Header } from './components/Header';
 import { ChatInterface } from './components/ChatInterface';
 import { InputArea } from './components/InputArea';
 import { TasksDrawer } from './components/TasksDrawer';
+import { QuotaErrorModal } from './components/QuotaErrorModal';
 import { useChatHistory } from './hooks/useChatHistory';
 import { generateId } from './utils';
 import type { Message, MediaItem, HistoryResponse } from './types';
@@ -47,6 +48,7 @@ function App() {
     const [currentToolStatus, setCurrentToolStatus] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isTasksOpen, setIsTasksOpen] = useState(false);
+    const [quotaErrorData, setQuotaErrorData] = useState<{ text: string, media?: MediaItem[], error: string } | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
     // Derived messages state
@@ -205,8 +207,7 @@ function App() {
                         } catch {
                             // Use raw string
                         }
-                        handleStreamError(errorMsg);
-                        return; // Exit loop and skip onComplete
+                        throw new Error(errorMsg);
                     }
                     setCurrentToolStatus(null);
                     // Final update
@@ -312,8 +313,7 @@ function App() {
                 } catch {
                     // ignore
                 }
-                handleStreamError(errorMsg);
-                return;
+                throw new Error(errorMsg);
             }
 
             await readStream(response, () => {
@@ -326,7 +326,12 @@ function App() {
             } else {
                 console.error("Fetch failed:", error);
                 const errorMsg = error instanceof Error ? error.message : String(error);
-                handleStreamError(errorMsg);
+
+                if (/quota|exhausted|429|too many requests/i.test(errorMsg)) {
+                    setQuotaErrorData({ text, media, error: errorMsg });
+                } else {
+                    handleStreamError(errorMsg);
+                }
             }
             setCurrentToolStatus(null);
         } finally {
@@ -383,6 +388,40 @@ function App() {
                 isGenerating={isGenerating}
                 onStop={handleStop}
             />
+            {quotaErrorData && (
+                <QuotaErrorModal
+                    currentModel={model}
+                    error={quotaErrorData.error}
+                    onRetry={(newModel) => {
+                        handleModelChange(newModel);
+
+                        queryClient.setQueryData<InfiniteData<HistoryResponse>>(['chat-history'], (oldData) => {
+                            if (!oldData) return oldData;
+                            const newPages = [...oldData.pages];
+                            if (newPages.length > 0) {
+                                const firstPage = { ...newPages[0] };
+                                const msgs = [...firstPage.messages];
+
+                                // Pop AI placeholder
+                                if (msgs.length > 0) msgs.pop();
+                                // Pop User message
+                                if (msgs.length > 0) msgs.pop();
+
+                                firstPage.messages = msgs;
+                                newPages[0] = firstPage;
+                            }
+                            return { ...oldData, pages: newPages };
+                        });
+
+                        setQuotaErrorData(null);
+                        sendMessage(quotaErrorData.text, quotaErrorData.media);
+                    }}
+                    onCancel={() => {
+                        handleStreamError(quotaErrorData.error);
+                        setQuotaErrorData(null);
+                    }}
+                />
+            )}
         </>
     );
 }
