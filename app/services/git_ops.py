@@ -409,16 +409,20 @@ def grep_code(query: str, case_sensitive: bool = False) -> str:
         if not case_sensitive:
             cmd.append("-i")
 
+        # Use -e to prevent argument injection if query starts with -
+        cmd.append("-e")
         cmd.append(query)
 
         # Check if we are in a git repo
         is_git_repo = os.path.exists(os.path.join(CODEBASE_ROOT, ".git"))
 
         if not is_git_repo:
-            # Fallback to standard grep: grep -r -n [-i] "query" .
+            # Fallback to standard grep: grep -r -n [-i] -e "query" .
             cmd = ["grep", "-r", "-n"]
             if not case_sensitive:
                 cmd.append("-i")
+            # Use -e to prevent argument injection if query starts with -
+            cmd.append("-e")
             cmd.append(query)
             cmd.append(".")
 
