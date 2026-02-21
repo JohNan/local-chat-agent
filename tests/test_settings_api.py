@@ -1,6 +1,7 @@
 """
 Tests for API settings endpoints.
 """
+
 import os
 import sys
 from fastapi.testclient import TestClient
@@ -11,6 +12,7 @@ sys.path.append(os.getcwd())
 from app.main import app
 
 client = TestClient(app)
+
 
 def test_api_settings_persistence(clean_db):  # pylint: disable=unused-argument
     """

@@ -48,6 +48,7 @@ async def rag_reindex():
 
 class SettingsRequest(BaseModel):
     """Request model for updating settings."""
+
     model: str
 
 
