@@ -151,7 +151,9 @@ class RAGManager:
                 logger.warning("Failed to read .gitignore: %s", e)
         return None
 
-    def _should_ignore_dir(self, directory: str, _spec: pathspec.PathSpec | None) -> bool:
+    def _should_ignore_dir(
+        self, directory: str, _spec: pathspec.PathSpec | None
+    ) -> bool:
         """Checks if a directory should be ignored."""
         ignore_dirs = {
             "venv",
