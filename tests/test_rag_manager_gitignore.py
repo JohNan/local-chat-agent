@@ -1,4 +1,3 @@
-
 import os
 import shutil
 import tempfile
@@ -10,6 +9,7 @@ import sys
 sys.path.append(os.getcwd())
 
 from app.services.rag_manager import RAGManager
+
 
 class TestRAGGitIgnore(unittest.TestCase):
     def setUp(self):
@@ -48,9 +48,13 @@ class TestRAGGitIgnore(unittest.TestCase):
 
     def test_gitignore_respected(self):
 
-        with patch("app.services.rag_manager.chromadb.PersistentClient") as mock_chroma, \
-             patch("app.services.rag_manager.genai.Client") as mock_genai, \
-             patch.dict(os.environ, {"GOOGLE_API_KEY": "fake_key"}):
+        with patch(
+            "app.services.rag_manager.chromadb.PersistentClient"
+        ) as mock_chroma, patch(
+            "app.services.rag_manager.genai.Client"
+        ) as mock_genai, patch.dict(
+            os.environ, {"GOOGLE_API_KEY": "fake_key"}
+        ):
 
             manager = RAGManager()
 
@@ -80,24 +84,38 @@ class TestRAGGitIgnore(unittest.TestCase):
             indexed_files = set()
             for call in calls:
                 # kwargs['metadatas'] is a list of dicts
-                metadatas = call.kwargs.get('metadatas', [])
+                metadatas = call.kwargs.get("metadatas", [])
                 if not metadatas and len(call.args) > 3:
-                     metadatas = call.args[3]
+                    metadatas = call.args[3]
 
                 for meta in metadatas:
-                    indexed_files.add(meta['filepath'])
+                    indexed_files.add(meta["filepath"])
 
             print(f"Indexed files: {indexed_files}")
 
             # Assertions
-            self.assertNotIn("secret.py", indexed_files, "secret.py should be ignored by .gitignore")
-            self.assertFalse(any("ignored_dir" in f for f in indexed_files), "ignored_dir should be ignored")
+            self.assertNotIn(
+                "secret.py", indexed_files, "secret.py should be ignored by .gitignore"
+            )
+            self.assertFalse(
+                any("ignored_dir" in f for f in indexed_files),
+                "ignored_dir should be ignored",
+            )
             self.assertIn("allowed.py", indexed_files, "allowed.py should be indexed")
-            self.assertIn("allowed_dir/nested.py", indexed_files, "allowed_dir/nested.py should be indexed")
+            self.assertIn(
+                "allowed_dir/nested.py",
+                indexed_files,
+                "allowed_dir/nested.py should be indexed",
+            )
 
             # Additional assertion: Verify the number of indexed files matches what we expect
             # We expect allowed.py and allowed_dir/nested.py
-            self.assertEqual(len(indexed_files), 2, f"Expected 2 indexed files, got {len(indexed_files)}")
+            self.assertEqual(
+                len(indexed_files),
+                2,
+                f"Expected 2 indexed files, got {len(indexed_files)}",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

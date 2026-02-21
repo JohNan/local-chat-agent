@@ -202,9 +202,7 @@ class RAGManager:
                 # Check each directory
                 # We need to construct the relative path of the directory
                 dirs[:] = [
-                    d
-                    for d in dirs
-                    if not spec.match_file(os.path.join(rel_root, d))
+                    d for d in dirs if not spec.match_file(os.path.join(rel_root, d))
                 ]
 
             # Original check for current directory (still useful for hardcoded ignores
