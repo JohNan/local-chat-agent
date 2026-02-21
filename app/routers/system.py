@@ -6,6 +6,7 @@ import asyncio
 import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from app.config import CLIENT, DEFAULT_MODEL
 from app.services import git_ops, rag_manager, prompt_router, chat_manager
@@ -45,11 +46,24 @@ async def rag_reindex():
     return {"status": "indexing started"}
 
 
+class SettingsRequest(BaseModel):
+    """Request model for updating settings."""
+
+    model: str
+
+
 @router.get("/api/settings")
 def api_settings():
     """Returns system settings."""
     model = chat_manager.get_setting("default_model", DEFAULT_MODEL)
     return {"model": model}
+
+
+@router.post("/api/settings")
+def save_settings(request: SettingsRequest):
+    """Saves system settings."""
+    chat_manager.save_setting("default_model", request.model)
+    return {"status": "updated", "model": request.model}
 
 
 @router.get("/api/models")

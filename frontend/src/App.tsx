@@ -18,6 +18,28 @@ function App() {
     } = useChatHistory();
 
     const [model, setModel] = useState("gemini-3-pro-preview");
+
+    useEffect(() => {
+        // Fetch saved model preference
+        fetch('/api/settings')
+            .then(res => res.json())
+            .then(data => {
+                if (data.model) {
+                    setModel(data.model);
+                }
+            })
+            .catch(err => console.error("Failed to fetch settings:", err));
+    }, []);
+
+    const handleModelChange = (newModel: string) => {
+        setModel(newModel);
+        fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: newModel })
+        }).catch(err => console.error("Failed to save model preference:", err));
+    };
+
     const [webSearchEnabled, setWebSearchEnabled] = useState(() => {
         const saved = localStorage.getItem("webSearchEnabled");
         return saved !== null ? JSON.parse(saved) : false;
@@ -344,7 +366,7 @@ function App() {
         <>
             <Header
                 model={model}
-                setModel={setModel}
+                setModel={handleModelChange}
                 webSearchEnabled={webSearchEnabled}
                 setWebSearchEnabled={setWebSearchEnabled}
                 onToggleTasks={() => setIsTasksOpen(!isTasksOpen)}
