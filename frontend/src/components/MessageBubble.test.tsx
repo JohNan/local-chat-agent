@@ -40,7 +40,7 @@ describe('MessageBubble', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         // Reset fetch mock before each test
-        global.fetch = vi.fn();
+        globalThis.fetch = vi.fn();
     });
 
     afterEach(() => {
@@ -135,7 +135,7 @@ describe('MessageBubble', () => {
         };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (global.fetch as any).mockResolvedValue({
+        (globalThis.fetch as any).mockResolvedValue({
             json: () => Promise.resolve(mockResponse),
         });
 
@@ -150,7 +150,7 @@ describe('MessageBubble', () => {
             expect(screen.getByText('Started! (session-123)')).toBeInTheDocument();
         });
 
-        expect(global.fetch).toHaveBeenCalledWith('/api/deploy_to_jules', expect.objectContaining({
+        expect(globalThis.fetch).toHaveBeenCalledWith('/api/deploy_to_jules', expect.objectContaining({
             method: 'POST',
             body: JSON.stringify({ prompt: 'Task content' })
         }));
@@ -170,7 +170,7 @@ describe('MessageBubble', () => {
         };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (global.fetch as any).mockResolvedValue({
+        (globalThis.fetch as any).mockResolvedValue({
             json: () => Promise.resolve(mockResponse),
         });
 
