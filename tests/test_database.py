@@ -10,6 +10,7 @@ import pytest
 # Ensure we can import app from the root
 sys.path.append(os.getcwd())
 
+# pylint: disable=wrong-import-position
 from app.services.database import DatabaseManager
 
 
@@ -21,7 +22,7 @@ def test_init_db_creates_tables(tmp_path):
     db_path = tmp_path / "test_init_db.db"
 
     # Reset the singleton instance to ensure a fresh start
-    DatabaseManager._instance = None
+    DatabaseManager.reset_instance()
 
     # Initialize DatabaseManager with the temporary path
     db = DatabaseManager(db_url=str(db_path))
@@ -81,7 +82,7 @@ def test_init_db_idempotency(tmp_path):
     db_path = tmp_path / "test_init_db_idempotency.db"
 
     # Reset the singleton instance
-    DatabaseManager._instance = None
+    DatabaseManager.reset_instance()
 
     # Initialize DatabaseManager
     db = DatabaseManager(db_url=str(db_path))
