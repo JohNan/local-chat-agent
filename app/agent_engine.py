@@ -134,24 +134,18 @@ def cancel_current_task():
     return False
 
 
-async def _process_turn_stream(
+async def _stream_with_retry(
     chat_session, current_msg, turn: int, task_state: TaskState
-) -> tuple[str, list]:
+):
     """
-    Handles the streaming interaction with the LLM for a single turn, including retries.
-    Returns the full text of the turn and any tool calls found.
+    Attempts to establish a stream with retry logic for transient errors.
     """
-    # Use native async method for streaming with retry logic
     max_retries = 3
     retry_delay = 2
-    stream = None
-    turn_text_parts = []
-    tool_calls = []
 
     for attempt in range(max_retries + 1):
         try:
-            stream = await chat_session.send_message_stream(current_msg)
-            break  # Success
+            return await chat_session.send_message_stream(current_msg)
         except Exception as e:  # pylint: disable=broad-exception-caught
             error_str = str(e)
             is_retryable = (
@@ -177,7 +171,22 @@ async def _process_turn_stream(
                 await asyncio.sleep(retry_delay)
                 retry_delay *= 2  # Exponential backoff
             else:
-                raise e  # Re-raise if not retryable or max retries reached
+                raise e
+
+    raise RuntimeError("Failed to establish stream after retries.")
+
+
+async def _process_turn_stream(
+    chat_session, current_msg, turn: int, task_state: TaskState
+) -> tuple[str, list]:
+    """
+    Handles the streaming interaction with the LLM for a single turn, including retries.
+    Returns the full text of the turn and any tool calls found.
+    """
+    turn_text_parts = []
+    tool_calls = []
+
+    stream = await _stream_with_retry(chat_session, current_msg, turn, task_state)
 
     async for chunk in stream:
         # Text processing
