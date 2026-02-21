@@ -1,0 +1,61 @@
+"""
+Test for LSP boot logic.
+"""
+
+import unittest
+from unittest.mock import patch
+from app.services.lsp_manager import LSPManager
+
+
+class TestLSPBoot(unittest.TestCase):
+    """Tests for LSP boot logic."""
+
+    def setUp(self):
+        # Reset singleton
+        # pylint: disable=protected-access
+        LSPManager._instance = None
+        LSPManager._servers = {}
+
+    @patch("app.services.lsp_manager.LSPRegistry")
+    @patch("app.services.lsp_manager.os.walk")
+    @patch("app.services.lsp_manager.LSPManager.start_server")
+    def test_start_supported_servers(
+        self, mock_start_server, mock_walk, mock_registry_cls
+    ):
+        """Tests that start_supported_servers correctly identifies and starts servers."""
+        # Setup Registry Mock
+        mock_registry = mock_registry_cls.return_value
+        # pylint: disable=protected-access
+        mock_registry._config = {
+            "python": {"extensions": [".py"]},
+            "typescript": {"extensions": [".ts", ".tsx"]},
+            "kotlin": {"extensions": [".kt"]},
+        }
+
+        # Setup os.walk Mock
+        # Simulate finding a python file and a typescript file, but no kotlin file
+        mock_walk.return_value = [
+            (".", ["src"], ["main.py", "README.md"]),
+            ("./src", [], ["app.ts"]),
+        ]
+
+        manager = LSPManager()
+        manager.start_supported_servers(".")
+
+        # Check calls
+        # Should attempt to start python server (because of main.py)
+        mock_start_server.assert_any_call("python", ".")
+
+        # Should attempt to start typescript server (because of app.ts)
+        mock_start_server.assert_any_call("typescript", ".")
+
+        # Should NOT attempt to start kotlin server
+        calls = [args[0] for args, _ in mock_start_server.call_args_list]
+        self.assertNotIn("kotlin", calls)
+
+        # Ensure we only called start_server twice
+        self.assertEqual(mock_start_server.call_count, 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

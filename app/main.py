@@ -19,6 +19,7 @@ from mcp.client.stdio import stdio_client
 from app.config import get_mcp_servers
 from app.services import rag_manager, llm_service
 from app.services.database import DatabaseManager
+from app.services.lsp_manager import LSPManager
 from app.routers import chat, system, history, jules
 
 # Configure logging
@@ -42,6 +43,10 @@ async def lifespan(_app: FastAPI):
     # Startup
     logger.info("Starting background RAG indexing...")
     asyncio.create_task(asyncio.to_thread(rag_manager.index_codebase_task))
+
+    # Initialize LSP Servers
+    logger.info("Initializing LSP servers...")
+    asyncio.create_task(asyncio.to_thread(LSPManager().start_supported_servers, "."))
 
     # Initialize MCP Clients
     async with AsyncExitStack() as stack:
