@@ -83,7 +83,7 @@ class RAGManager:
                 )
                 return None
 
-    def _process_file_indexing(self, filepath, pending_data):
+    def _process_file_indexing(self, filepath, pending_data, existing_info=None):
         """Processes a single file for indexing."""
         # pylint: disable=too-many-locals
         try:
@@ -92,26 +92,11 @@ class RAGManager:
 
             file_hash = self._calculate_hash(content)
 
-            # Check if file already indexed with same hash
-            # We query for any chunk of this file to check its metadata
-            existing_docs = self.collection.get(
-                where={"filepath": filepath}, limit=1, include=["metadatas"]
-            )
-
-            if existing_docs and existing_docs["metadatas"]:
-                existing_metadata = existing_docs["metadatas"][0]
-                if existing_metadata.get("file_hash") == file_hash:
+            existing_ids = set()
+            if existing_info:
+                if existing_info.get("file_hash") == file_hash:
                     return False  # Skip unchanged file
-
-            # File changed or new. Find orphaned chunks (existing chunks not in new content).
-            all_existing_docs = self.collection.get(
-                where={"filepath": filepath}, include=["metadatas"]
-            )
-            existing_ids = (
-                set(all_existing_docs["ids"])
-                if all_existing_docs and all_existing_docs["ids"]
-                else set()
-            )
+                existing_ids = existing_info.get("chunk_ids", set())
 
             # Chunking
             chunks = self._chunk_text(content)
@@ -176,6 +161,8 @@ class RAGManager:
             "deletions": [],
         }
 
+        existing_files = self._fetch_existing_metadata()
+
         for root, _, files in os.walk("."):
             if any(ignore in root for ignore in ignore_dirs):
                 continue
@@ -185,7 +172,8 @@ class RAGManager:
                     continue
 
                 filepath = os.path.relpath(os.path.join(root, file), ".")
-                if self._process_file_indexing(filepath, pending_data):
+                existing_info = existing_files.get(filepath)
+                if self._process_file_indexing(filepath, pending_data, existing_info):
                     files_indexed += 1
 
         # Process batches
@@ -230,6 +218,26 @@ class RAGManager:
 
         logger.info("Indexing complete. Indexed %d files.", files_indexed)
         return {"status": "success", "files_indexed": files_indexed}
+
+    def _fetch_existing_metadata(self) -> dict:
+        """Fetches metadata for all existing files to avoid N+1 queries."""
+        existing_files = {}
+        try:
+            all_docs = self.collection.get(include=["metadatas"])
+            if all_docs and all_docs.get("ids") and all_docs.get("metadatas"):
+                for doc_id, meta in zip(all_docs["ids"], all_docs["metadatas"]):
+                    fp = meta.get("filepath")
+                    if not fp:
+                        continue
+                    if fp not in existing_files:
+                        existing_files[fp] = {
+                            "file_hash": meta.get("file_hash"),
+                            "chunk_ids": set(),
+                        }
+                    existing_files[fp]["chunk_ids"].add(doc_id)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error fetching existing metadata: %s", e)
+        return existing_files
 
     def _chunk_text(
         self, text: str, chunk_size: int = 2000, overlap: int = 200

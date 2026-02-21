@@ -129,8 +129,11 @@ def test_index_codebase_optimization(mock_chroma, mock_genai):
                     mock_open.return_value.__enter__.return_value = mock_file
 
                     # Case 1: File exists and hash matches
+                    # We must include filepath in metadata because index_codebase uses it
                     mock_collection.get.return_value = {
-                        "metadatas": [{"file_hash": "dummy_hash"}],
+                        "metadatas": [
+                            {"filepath": "test.py", "file_hash": "dummy_hash"}
+                        ],
                         "ids": ["test.py:0"],
                     }
 
@@ -142,10 +145,8 @@ def test_index_codebase_optimization(mock_chroma, mock_genai):
                     assert result["files_indexed"] == 0
 
                     # Case 2: File exists but hash mismatch
-                    # Mock return value for both calls (hash check and orphan check)
-                    # Use side_effect if we wanted different responses, but here consistent is fine
                     mock_collection.get.return_value = {
-                        "metadatas": [{"file_hash": "old_hash"}],
+                        "metadatas": [{"filepath": "test.py", "file_hash": "old_hash"}],
                         "ids": ["test.py:0"],
                     }
 
