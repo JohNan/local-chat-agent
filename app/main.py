@@ -16,7 +16,7 @@ from google.genai import types
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from app.config import get_mcp_servers
+from app.config import get_mcp_servers, HOST, PORT
 from app.services import rag_manager, llm_service
 from app.services.database import DatabaseManager
 from app.services.git_ops import CODEBASE_ROOT
@@ -142,6 +142,5 @@ def index():
 
 if __name__ == "__main__":
     import uvicorn
-    from app.config import HOST, PORT
 
     uvicorn.run(app, host=HOST, port=PORT)
