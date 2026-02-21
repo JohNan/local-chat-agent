@@ -177,12 +177,6 @@ async def chat_get(message: str = Query(...)):
     full_history = await asyncio.to_thread(chat_manager.load_chat_history)
     formatted_history = await asyncio.to_thread(format_history, full_history)
 
-    # Use native async client
-    # NOTE: The original code in main.py duplicated tool config here.
-    # I should use get_tool_config here too for consistency, or copy exactly.
-    # The original code hardcoded tool config in GET endpoint.
-    # To be cleaner, I will use get_tool_config and ENABLE_GOOGLE_SEARCH.
-
     tool = get_tool_config(CLIENT, ENABLE_GOOGLE_SEARCH)  # Use default search config
 
     active_persona = await asyncio.to_thread(prompt_router.load_active_persona)
