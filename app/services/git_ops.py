@@ -35,8 +35,11 @@ def _validate_path(path: str) -> str:
     root_abs = os.path.abspath(CODEBASE_ROOT)
 
     # Security check: Ensure we are still inside CODEBASE_ROOT using commonpath
+    # We use realpath to resolve symlinks and prevent traversal
     try:
-        if os.path.commonpath([full_path, root_abs]) != root_abs:
+        full_path_real = os.path.realpath(full_path)
+        root_real = os.path.realpath(CODEBASE_ROOT)
+        if os.path.commonpath([full_path_real, root_real]) != root_real:
             raise ValueError(
                 f"Access denied. Cannot access path outside of codebase: {path}"
             )
