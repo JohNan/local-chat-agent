@@ -97,7 +97,7 @@ def test_grep_code_fallback_commands():
 
         # Verify call arguments for default (case insensitive) fallback
         mock_run.assert_called_with(
-            ["grep", "-r", "-n", "-i", "test_query", "."],
+            ["grep", "-r", "-n", "-i", "-e", "test_query", "."],
             cwd=git_ops.CODEBASE_ROOT,
             capture_output=True,
             text=True,
@@ -109,7 +109,7 @@ def test_grep_code_fallback_commands():
 
         # Verify call arguments for case sensitive fallback
         mock_run.assert_called_with(
-            ["grep", "-r", "-n", "test_query", "."],
+            ["grep", "-r", "-n", "-e", "test_query", "."],
             cwd=git_ops.CODEBASE_ROOT,
             capture_output=True,
             text=True,
