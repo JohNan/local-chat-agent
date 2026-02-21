@@ -19,6 +19,7 @@ from mcp.client.stdio import stdio_client
 from app.config import get_mcp_servers
 from app.services import rag_manager, llm_service
 from app.services.database import DatabaseManager
+from app.services.git_ops import CODEBASE_ROOT
 from app.services.lsp_manager import LSPManager
 from app.routers import chat, system, history, jules
 
@@ -46,7 +47,9 @@ async def lifespan(_app: FastAPI):
 
     # Initialize LSP Servers
     logger.info("Initializing LSP servers...")
-    asyncio.create_task(asyncio.to_thread(LSPManager().start_supported_servers, "."))
+    asyncio.create_task(
+        asyncio.to_thread(LSPManager().start_supported_servers, CODEBASE_ROOT)
+    )
 
     # Initialize MCP Clients
     async with AsyncExitStack() as stack:
