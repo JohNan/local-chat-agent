@@ -51,20 +51,14 @@ def test_rag_manager_safe_delete(mock_chroma, mock_genai):
         manager.genai_client.models.embed_content.return_value = mock_embedding
 
         # Mock existing file in DB (2 chunks)
-        # First call: check hash (returns metadata)
-        # Second call (impl detail): get all IDs for orphan check
-        mock_collection.get.side_effect = [
-            # 1. Initial check (limit=1 or just metadatas)
-            {
-                "ids": ["test.py:0"],
-                "metadatas": [{"file_hash": "old_hash", "filepath": "test.py"}],
-            },
-            # 2. Fetch all IDs for orphan check (if implemented)
-            {
-                "ids": ["test.py:0", "test.py:1"],
-                "metadatas": [{"file_hash": "old_hash"}, {"file_hash": "old_hash"}],
-            },
-        ]
+        # We fetch all metadata at once now.
+        mock_collection.get.return_value = {
+            "ids": ["test.py:0", "test.py:1"],
+            "metadatas": [
+                {"filepath": "test.py", "file_hash": "old_hash"},
+                {"filepath": "test.py", "file_hash": "old_hash"},
+            ],
+        }
 
         # Mock os.walk to find 1 file
         with patch("os.walk") as mock_walk:
