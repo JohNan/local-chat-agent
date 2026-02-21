@@ -57,13 +57,13 @@ def test_rag_manager_safe_delete(mock_chroma, mock_genai):
             # 1. Initial check (limit=1 or just metadatas)
             {
                 "ids": ["test.py:0"],
-                "metadatas": [{"file_hash": "old_hash", "filepath": "test.py"}]
+                "metadatas": [{"file_hash": "old_hash", "filepath": "test.py"}],
             },
             # 2. Fetch all IDs for orphan check (if implemented)
             {
                 "ids": ["test.py:0", "test.py:1"],
-                "metadatas": [{"file_hash": "old_hash"}, {"file_hash": "old_hash"}]
-            }
+                "metadatas": [{"file_hash": "old_hash"}, {"file_hash": "old_hash"}],
+            },
         ]
 
         # Mock os.walk to find 1 file
@@ -71,7 +71,7 @@ def test_rag_manager_safe_delete(mock_chroma, mock_genai):
             mock_walk.return_value = [(".", [], ["test.py"])]
             with patch("builtins.open", new_callable=MagicMock) as mock_open:
                 mock_file = MagicMock()
-                mock_file.read.return_value = "new_content" # small content -> 1 chunk
+                mock_file.read.return_value = "new_content"  # small content -> 1 chunk
                 mock_open.return_value.__enter__.return_value = mock_file
 
                 # Force _chunk_text to return 1 chunk
@@ -79,8 +79,8 @@ def test_rag_manager_safe_delete(mock_chroma, mock_genai):
                     manager.index_codebase()
 
         # Check calls
-        upsert_calls = [c for c in mock_collection.mock_calls if c[0] == 'upsert']
-        delete_calls = [c for c in mock_collection.mock_calls if c[0] == 'delete']
+        upsert_calls = [c for c in mock_collection.mock_calls if c[0] == "upsert"]
+        delete_calls = [c for c in mock_collection.mock_calls if c[0] == "delete"]
 
         # Assert upsert happened
         assert len(upsert_calls) > 0, "Upsert should be called"
@@ -91,13 +91,18 @@ def test_rag_manager_safe_delete(mock_chroma, mock_genai):
         # Assert order: All upserts should be before any delete
         # We can check the index of the first delete call relative to the last upsert call
         all_calls = mock_collection.mock_calls
-        first_delete_idx = next((i for i, c in enumerate(all_calls) if c[0] == 'delete'), -1)
-        last_upsert_idx = next((i for i, c in enumerate(reversed(all_calls)) if c[0] == 'upsert'), -1)
+        first_delete_idx = next(
+            (i for i, c in enumerate(all_calls) if c[0] == "delete"), -1
+        )
+        last_upsert_idx = next(
+            (i for i, c in enumerate(reversed(all_calls)) if c[0] == "upsert"), -1
+        )
         # reversed index needs conversion
         last_upsert_idx = len(all_calls) - 1 - last_upsert_idx
 
-        assert first_delete_idx > last_upsert_idx, \
-            f"Delete (idx {first_delete_idx}) happened before Upsert (idx {last_upsert_idx})! Unsafe!"
+        assert (
+            first_delete_idx > last_upsert_idx
+        ), f"Delete (idx {first_delete_idx}) happened before Upsert (idx {last_upsert_idx})! Unsafe!"
 
         # Assert arguments: delete should be called with ids=['test.py:1'], not where={...}
         # The orphan is test.py:1 because test.py:0 is in new chunks.
@@ -109,4 +114,6 @@ def test_rag_manager_safe_delete(mock_chroma, mock_genai):
         _, _, kwargs = delete_calls[0]
         assert "ids" in kwargs, "Delete should be called with 'ids'"
         assert "where" not in kwargs, "Delete should NOT be called with 'where'"
-        assert kwargs["ids"] == ["test.py:1"], f"Expected to delete orphan 'test.py:1', got {kwargs['ids']}"
+        assert kwargs["ids"] == [
+            "test.py:1"
+        ], f"Expected to delete orphan 'test.py:1', got {kwargs['ids']}"
