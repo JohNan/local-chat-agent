@@ -180,9 +180,7 @@ async def chat(request: ChatRequest):
     )
 
     queue = asyncio.Queue()
-    asyncio.create_task(
-        agent_engine.run_agent_task(queue, chat_session, msg_content)
-    )
+    asyncio.create_task(agent_engine.run_agent_task(queue, chat_session, msg_content))
 
     return StreamingResponse(
         stream_generator(queue),
