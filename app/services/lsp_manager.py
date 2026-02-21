@@ -95,7 +95,7 @@ class LSPServer:
                 break
 
     def send_request(
-        self, method: str, params: Any, timeout: float = 5.0
+        self, method: str, params: Any, timeout: float = 30.0
     ) -> Optional[Dict[str, Any]]:
         """Sends a request and waits for a response."""
         req_id = int(time.time() * 1000000) % 10000000
@@ -216,7 +216,8 @@ class LSPManager:
                     "rootUri": f"file://{root_path}",
                     "capabilities": {},
                 }
-                resp = server.send_request("initialize", init_params)
+                # Increase timeout for initialization (some servers are slow)
+                resp = server.send_request("initialize", init_params, timeout=60.0)
                 if resp and "error" not in resp:
                     server.send_notification("initialized", {})
                     self._servers[key] = server
@@ -233,6 +234,39 @@ class LSPManager:
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Failed to start LSP server for %s: %s", language, e)
                 return None
+
+    def start_supported_servers(self, root_path: str):
+        """
+        Scans the root path for supported files and starts corresponding LSP servers.
+        """
+        logger.info("Scanning for supported languages to start LSP servers...")
+        registry = LSPRegistry()
+        # pylint: disable=protected-access
+        for language, config in registry._config.items():
+            extensions = config.get("extensions", [])
+            if not extensions:
+                continue
+
+            found = False
+            # Walk the directory to find a matching file
+            for root, dirs, files in os.walk(root_path):
+                # Skip common ignored directories
+                dirs[:] = [
+                    d
+                    for d in dirs
+                    if d not in {".git", "node_modules", "venv", "__pycache__", "dist"}
+                ]
+
+                for file in files:
+                    if any(file.endswith(ext) for ext in extensions):
+                        found = True
+                        break
+                if found:
+                    break
+
+            if found:
+                logger.info("Found %s files, starting LSP server...", language)
+                self.start_server(language, root_path)
 
     def get_definition(self, file_path: str, line: int, col: int) -> Dict[str, Any]:
         """
