@@ -140,6 +140,34 @@ class RAGManager:
             logger.error("Error indexing file %s: %s", filepath, e)
             return False
 
+    def _load_gitignore(self):
+        """Loads .gitignore and returns a PathSpec object."""
+        gitignore_path = ".gitignore"
+        if os.path.exists(gitignore_path):
+            try:
+                with open(gitignore_path, "r", encoding="utf-8") as f:
+                    return pathspec.PathSpec.from_lines("gitignore", f)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.warning("Failed to read .gitignore: %s", e)
+        return None
+
+    def _should_ignore_dir(self, directory: str, _spec: pathspec.PathSpec | None) -> bool:
+        """Checks if a directory should be ignored."""
+        ignore_dirs = {
+            "venv",
+            ".git",
+            "node_modules",
+            "__pycache__",
+            "chroma_db",
+            "site-packages",
+        }
+        if directory in ignore_dirs:
+            return True
+        # Note: We rely on in-place filtering in os.walk to handle pathspec
+        # checking for directories, as it needs relative path context.
+        # This helper primarily handles the hardcoded set.
+        return False
+
     def index_codebase(self):
         """Indexes the codebase by walking through files."""
         # pylint: disable=too-many-locals, too-many-branches
@@ -161,24 +189,8 @@ class RAGManager:
             ".css",
             ".json",
         }
-        ignore_dirs = {
-            "venv",
-            ".git",
-            "node_modules",
-            "__pycache__",
-            "chroma_db",
-            "site-packages",
-        }
 
-        # Load .gitignore if exists
-        spec = None
-        gitignore_path = ".gitignore"
-        if os.path.exists(gitignore_path):
-            try:
-                with open(gitignore_path, "r", encoding="utf-8") as f:
-                    spec = pathspec.PathSpec.from_lines("gitignore", f)
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.warning("Failed to read .gitignore: %s", e)
+        spec = self._load_gitignore()
 
         pending_data = {
             "documents": [],
@@ -195,7 +207,7 @@ class RAGManager:
 
             # Filter dirs in place to prevent traversal
             # 1. Hardcoded ignores
-            dirs[:] = [d for d in dirs if d not in ignore_dirs]
+            dirs[:] = [d for d in dirs if not self._should_ignore_dir(d, spec)]
 
             # 2. Pathspec ignores
             if spec:
@@ -207,7 +219,7 @@ class RAGManager:
 
             # Original check for current directory (still useful for hardcoded ignores
             # if we somehow started in an ignored dir)
-            if any(ignore in root for ignore in ignore_dirs):
+            if self._should_ignore_dir(os.path.basename(root), spec):
                 continue
 
             for file in files:
@@ -223,6 +235,13 @@ class RAGManager:
                 if self._process_file_indexing(filepath, pending_data):
                     files_indexed += 1
 
+        self._process_batches(pending_data)
+
+        logger.info("Indexing complete. Indexed %d files.", files_indexed)
+        return {"status": "success", "files_indexed": files_indexed}
+
+    def _process_batches(self, pending_data):
+        """Processes batched data for upsert and deletion."""
         # Process batches
         batch_size = 100
         total_chunks = len(pending_data["documents"])
@@ -262,9 +281,6 @@ class RAGManager:
                     self.collection.delete(ids=batch_del_ids)
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     logger.error("Error deleting batch starting at %d: %s", i, e)
-
-        logger.info("Indexing complete. Indexed %d files.", files_indexed)
-        return {"status": "success", "files_indexed": files_indexed}
 
     def _chunk_text(
         self, text: str, chunk_size: int = 2000, overlap: int = 200
