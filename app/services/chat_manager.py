@@ -7,6 +7,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
+from app.config import HISTORY_LIMIT
 from .database import DatabaseManager
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ def _row_to_message(row: dict) -> dict:
     return msg
 
 
-def load_chat_history(limit: int = None):
+def load_chat_history(limit: int = HISTORY_LIMIT):
     """
     Loads chat history from the database, optionally limited to the most recent messages.
     """
