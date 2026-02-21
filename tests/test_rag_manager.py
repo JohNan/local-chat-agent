@@ -187,18 +187,20 @@ def test_index_codebase_batching(mock_chroma, mock_genai):
         with patch("os.walk") as mock_walk:
             mock_walk.return_value = [(".", [], ["test1.py", "test2.py"])]
 
-            with patch("builtins.open") as mock_open:
-                f1 = MagicMock()
-                f1.__enter__.return_value.read.return_value = "content1"
-                f2 = MagicMock()
-                f2.__enter__.return_value.read.return_value = "content2"
-                mock_open.side_effect = [f1, f2]
+            # Patch os.path.exists to avoid checking for .gitignore
+            with patch("os.path.exists", return_value=False):
+                with patch("builtins.open") as mock_open:
+                    f1 = MagicMock()
+                    f1.__enter__.return_value.read.return_value = "content1"
+                    f2 = MagicMock()
+                    f2.__enter__.return_value.read.return_value = "content2"
+                    mock_open.side_effect = [f1, f2]
 
-                mock_collection.get.return_value = {"metadatas": [], "ids": []}
+                    mock_collection.get.return_value = {"metadatas": [], "ids": []}
 
-                result = manager.index_codebase()
+                    result = manager.index_codebase()
 
-                assert result["files_indexed"] == 2
+                    assert result["files_indexed"] == 2
 
                 # Verify embed_content called once with 2 contents (batch)
                 manager.genai_client.models.embed_content.assert_called_once()

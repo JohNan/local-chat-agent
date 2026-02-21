@@ -7,6 +7,7 @@ import os
 import logging
 import hashlib
 import chromadb
+import pathspec
 from google import genai
 
 logger = logging.getLogger(__name__)
@@ -169,6 +170,16 @@ class RAGManager:
             "site-packages",
         }
 
+        # Load .gitignore if exists
+        spec = None
+        gitignore_path = ".gitignore"
+        if os.path.exists(gitignore_path):
+            try:
+                with open(gitignore_path, "r", encoding="utf-8") as f:
+                    spec = pathspec.PathSpec.from_lines("gitignore", f)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.warning("Failed to read .gitignore: %s", e)
+
         pending_data = {
             "documents": [],
             "metadatas": [],
@@ -176,7 +187,28 @@ class RAGManager:
             "deletions": [],
         }
 
-        for root, _, files in os.walk("."):
+        for root, dirs, files in os.walk("."):
+            # Relpath for matching
+            rel_root = os.path.relpath(root, ".")
+            if rel_root == ".":
+                rel_root = ""
+
+            # Filter dirs in place to prevent traversal
+            # 1. Hardcoded ignores
+            dirs[:] = [d for d in dirs if d not in ignore_dirs]
+
+            # 2. Pathspec ignores
+            if spec:
+                # Check each directory
+                # We need to construct the relative path of the directory
+                dirs[:] = [
+                    d
+                    for d in dirs
+                    if not spec.match_file(os.path.join(rel_root, d))
+                ]
+
+            # Original check for current directory (still useful for hardcoded ignores
+            # if we somehow started in an ignored dir)
             if any(ignore in root for ignore in ignore_dirs):
                 continue
 
@@ -185,6 +217,11 @@ class RAGManager:
                     continue
 
                 filepath = os.path.relpath(os.path.join(root, file), ".")
+
+                # Check pathspec for file
+                if spec and spec.match_file(filepath):
+                    continue
+
                 if self._process_file_indexing(filepath, pending_data):
                     files_indexed += 1
 
