@@ -9,17 +9,21 @@ It runs on **Python 3.11+** using **FastAPI** and **Google Gemini API**.
   - Routes: Defined in `app/main.py`.
   - Services: Business logic in `app/services/`.
     - `chat_manager.py`: Handles chat history persistence and pagination.
+    - `database.py`: Manages SQLite database (`app.db`) for tasks, history, and settings.
     - `git_ops.py`: Git operations and file system tools.
-    - `rag_manager.py`: Handles RAG system and codebase indexing (uses ChromaDB).
     - `jules_api.py`: Manages integration with Jules API.
-    - `task_manager.py`: Handles task persistence (`tasks.json`).
+    - `lsp_manager.py` & `lsp_registry.py`: Manages Language Server Protocol (LSP) processes for code intelligence.
+    - `prompt_router.py`: Handles sticky persona logic and intent classification.
+    - `rag_manager.py`: Handles RAG system and codebase indexing (uses ChromaDB).
+    - `task_manager.py`: Handles task persistence (via SQLite).
+  - **MCP Integration:** The system supports Model Context Protocol (MCP) for dynamic tool extension. Configuration is loaded from `mcp_servers.json`.
 - **Frontend:** React + Vite (TypeScript). Build artifacts are served by FastAPI at `app/static/dist`.
 - **Container:** Dockerized via `Dockerfile`.
 
 ## Development Rules
 1. **Model:** Always ensure `gemini-3-pro-preview` is used.
 2. **Formatting & Testing:** Run `black .`, `pylint app/`, and `pytest` before committing.
-3. **RAG & Persistence:** The system uses ChromaDB for the RAG system (persisted locally). Task state is saved in `tasks.json`. Ensure `rag_manager.index_codebase_task` is called on startup and after git pulls.
+3. **RAG & Persistence:** The system uses ChromaDB for the RAG system (persisted locally). Task state and chat history are saved in SQLite (`app.db`), replacing legacy JSON files. Ensure `rag_manager.index_codebase_task` is called on startup and after git pulls.
 4. **Security:** Never hardcode API keys. Use `os.environ.get("GOOGLE_API_KEY")` or `os.environ.get("JULES_API_KEY")`.
 5. **Frontend State:** Complex scroll logic (lazy loading) is handled in `ChatInterface.tsx` using `useLayoutEffect`. Maintain this pattern to prevent scroll jumping.
 

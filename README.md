@@ -7,11 +7,12 @@ A lightweight, self-hosted web interface that acts as a "Prompt Architect" for a
 ## Features
 
 -   **Prompt Architect**: Generates structured "Jules Prompt" blocks with file paths and acceptance criteria.
--   **Chat History Persistence**: Chat history is automatically saved to a flat JSON file (`chat_history.json`), allowing you to resume sessions across restarts.
--   **Lazy Loading**: The frontend efficiently handles large chat histories by lazy loading messages as you scroll up, ensuring high performance.
--   **Context Reset**: Insert a "Context Reset" marker to start a fresh logical session without deleting your entire history.
+-   **Multi-language LSP**: Integrated Language Server Protocol support (Python, TypeScript, Kotlin) for precise "Go to Definition" and code intelligence.
+-   **Semantic Code Search (RAG)**: Uses ChromaDB and Gemini Embeddings for context-aware code retrieval and semantic search.
+-   **MCP Support**: Extensible tool usage via Model Context Protocol (MCP), allowing dynamic integration of external tools.
+-   **Sticky Personas**: Intelligent intent classification (UI, Mobile, Architect, CI/CD) that adapts the agent's behavior and persists across sessions.
+-   **SQLite Persistence**: Robust data storage for chat history, tasks, and settings (`app.db`), replacing legacy JSON files.
 -   **Git Integration**: Perform `git pull` operations directly from the UI to keep your local codebase up-to-date.
--   **RAG System**: Uses ChromaDB and Gemini Embeddings for semantic search and code retrieval.
 -   **Direct Jules Deployment**: Deploy prompts directly to Jules (creating sessions/PRs) from the UI.
 -   **Task Management**: View and track Jules tasks via the UI.
 -   **Lightweight**: Runs on older hardware (no AVX required).
@@ -56,12 +57,17 @@ The backend exposes several key endpoints:
     cp .env.example .env
     # Edit .env and paste your GOOGLE_API_KEY
     ```
-3.  **Local Setup (Optional)**:
+3.  **Configure MCP Servers**:
+    Copy the example configuration:
+    ```bash
+    cp mcp_servers.json.example mcp_servers.json
+    ```
+4.  **Local Setup (Optional)**:
     For local development, use the setup script which uses `uv` for faster installation:
     ```bash
     ./setup_env.sh
     ```
-4.  **Configure Docker Compose**:
+5.  **Configure Docker Compose**:
     Copy the example compose file:
     ```bash
     cp docker-compose.example.yml docker-compose.yml
