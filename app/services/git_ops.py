@@ -319,26 +319,28 @@ def get_file_history(filepath: str, max_count: int = 10) -> str:
         # Validate path but we need the relative path for git log if we run it from root
         # _validate_path returns absolute path
         abs_path = _validate_path(filepath)
-        # Convert back to relative path for git command, or use abs_path if git supports it inside repo
-        # Git log expects path relative to CWD usually, or absolute path.
-        # But we must be sure we are not passing "../" to git log.
-        # Since _validate_path ensures it's inside CODEBASE_ROOT, we can use the relative path safely.
+        # Convert back to relative path for git command, or use abs_path if git
+        # supports it inside repo. Git log expects path relative to CWD usually,
+        # or absolute path. But we must be sure we are not passing "../" to git log.
+        # Since _validate_path ensures it's inside CODEBASE_ROOT, we can use the
+        # relative path safely.
         rel_path = os.path.relpath(abs_path, CODEBASE_ROOT)
     except ValueError as e:
         return f"Error: {str(e)}"
 
     try:
         # Use git log to get the history
+        cmd = [
+            "git",
+            "log",
+            "-n",
+            str(max_count),
+            "--pretty=format:%h - %an, %ar : %s",
+            "--",
+            rel_path,
+        ]
         result = subprocess.run(
-            [
-                "git",
-                "log",
-                "-n",
-                str(max_count),
-                "--pretty=format:%h - %an, %ar : %s",
-                "--",
-                rel_path,
-            ],
+            cmd,
             cwd=CODEBASE_ROOT,
             capture_output=True,
             text=True,
@@ -612,6 +614,17 @@ def read_android_manifest(manifest_path: str = None) -> str:
         return f"Error parsing AndroidManifest.xml: {e}"
 
 
+def _validate_definition_target(target_path: str) -> None:
+    """Validates that the target definition path is within the codebase."""
+    try:
+        target_path_abs = os.path.abspath(target_path)
+        root_abs = os.path.abspath(CODEBASE_ROOT)
+        if os.path.commonpath([target_path_abs, root_abs]) != root_abs:
+            raise ValueError("Access denied. Definition is outside of codebase.")
+    except ValueError as e:
+        raise ValueError("Access denied. Definition is outside of codebase.") from e
+
+
 def get_definition(file_path: str, line: int, col: int) -> dict:
     """
     Finds the definition of a symbol using the Language Server Protocol (LSP).
@@ -658,15 +671,10 @@ def get_definition(file_path: str, line: int, col: int) -> dict:
         target_path = uri
 
     # Validate target path
-    # Some definitions might be in system libraries which are outside CODEBASE_ROOT.
-    # We should return access denied or handle gracefully.
     try:
-        target_path_abs = os.path.abspath(target_path)
-        root_abs = os.path.abspath(CODEBASE_ROOT)
-        if os.path.commonpath([target_path_abs, root_abs]) != root_abs:
-            return {"error": "Access denied. Definition is outside of codebase."}
-    except ValueError:
-        return {"error": "Access denied. Definition is outside of codebase."}
+        _validate_definition_target(target_path)
+    except ValueError as e:
+        return {"error": str(e)}
 
     # Get relative path for display
     try:
