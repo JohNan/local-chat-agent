@@ -134,227 +134,256 @@ def cancel_current_task():
     return False
 
 
-async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: str):
+async def _stream_with_retry(
+    chat_session, current_msg, turn: int, task_state: TaskState
+):
     """
-    Background worker that runs the agent loop and pushes events to the queue.
-    Decoupled from the HTTP response to ensure completion even if client disconnects.
+    Attempts to establish a stream with retry logic for transient errors.
     """
-    # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-nested-blocks, global-statement
-    global CURRENT_STATE
-    task_state = TaskState()
-    CURRENT_STATE = task_state
-    task_state.add_listener(initial_queue)
+    max_retries = 3
+    retry_delay = 2
 
-    current_msg = user_msg
+    for attempt in range(max_retries + 1):
+        try:
+            return await chat_session.send_message_stream(current_msg)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            error_str = str(e)
+            is_retryable = (
+                "503" in error_str
+                or "Service Unavailable" in error_str
+                or "high demand" in error_str
+            )
+
+            if is_retryable and attempt < max_retries:
+                logger.warning(
+                    "[TURN %d] Gemini 503/Busy. Retrying in %ds (Attempt %d/%d)...",
+                    turn,
+                    retry_delay,
+                    attempt + 1,
+                    max_retries,
+                )
+                # Notify frontend via tool status
+                msg = (
+                    f"Gemini API is busy. Retrying in {retry_delay} seconds... "
+                    f"(Attempt {attempt + 1}/{max_retries})"
+                )
+                await task_state.broadcast(f"event: tool\ndata: {json.dumps(msg)}\n\n")
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                raise e
+
+    raise RuntimeError("Failed to establish stream after retries.")
+
+
+async def _process_turn_stream(
+    chat_session, current_msg, turn: int, task_state: TaskState
+) -> tuple[str, list]:
+    """
+    Handles the streaming interaction with the LLM for a single turn, including retries.
+    Returns the full text of the turn and any tool calls found.
+    """
+    turn_text_parts = []
+    tool_calls = []
+
+    stream = await _stream_with_retry(chat_session, current_msg, turn, task_state)
+
+    async for chunk in stream:
+        # Text processing
+        try:
+            chunk_text = ""
+            # Safely extract text from parts if available
+            if hasattr(chunk, "parts"):
+                for part in chunk.parts:
+                    if part.text:
+                        chunk_text += part.text
+            # Fallback for simple text responses (if parts is missing/empty)
+            elif hasattr(chunk, "text"):
+                try:
+                    chunk_text = chunk.text
+                except Exception:  # pylint: disable=broad-exception-caught
+                    pass
+
+            if chunk_text:
+                turn_text_parts.append(chunk_text)
+                await task_state.broadcast(
+                    f"event: message\ndata: {json.dumps(chunk_text)}\n\n"
+                )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("[TURN %d] Error processing chunk text: %s", turn, e)
+
+        # Tool call processing
+        try:
+            # 1. Primary check: chunk.function_calls (Gemini SDK v0.3+)
+            if hasattr(chunk, "function_calls") and chunk.function_calls:
+                tool_calls.extend(chunk.function_calls)
+            # 2. Fallback check: chunk.parts (Legacy)
+            elif hasattr(chunk, "parts"):
+                for part in chunk.parts:
+                    if part.function_call:
+                        tool_calls.append(part.function_call)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("[TURN %d] Error processing chunk tool calls: %s", turn, e)
+
+    full_turn_text = "".join(turn_text_parts)
+    return full_turn_text, tool_calls
+
+
+async def _execute_turn_tools(
+    tool_calls: list, turn: int, task_state: TaskState, tool_usage_counts: defaultdict
+) -> list[types.Part]:
+    """
+    Executes the tools for a single turn and returns the response parts.
+    """
+    logger.debug("[TURN %d] Executing tools...", turn)
+    tool_descriptions = []
+    for fc in tool_calls:
+        tool_usage_counts[fc.name] += 1
+        if fc.name == "read_file":
+            tool_descriptions.append(f"Reading file '{fc.args.get('filepath')}'")
+        elif fc.name == "list_files":
+            tool_descriptions.append(f"Listing directory '{fc.args.get('directory')}'")
+        elif fc.name == "get_file_history":
+            tool_descriptions.append(f"Getting history for '{fc.args.get('filepath')}'")
+        elif fc.name == "get_recent_commits":
+            tool_descriptions.append("Getting recent commits")
+        elif fc.name == "get_file_outline":
+            tool_descriptions.append(f"Outlining '{fc.args.get('filepath')}'")
+        elif fc.name == "read_android_manifest":
+            tool_descriptions.append("Reading Android Manifest")
+        elif fc.name == "search_codebase_semantic":
+            tool_descriptions.append(f"Searching codebase for '{fc.args.get('query')}'")
+        else:
+            tool_descriptions.append(f"Running {fc.name}")
+
+    joined_descriptions = ", ".join(tool_descriptions)
+    # STRICT JSON ENCODING prevents newlines from breaking SSE
+    tool_status_msg = f"{joined_descriptions}..."
+    await task_state.broadcast(f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n")
+
+    # Parallel Execution
+    tool_results = await asyncio.gather(*[_execute_tool(fc) for fc in tool_calls])
+
+    response_parts = []
+    for fc, result in zip(tool_calls, tool_results):
+        response_parts.append(
+            types.Part.from_function_response(name=fc.name, response={"result": result})
+        )
+    return response_parts
+
+
+async def _run_loop(
+    chat_session, current_msg, task_state: TaskState
+) -> tuple[defaultdict, list[str], str]:
+    """
+    Runs the main agent loop.
+    Returns collected tool usage, reasoning trace, and final answer.
+    """
     turn = 0
     tool_usage_counts = defaultdict(int)
     reasoning_trace = []
     final_answer = ""
 
-    try:
-        while turn < 30:
-            turn += 1
-            tool_calls = []
-            logger.debug("[TURN %d] Sending message to SDK", turn)
+    while turn < 30:
+        turn += 1
+        logger.debug("[TURN %d] Sending message to SDK", turn)
 
-            turn_text_parts = []
-
-            try:
-                # Use native async method for streaming with retry logic
-                max_retries = 3
-                retry_delay = 2
-                stream = None
-
-                for attempt in range(max_retries + 1):
-                    try:
-                        stream = await chat_session.send_message_stream(current_msg)
-                        break  # Success
-                    except Exception as e:  # pylint: disable=broad-exception-caught
-                        error_str = str(e)
-                        is_retryable = (
-                            "503" in error_str
-                            or "Service Unavailable" in error_str
-                            or "high demand" in error_str
-                        )
-
-                        if is_retryable and attempt < max_retries:
-                            logger.warning(
-                                "[TURN %d] Gemini 503/Busy. Retrying in %ds (Attempt %d/%d)...",
-                                turn,
-                                retry_delay,
-                                attempt + 1,
-                                max_retries,
-                            )
-                            # Notify frontend via tool status
-                            msg = (
-                                f"Gemini API is busy. Retrying in {retry_delay} seconds... "
-                                f"(Attempt {attempt + 1}/{max_retries})"
-                            )
-                            await task_state.broadcast(
-                                f"event: tool\ndata: {json.dumps(msg)}\n\n"
-                            )
-                            await asyncio.sleep(retry_delay)
-                            retry_delay *= 2  # Exponential backoff
-                        else:
-                            raise e  # Re-raise if not retryable or max retries reached
-
-                if not stream:
-                    raise RuntimeError("Failed to establish stream after retries.")
-
-                async for chunk in stream:
-                    # Text processing
-                    try:
-                        chunk_text = ""
-                        # Safely extract text from parts if available
-                        if hasattr(chunk, "parts"):
-                            for part in chunk.parts:
-                                if part.text:
-                                    chunk_text += part.text
-                        # Fallback for simple text responses (if parts is missing/empty)
-                        elif hasattr(chunk, "text"):
-                            try:
-                                chunk_text = chunk.text
-                            except Exception:  # pylint: disable=broad-exception-caught
-                                pass
-
-                        if chunk_text:
-                            turn_text_parts.append(chunk_text)
-                            await task_state.broadcast(
-                                f"event: message\ndata: {json.dumps(chunk_text)}\n\n"
-                            )
-                    except Exception as e:  # pylint: disable=broad-exception-caught
-                        logger.error(
-                            "[TURN %d] Error processing chunk text: %s", turn, e
-                        )
-
-                    # Tool call processing
-                    try:
-                        # 1. Primary check: chunk.function_calls (Gemini SDK v0.3+)
-                        if hasattr(chunk, "function_calls") and chunk.function_calls:
-                            tool_calls.extend(chunk.function_calls)
-                        # 2. Fallback check: chunk.parts (Legacy)
-                        elif hasattr(chunk, "parts"):
-                            for part in chunk.parts:
-                                if part.function_call:
-                                    tool_calls.append(part.function_call)
-                    except Exception as e:  # pylint: disable=broad-exception-caught
-                        logger.error(
-                            "[TURN %d] Error processing chunk tool calls: %s", turn, e
-                        )
-
-                # End of stream for this turn.
-                full_turn_text = "".join(turn_text_parts)
-
-                if full_turn_text:
-                    reasoning_trace.append(full_turn_text)
-
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.error("Turn %d Error: %s", turn, traceback.format_exc())
-                error_msg = _extract_error_message(str(e))
-                await task_state.broadcast(
-                    f"event: error\ndata: {json.dumps(error_msg)}\n\n"
-                )
-                return
-
-            # Decision Point
-            if not tool_calls:
-                if reasoning_trace:
-                    final_answer = reasoning_trace.pop()
-                break
-
-            # Execute Tools
-            logger.debug("[TURN %d] Executing tools...", turn)
-            tool_descriptions = []
-            for fc in tool_calls:
-                tool_usage_counts[fc.name] += 1
-                if fc.name == "read_file":
-                    tool_descriptions.append(
-                        f"Reading file '{fc.args.get('filepath')}'"
-                    )
-                elif fc.name == "list_files":
-                    tool_descriptions.append(
-                        f"Listing directory '{fc.args.get('directory')}'"
-                    )
-                elif fc.name == "get_file_history":
-                    tool_descriptions.append(
-                        f"Getting history for '{fc.args.get('filepath')}'"
-                    )
-                elif fc.name == "get_recent_commits":
-                    tool_descriptions.append("Getting recent commits")
-                elif fc.name == "get_file_outline":
-                    tool_descriptions.append(f"Outlining '{fc.args.get('filepath')}'")
-                elif fc.name == "read_android_manifest":
-                    tool_descriptions.append("Reading Android Manifest")
-                elif fc.name == "search_codebase_semantic":
-                    tool_descriptions.append(
-                        f"Searching codebase for '{fc.args.get('query')}'"
-                    )
-                else:
-                    tool_descriptions.append(f"Running {fc.name}")
-
-            joined_descriptions = ", ".join(tool_descriptions)
-            # STRICT JSON ENCODING prevents newlines from breaking SSE
-            tool_status_msg = f"{joined_descriptions}..."
-            await task_state.broadcast(
-                f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n"
+        # _process_turn_stream raises exception on failure, which will be caught by caller
+        try:
+            full_turn_text, tool_calls = await _process_turn_stream(
+                chat_session, current_msg, turn, task_state
             )
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Log the error with turn context before propagating
+            logger.error("Turn %d Error: %s", turn, traceback.format_exc())
+            raise
 
-            # Parallel Execution
-            tool_results = await asyncio.gather(
-                *[_execute_tool(fc) for fc in tool_calls]
-            )
+        if full_turn_text:
+            reasoning_trace.append(full_turn_text)
 
-            response_parts = []
-            for fc, result in zip(tool_calls, tool_results):
-                response_parts.append(
-                    types.Part.from_function_response(
-                        name=fc.name, response={"result": result}
-                    )
-                )
-
-            # Update State
-            current_msg = response_parts
-
-        # Construct Summary
-        stream_summary_markdown = ""
-
-        if tool_usage_counts or reasoning_trace:
-            # pylint: disable=line-too-long
-            stream_summary_markdown = "\n\n<details><summary>Click to view reasoning and tool usage</summary>\n\n"
-            # pylint: enable=line-too-long
-
-            # Tool Usage
-            if tool_usage_counts:
-                stream_summary_markdown += "#### Tool Usage\n"
-                for tool, count in tool_usage_counts.items():
-                    stream_summary_markdown += f"- **{tool}**: {count}\n"
-                stream_summary_markdown += "\n"
-
-            # Reasoning Trace
+        if not tool_calls:
             if reasoning_trace:
-                stream_summary_markdown += "#### Reasoning Trace\n"
-                for i, step in enumerate(reasoning_trace, 1):
-                    stream_summary_markdown += f"{i}. {step}\n\n"
+                final_answer = reasoning_trace.pop()
+            break
 
-            stream_summary_markdown += "</details>"
+        current_msg = await _execute_turn_tools(
+            tool_calls, turn, task_state, tool_usage_counts
+        )
 
-            await task_state.broadcast(
-                f"event: message\ndata: {json.dumps(stream_summary_markdown)}\n\n"
-            )
+    return tool_usage_counts, reasoning_trace, final_answer
 
-        # Construct History Summary (includes Final Answer + Details)
-        history_summary = ""
-        if final_answer:
-            history_summary += final_answer
 
-        if stream_summary_markdown:
-            history_summary += stream_summary_markdown
+async def _finalize_task(
+    tool_usage_counts: defaultdict,
+    reasoning_trace: list[str],
+    final_answer: str,
+    task_state: TaskState,
+) -> None:
+    """
+    Constructs the final summary, saves to history, and signals completion.
+    """
+    # Construct Summary
+    stream_summary_markdown = ""
 
-        # Save to history ONLY at the very end
-        if history_summary:
-            await asyncio.to_thread(chat_manager.save_message, "model", history_summary)
+    if tool_usage_counts or reasoning_trace:
+        # pylint: disable=line-too-long
+        stream_summary_markdown = (
+            "\n\n<details><summary>Click to view reasoning and tool usage</summary>\n\n"
+        )
+        # pylint: enable=line-too-long
 
-        await task_state.broadcast("event: done\ndata: [DONE]\n\n")
+        # Tool Usage
+        if tool_usage_counts:
+            stream_summary_markdown += "#### Tool Usage\n"
+            for tool, count in tool_usage_counts.items():
+                stream_summary_markdown += f"- **{tool}**: {count}\n"
+            stream_summary_markdown += "\n"
+
+        # Reasoning Trace
+        if reasoning_trace:
+            stream_summary_markdown += "#### Reasoning Trace\n"
+            for i, step in enumerate(reasoning_trace, 1):
+                stream_summary_markdown += f"{i}. {step}\n\n"
+
+        stream_summary_markdown += "</details>"
+
+        await task_state.broadcast(
+            f"event: message\ndata: {json.dumps(stream_summary_markdown)}\n\n"
+        )
+
+    # Construct History Summary (includes Final Answer + Details)
+    history_summary = ""
+    if final_answer:
+        history_summary += final_answer
+
+    if stream_summary_markdown:
+        history_summary += stream_summary_markdown
+
+    # Save to history ONLY at the very end
+    if history_summary:
+        await asyncio.to_thread(chat_manager.save_message, "model", history_summary)
+
+    await task_state.broadcast("event: done\ndata: [DONE]\n\n")
+
+
+async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: str):
+    """
+    Background worker that runs the agent loop and pushes events to the queue.
+    Decoupled from the HTTP response to ensure completion even if client disconnects.
+    """
+    # pylint: disable=global-statement
+    global CURRENT_STATE
+    task_state = TaskState()
+    CURRENT_STATE = task_state
+    task_state.add_listener(initial_queue)
+
+    try:
+        tool_usage_counts, reasoning_trace, final_answer = await _run_loop(
+            chat_session, user_msg, task_state
+        )
+        await _finalize_task(
+            tool_usage_counts, reasoning_trace, final_answer, task_state
+        )
 
     except asyncio.CancelledError:
         logger.info("Task was cancelled.")
