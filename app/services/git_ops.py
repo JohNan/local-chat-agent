@@ -32,7 +32,6 @@ def _validate_path(path: str) -> str:
 
     # Resolve absolute path
     full_path = os.path.abspath(os.path.join(CODEBASE_ROOT, path))
-    root_abs = os.path.abspath(CODEBASE_ROOT)
 
     # Security check: Ensure we are still inside CODEBASE_ROOT using commonpath
     # We use realpath to resolve symlinks and prevent traversal
