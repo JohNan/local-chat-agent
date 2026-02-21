@@ -589,7 +589,9 @@ def read_android_manifest(manifest_path: str = None) -> str:
 
 def get_definition(file_path: str, line: int, col: int) -> dict:
     """
-    Finds the definition of a symbol using LSP.
+    Finds the definition of a symbol using the Language Server Protocol (LSP).
+    This tool uses a robust language server to precisely locate definitions,
+    making it more accurate than text search. Prioritize this for Python, TS, and Kotlin.
 
     Args:
         file_path: Relative path to the file.
