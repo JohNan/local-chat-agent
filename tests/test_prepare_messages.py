@@ -1,14 +1,15 @@
 """
 Tests for the prepare_messages function in llm_service.
 """
+
 import base64
 import sys
 import os
-import pytest
 
 # Add repo root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# pylint: disable=wrong-import-position
 from app.services import llm_service
 
 
@@ -81,7 +82,7 @@ class TestPrepareMessages:
 
         media = [
             {"mime_type": "image/png", "data": encoded_data1},
-            {"mime_type": "image/jpeg", "data": encoded_data2}
+            {"mime_type": "image/jpeg", "data": encoded_data2},
         ]
 
         storage_parts, gemini_msg = llm_service.prepare_messages(user_msg, media)
