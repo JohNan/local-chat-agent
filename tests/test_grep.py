@@ -82,8 +82,9 @@ def test_grep_code_truncation(temp_codebase):
 def test_grep_code_fallback_commands():
     """Test grep_code fallback to standard grep when not in a git repo."""
     # Mock os.path.exists to simulate no .git directory
-    with patch("app.services.git_ops.os.path.exists", return_value=False) as mock_exists, \
-         patch("app.services.git_ops.subprocess.run") as mock_run:
+    with patch(
+        "app.services.git_ops.os.path.exists", return_value=False
+    ) as mock_exists, patch("app.services.git_ops.subprocess.run") as mock_run:
 
         # Configure mock_run result
         mock_result = MagicMock()
@@ -96,11 +97,11 @@ def test_grep_code_fallback_commands():
 
         # Verify call arguments for default (case insensitive) fallback
         mock_run.assert_called_with(
-            ['grep', '-r', '-n', '-i', 'test_query', '.'],
+            ["grep", "-r", "-n", "-i", "test_query", "."],
             cwd=git_ops.CODEBASE_ROOT,
             capture_output=True,
             text=True,
-            check=False
+            check=False,
         )
 
         # Test 2: Case Sensitive
@@ -108,9 +109,9 @@ def test_grep_code_fallback_commands():
 
         # Verify call arguments for case sensitive fallback
         mock_run.assert_called_with(
-            ['grep', '-r', '-n', 'test_query', '.'],
+            ["grep", "-r", "-n", "test_query", "."],
             cwd=git_ops.CODEBASE_ROOT,
             capture_output=True,
             text=True,
-            check=False
+            check=False,
         )
