@@ -10,7 +10,7 @@ def test_core_instruction_contains_lsp_rule():
     expected_rule = (
         "3. **Navigate (LSP):**\n"
         "   - **Found a usage but need the implementation?** -> Use `get_definition`.\n"
-        "   - *Constraint:* Do NOT grep for \"def my_function\" or \"class MyClass\". Use LSP on the symbol usage instead."
+        '   - *Constraint:* Do NOT grep for "def my_function" or "class MyClass". Use LSP on the symbol usage instead.'
     )
     assert expected_rule in CORE_INSTRUCTION
 

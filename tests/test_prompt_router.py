@@ -4,7 +4,11 @@ Tests for prompt_router service.
 
 import json
 from unittest.mock import patch, mock_open, MagicMock
-from app.services.prompt_router import load_active_persona, PERSONA_FILE, load_core_instruction
+from app.services.prompt_router import (
+    load_active_persona,
+    PERSONA_FILE,
+    load_core_instruction,
+)
 
 
 def test_load_active_persona_file_not_found():
