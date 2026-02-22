@@ -270,7 +270,7 @@ class LSPManager:
 
             file_count = 0
             found_threshold = False
-            MIN_FILE_THRESHOLD = 2
+            min_file_threshold = 2
 
             # Walk the directory to find a matching file
             for _, dirs, files in os.walk(root_path):
@@ -284,7 +284,7 @@ class LSPManager:
                 for file in files:
                     if any(file.endswith(ext) for ext in extensions):
                         file_count += 1
-                        if file_count >= MIN_FILE_THRESHOLD:
+                        if file_count >= min_file_threshold:
                             found_threshold = True
                             break
                 if found_threshold:
@@ -293,7 +293,7 @@ class LSPManager:
             if found_threshold:
                 logger.info(
                     "Found >= %d %s files, starting LSP server...",
-                    MIN_FILE_THRESHOLD,
+                    min_file_threshold,
                     language,
                 )
                 self.start_server(language, root_path)
