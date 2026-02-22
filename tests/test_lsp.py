@@ -85,6 +85,12 @@ def test_lsp_manager_start_server(MockRegistry, MockPopen, mock_lsp_manager):
         assert MockPopen.called
         assert server_instance.send_request.called  # initialize called
 
+        # Verify initialization timeout is 120.0
+        # server_instance.send_request.call_args is a tuple (args, kwargs)
+        args, kwargs = server_instance.send_request.call_args
+        assert args[0] == "initialize"
+        assert kwargs["timeout"] == 120.0
+
 
 @patch("app.services.git_ops.LSPManager")
 @patch("app.services.git_ops.read_file")
