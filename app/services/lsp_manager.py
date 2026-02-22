@@ -237,7 +237,7 @@ class LSPManager:
                     "capabilities": {},
                 }
                 # Increase timeout for initialization (some servers are slow)
-                resp = server.send_request("initialize", init_params, timeout=60.0)
+                resp = server.send_request("initialize", init_params, timeout=120.0)
                 if resp and "error" not in resp:
                     server.send_notification("initialized", {})
                     self._servers[key] = server
@@ -268,7 +268,10 @@ class LSPManager:
             if not extensions:
                 continue
 
-            found = False
+            file_count = 0
+            found_threshold = False
+            MIN_FILE_THRESHOLD = 2
+
             # Walk the directory to find a matching file
             for _, dirs, files in os.walk(root_path):
                 # Skip common ignored directories
@@ -280,13 +283,19 @@ class LSPManager:
 
                 for file in files:
                     if any(file.endswith(ext) for ext in extensions):
-                        found = True
-                        break
-                if found:
+                        file_count += 1
+                        if file_count >= MIN_FILE_THRESHOLD:
+                            found_threshold = True
+                            break
+                if found_threshold:
                     break
 
-            if found:
-                logger.info("Found %s files, starting LSP server...", language)
+            if found_threshold:
+                logger.info(
+                    "Found >= %d %s files, starting LSP server...",
+                    MIN_FILE_THRESHOLD,
+                    language,
+                )
                 self.start_server(language, root_path)
 
     def get_definition(self, file_path: str, line: int, col: int) -> Dict[str, Any]:

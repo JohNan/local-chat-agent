@@ -36,8 +36,11 @@ class TestLSPBoot(unittest.TestCase):
 
         # Setup os.walk Mock
         # Simulate finding a python file and a typescript file, but no kotlin file
+        # Python: 2 files -> Should start
+        # TypeScript: 1 file -> Should NOT start
+        # Kotlin: 0 files -> Should NOT start
         mock_walk.return_value = [
-            (".", ["src"], ["main.py", "README.md"]),
+            (".", ["src"], ["main.py", "utils.py", "README.md"]),
             ("./src", [], ["app.ts"]),
         ]
 
@@ -47,18 +50,18 @@ class TestLSPBoot(unittest.TestCase):
         expected_path = os.path.abspath(".")
 
         # Check calls
-        # Should attempt to start python server (because of main.py)
+        # Should attempt to start python server (because of main.py and utils.py)
         mock_start_server.assert_any_call("python", expected_path)
 
-        # Should attempt to start typescript server (because of app.ts)
-        mock_start_server.assert_any_call("typescript", expected_path)
+        # Should NOT attempt to start typescript server (because only 1 file)
+        calls = [args[0] for args, _ in mock_start_server.call_args_list]
+        self.assertNotIn("typescript", calls)
 
         # Should NOT attempt to start kotlin server
-        calls = [args[0] for args, _ in mock_start_server.call_args_list]
         self.assertNotIn("kotlin", calls)
 
-        # Ensure we only called start_server twice
-        self.assertEqual(mock_start_server.call_count, 2)
+        # Ensure we only called start_server once
+        self.assertEqual(mock_start_server.call_count, 1)
 
 
 if __name__ == "__main__":
