@@ -57,6 +57,7 @@ TOOL_MAP = {
     "get_definition": git_ops.get_definition,
     "search_codebase_semantic": rag_manager.search_codebase_semantic,
     "code_execution": code_executor.execute_code,
+    "run_programming_task": code_executor.execute_code,
 }
 
 
@@ -254,6 +255,8 @@ async def _execute_turn_tools(
             tool_descriptions.append("Reading Android Manifest")
         elif fc.name == "search_codebase_semantic":
             tool_descriptions.append(f"Searching codebase for '{fc.args.get('query')}'")
+        elif fc.name in ("code_execution", "run_programming_task"):
+            tool_descriptions.append("Running python code")
         else:
             tool_descriptions.append(f"Running {fc.name}")
 
