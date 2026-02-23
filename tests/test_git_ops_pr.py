@@ -1,6 +1,7 @@
 """
 Tests for git_ops PR functions.
 """
+
 import unittest
 from unittest.mock import patch, MagicMock
 from app.services import git_ops
