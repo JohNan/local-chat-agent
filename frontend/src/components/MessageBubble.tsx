@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js';
-import { Bot, Loader2, Rocket, Check, X, User, GitPullRequestArrow, RefreshCw, Copy, FileText } from 'lucide-react';
+import { Bot, Loader2, Rocket, Check, X, User, GitPullRequestArrow, RefreshCw, Copy, FileText, Search } from 'lucide-react';
 import type { Message } from '../types';
 
 // Configure marked with highlight.js
@@ -30,9 +30,10 @@ interface MessageBubbleProps {
     message: Message;
     toolStatus?: string | null;
     deployedSessionId?: string | null;
+    onSendMessage?: (text: string) => void;
 }
 
-const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolStatus, deployedSessionId }) => {
+const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolStatus, deployedSessionId, onSendMessage }) => {
     const [deploying, setDeploying] = useState(false);
     const [deployResult, setDeployResult] = useState<string | null>(
         deployedSessionId ? `Started! (${deployedSessionId})` : null
@@ -51,6 +52,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [statusData, setStatusData] = useState<any>(null);
     const [checkingStatus, setCheckingStatus] = useState(false);
+    const [isReviewing, setIsReviewing] = useState(false);
     const [copied, setCopied] = useState(false);
     const [copyError, setCopyError] = useState(false);
 
@@ -233,30 +235,101 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
         }
     };
 
+    const handleReview = async () => {
+        if (!sessionId) return;
+        setIsReviewing(true);
+        try {
+            const response = await fetch(`/api/jules_session/${sessionId}/review`, {
+                method: 'POST',
+            });
+            const data = await response.json();
+            if (data.success && data.prompt) {
+                if (onSendMessage) {
+                    onSendMessage(data.prompt);
+                }
+            } else {
+                alert("Error generating review: " + (data.error || "Unknown error"));
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error generating review");
+        } finally {
+            setIsReviewing(false);
+        }
+    };
+
     const renderStatus = () => {
         if (!statusData) return null;
 
         // Find PR URL if exists
         let prUrl = null;
         if (statusData.outputs) {
-             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-             statusData.outputs.forEach((output: any) => {
-                 if (output.pullRequest && output.pullRequest.url) {
-                     prUrl = output.pullRequest.url;
-                 }
-             });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            statusData.outputs.forEach((output: any) => {
+                if (output.pullRequest && output.pullRequest.url) {
+                    prUrl = output.pullRequest.url;
+                }
+            });
         }
 
         const state = statusData.state || "UNKNOWN";
 
         return (
-            <div className="status-box" style={{ marginTop: '10px', fontSize: '0.9em', padding: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px' }}>
-                <div><strong>Status:</strong> {state}</div>
+            <div
+                className="status-box"
+                style={{
+                    marginTop: '10px',
+                    fontSize: '0.9em',
+                    padding: '8px',
+                    background: 'rgba(0,0,0,0.05)',
+                    borderRadius: '4px',
+                }}
+            >
+                <div>
+                    <strong>Status:</strong> {state}
+                </div>
                 {prUrl && (
-                    <a href={prUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '4px', color: '#0969da', textDecoration: 'none' }}>
-                        <GitPullRequestArrow size={14} />
-                        View PR
-                    </a>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '4px', alignItems: 'center' }}>
+                        <a
+                            href={prUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                color: '#0969da',
+                                textDecoration: 'none',
+                            }}
+                        >
+                            <GitPullRequestArrow size={14} />
+                            View PR
+                        </a>
+                        {onSendMessage && (
+                            <button
+                                onClick={handleReview}
+                                disabled={isReviewing}
+                                style={{
+                                    border: 'none',
+                                    background: 'none',
+                                    padding: 0,
+                                    color: '#0969da',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontSize: 'inherit',
+                                }}
+                            >
+                                {isReviewing ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                    <Search size={14} />
+                                )}
+                                Review
+                            </button>
+                        )}
+                    </div>
                 )}
             </div>
         );
