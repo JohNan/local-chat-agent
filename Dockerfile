@@ -1,5 +1,5 @@
 # Stage 1: Build Frontend
-FROM node:22-alpine AS frontend-builder
+FROM node:26-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 # Copy dependency definitions first to leverage Docker cache
@@ -11,14 +11,14 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Python Runtime
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     openssh-client \
-    openjdk-21-jre-headless \
+    openjdk-25-jre-headless \
     nodejs \
     npm \
     unzip \
