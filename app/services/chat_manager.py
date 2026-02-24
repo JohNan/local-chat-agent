@@ -5,12 +5,25 @@ Service module for managing chat history via SQLite.
 import json
 import logging
 import uuid
+import functools
 from datetime import datetime, timezone
 
 from app.config import HISTORY_LIMIT
 from .database import DatabaseManager
 
 logger = logging.getLogger(__name__)
+
+
+@functools.lru_cache(maxsize=1024)
+def _parse_parts(parts_str: str) -> list:
+    """Parses JSON parts string with caching. Returns an empty list on error."""
+    try:
+        parsed = json.loads(parts_str)
+        if isinstance(parsed, list):
+            return parsed
+        return []
+    except json.JSONDecodeError:
+        return []
 
 
 def _row_to_message(row: dict) -> dict:
@@ -21,10 +34,9 @@ def _row_to_message(row: dict) -> dict:
         "created_at": row["created_at"],
     }
     if row["parts"]:
-        try:
-            msg["parts"] = json.loads(row["parts"])
-        except json.JSONDecodeError:
-            msg["parts"] = []
+        # Return a shallow copy to prevent mutation of the cached list
+        # Note: Dictionaries inside the list are still shared
+        msg["parts"] = _parse_parts(row["parts"])[:]
     else:
         # Fallback if no parts, use content if available
         if row["content"]:
