@@ -695,3 +695,49 @@ def get_definition(file_path: str, line: int, col: int) -> dict:
     content_snippet = read_file(rel_target_path, start_line, start_line + 5)
 
     return {"file": rel_target_path, "line": start_line, "content": content_snippet}
+
+
+def get_pr_diff(pr_number: int) -> str:
+    """
+    Retrieves the diff for a specific Pull Request.
+    """
+    try:
+        temp_branch = f"pr_review_temp_{pr_number}"
+
+        # 1. Fetch PR head to temp branch
+        # We use check=True to raise CalledProcessError on failure
+        subprocess.run(
+            ["git", "fetch", "origin", f"pull/{pr_number}/head:{temp_branch}"],
+            cwd=CODEBASE_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        # 2. Get diff from common ancestor (HEAD...temp_branch)
+        result = subprocess.run(
+            ["git", "diff", f"HEAD...{temp_branch}"],
+            cwd=CODEBASE_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        diff_output = result.stdout
+
+        # 3. Cleanup temp branch
+        subprocess.run(
+            ["git", "branch", "-D", temp_branch],
+            cwd=CODEBASE_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        return diff_output
+
+    except subprocess.CalledProcessError as e:
+        logger.error("Error getting PR diff: %s", e.stderr)
+        return f"Error retrieving PR diff: {e.stderr or e.stdout}"
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error getting PR diff: %s", e)
+        return f"Error retrieving PR diff: {str(e)}"

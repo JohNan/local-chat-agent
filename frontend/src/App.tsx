@@ -382,6 +382,7 @@ function App() {
                 onLoadHistory={fetchNextPage}
                 toolStatus={currentToolStatus}
                 isLoadingHistory={isFetchingNextPage}
+                onSendMessage={sendMessage}
             />
             <InputArea
                 onSendMessage={sendMessage}
