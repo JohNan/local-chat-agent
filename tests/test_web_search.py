@@ -80,8 +80,8 @@ def test_web_search_disabled_via_request(client):
         tool = config.tools[0]
         assert tool.google_search is None
 
-        # Verify system instruction is default
-        assert config.system_instruction == prompt_router.CORE_INSTRUCTION
+        # Verify system instruction contains CORE_INSTRUCTION
+        assert prompt_router.CORE_INSTRUCTION in config.system_instruction
 
 
 def test_web_search_default_false(client):

@@ -6,6 +6,7 @@ Manages sticky personas and intent classification for the agent.
 import json
 import os
 import logging
+from datetime import datetime
 from pathlib import Path
 from app.config import CLIENT
 
@@ -116,7 +117,10 @@ def get_system_instruction(persona_key: str) -> str:
     if persona_key not in PERSONA_PROMPTS:
         persona_key = "GENERAL"
 
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    date_context = f"Today's date is {current_date}."
+
     extra_instruction = PERSONA_PROMPTS.get(persona_key, "")
     if extra_instruction:
-        return f"{CORE_INSTRUCTION}\n\n{extra_instruction}"
-    return CORE_INSTRUCTION
+        return f"{date_context}\n\n{CORE_INSTRUCTION}\n\n{extra_instruction}"
+    return f"{date_context}\n\n{CORE_INSTRUCTION}"

@@ -4,10 +4,12 @@ Tests for prompt_router service.
 
 import json
 from unittest.mock import patch, mock_open, MagicMock
+from datetime import datetime
 from app.services.prompt_router import (
     load_active_persona,
     PERSONA_FILE,
     load_core_instruction,
+    get_system_instruction,
 )
 
 
@@ -103,3 +105,22 @@ def test_load_core_instruction_read_error():
         app_path.read_text.return_value = "App Content"
 
         assert load_core_instruction() == "App Content"
+
+
+def test_get_system_instruction_includes_date():
+    """Test that get_system_instruction includes the current date."""
+    fixed_date = datetime(2023, 10, 27)
+    expected_date_str = "2023-10-27"
+
+    with patch("app.services.prompt_router.datetime") as mock_datetime:
+        mock_datetime.now.return_value = fixed_date
+        # No need to mock strftime if fixed_date is a real datetime object,
+        # but since we mocked datetime class, the instance returned by now()
+        # might need to support strftime if it were a Mock.
+        # However, we set return_value to a real datetime object.
+        # The issue is that the code calls datetime.now().strftime(...)
+        # So it calls strftime on fixed_date. fixed_date is a real datetime.
+        # So it should work without extra mocking.
+
+        instruction = get_system_instruction("GENERAL")
+        assert f"Today's date is {expected_date_str}." in instruction
