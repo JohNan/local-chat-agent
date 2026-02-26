@@ -8,6 +8,7 @@ interface HeaderProps {
     webSearchEnabled: boolean;
     setWebSearchEnabled: (enabled: boolean) => void;
     onToggleTasks: () => void;
+    isGenerating: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
     webSearchEnabled,
     setWebSearchEnabled,
     onToggleTasks,
+    isGenerating,
 }) => {
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [loading, setLoading] = useState(false);
@@ -113,7 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
         <>
             <div className="header">
                 <div className="header-title">
-                    <Bot size={24} />
+                    <Bot size={24} className={isGenerating ? "animate-pulse" : ""} color={isGenerating ? "#4caf50" : "currentColor"} />
                     <span>Gemini Agent</span>
                     <div
                         title={status?.active_persona || "General"}
