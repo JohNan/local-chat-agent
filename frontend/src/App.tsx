@@ -15,7 +15,8 @@ function App() {
         data,
         fetchNextPage,
         isFetchingNextPage,
-        queryClient
+        queryClient,
+        status
     } = useChatHistory();
 
     const [model, setModel] = useState("gemini-3-pro-preview");
@@ -50,6 +51,7 @@ function App() {
     const [isTasksOpen, setIsTasksOpen] = useState(false);
     const [quotaErrorData, setQuotaErrorData] = useState<{ text: string, media?: MediaItem[], error: string } | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const hasCheckedStream = useRef(false);
 
     // Derived messages state
     const messages = useMemo(() => {
@@ -238,24 +240,6 @@ function App() {
         }
     };
 
-    const resumeStream = async () => {
-        try {
-            const res = await fetch('/api/stream/active');
-            if (res.ok) {
-                 // Add placeholder for AI message
-                const aiMsg: Message = { id: generateId(), role: 'model', text: "", parts: [{text: ""}] };
-                addMessage(aiMsg);
-
-                await readStream(res, () => {
-                     // On complete, ensure sync
-                     queryClient.invalidateQueries({ queryKey: ['chat-history'] });
-                });
-            }
-        } catch (e) {
-            console.error("Failed to resume stream", e);
-        }
-    };
-
     const handleStop = async () => {
         // Client-side abort
         if (abortControllerRef.current) {
@@ -340,12 +324,36 @@ function App() {
         }
     };
 
-    // Initial load handled by React Query automatically,
-    // but we need to check for active stream on mount.
+    // Check for active stream on mount
     useEffect(() => {
-        resumeStream();
+        if (status === 'success' && !hasCheckedStream.current) {
+            hasCheckedStream.current = true;
+            const checkStream = async () => {
+                try {
+                    const res = await fetch('/api/stream/active');
+                    if (res.ok) {
+                        setIsGenerating(true);
+                        // Add placeholder for AI message
+                        const aiMsg: Message = { id: generateId(), role: 'model', text: "", parts: [{text: ""}] };
+                        addMessage(aiMsg);
+
+                        await readStream(res, () => {
+                             // On complete, ensure sync
+                             queryClient.invalidateQueries({ queryKey: ['chat-history'] });
+                             setIsGenerating(false);
+                        });
+                    } else {
+                        setIsGenerating(false);
+                    }
+                } catch (e) {
+                    console.error("Failed to check active stream", e);
+                    setIsGenerating(false);
+                }
+            };
+            checkStream();
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [status]);
 
     // Persist web search preference
     useEffect(() => {
@@ -375,6 +383,7 @@ function App() {
                 webSearchEnabled={webSearchEnabled}
                 setWebSearchEnabled={setWebSearchEnabled}
                 onToggleTasks={() => setIsTasksOpen(!isTasksOpen)}
+                isGenerating={isGenerating}
             />
             <TasksDrawer isOpen={isTasksOpen} onClose={() => setIsTasksOpen(false)} />
             <ChatInterface

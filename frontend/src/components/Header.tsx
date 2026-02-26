@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, List, LayoutTemplate, Smartphone, Box, Server, MessageSquare } from 'lucide-react';
+import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, List, LayoutTemplate, Smartphone, Box, Server, MessageSquare, Loader2 } from 'lucide-react';
 import type { RepoStatus } from '../types';
 
 interface HeaderProps {
@@ -8,6 +8,7 @@ interface HeaderProps {
     webSearchEnabled: boolean;
     setWebSearchEnabled: (enabled: boolean) => void;
     onToggleTasks: () => void;
+    isGenerating: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
     webSearchEnabled,
     setWebSearchEnabled,
     onToggleTasks,
+    isGenerating,
 }) => {
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [loading, setLoading] = useState(false);
@@ -147,6 +149,22 @@ export const Header: React.FC<HeaderProps> = ({
                             </div>
                         )}
                     </div>
+                    {isGenerating && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginLeft: '15px',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            fontSize: '0.9em',
+                            color: '#ccc'
+                        }}>
+                            <Loader2 className="animate-spin" size={16} />
+                            <span>Thinking...</span>
+                        </div>
+                    )}
                 </div>
                 <div className="header-controls">
                     <button onClick={onToggleTasks} className="icon-btn" title="Tasks">
