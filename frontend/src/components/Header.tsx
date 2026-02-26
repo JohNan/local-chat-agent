@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, List, LayoutTemplate, Smartphone, Box, Server, MessageSquare, Loader2 } from 'lucide-react';
+import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, List, LayoutTemplate, Smartphone, Box, Server, MessageSquare } from 'lucide-react';
 import type { RepoStatus } from '../types';
 
 interface HeaderProps {
@@ -115,7 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
         <>
             <div className="header">
                 <div className="header-title">
-                    <Bot size={24} />
+                    <Bot size={24} className={isGenerating ? "animate-pulse" : ""} color={isGenerating ? "#4caf50" : "currentColor"} />
                     <span>Gemini Agent</span>
                     <div
                         title={status?.active_persona || "General"}
@@ -149,22 +149,6 @@ export const Header: React.FC<HeaderProps> = ({
                             </div>
                         )}
                     </div>
-                    {isGenerating && (
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            marginLeft: '15px',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                            fontSize: '0.9em',
-                            color: '#ccc'
-                        }}>
-                            <Loader2 className="animate-spin" size={16} />
-                            <span>Thinking...</span>
-                        </div>
-                    )}
                 </div>
                 <div className="header-controls">
                     <button onClick={onToggleTasks} className="icon-btn" title="Tasks">

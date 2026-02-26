@@ -286,6 +286,15 @@ code {
     animation: spin 1s linear infinite;
 }
 
+@keyframes pulse {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.92); }
+    100% { opacity: 1; transform: scale(1); }
+}
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 /* Deploy Button in Chat */
 .deploy-btn {
     background-color: #2da44e;
