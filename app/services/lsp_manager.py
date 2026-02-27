@@ -2,6 +2,7 @@
 Service for managing Language Server Protocol (LSP) processes.
 """
 
+import collections
 import json
 import logging
 import os
@@ -24,6 +25,7 @@ class LSPServer:
         self.root_path = root_path
         self.responses: Dict[int, Any] = {}
         self.conditions: Dict[int, threading.Condition] = {}
+        self.stderr_buffer = collections.deque(maxlen=20)
         self.lock = threading.Lock()
         self.reader_thread = threading.Thread(target=self._read_loop, daemon=True)
         self.reader_thread.start()
@@ -37,10 +39,13 @@ class LSPServer:
                 line = self.process.stderr.readline()
                 if not line:
                     break
+                decoded_line = line.decode("utf-8", errors="ignore").strip()
+                with self.lock:
+                    self.stderr_buffer.append(decoded_line)
                 logger.debug(
                     "[%s] stderr: %s",
                     self.language,
-                    line.decode("utf-8", errors="ignore").strip(),
+                    decoded_line,
                 )
             except Exception:  # pylint: disable=broad-exception-caught
                 break
@@ -243,10 +248,13 @@ class LSPManager:
                     self._servers[key] = server
                     return server
 
+                with server.lock:
+                    stderr_output = "\n".join(server.stderr_buffer)
                 logger.error(
-                    "Failed to initialize LSP server for %s. Response: %s",
+                    "Failed to initialize LSP server for %s.\nResponse: %s\nRecent stderr:\n%s",
                     language,
                     resp,
+                    stderr_output,
                 )
                 process.terminate()
                 return None
