@@ -1,6 +1,7 @@
 google-genai==1.61.0
 markdown==3.10.1
 requests==2.32.5
+beautifulsoup4==4.12.3
 pytest==9.0.2
 pytest-mock==3.15.1
 black==26.1.0
