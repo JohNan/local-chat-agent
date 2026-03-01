@@ -7,7 +7,7 @@ import logging
 import asyncio
 from google.genai import types
 
-from app.services import git_ops, rag_manager
+from app.services import git_ops, rag_manager, web_ops
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +54,9 @@ def get_tool_config(client, enable_search):
         ),
         types.FunctionDeclaration.from_callable(
             client=client, callable=rag_manager.search_codebase_semantic
+        ),
+        types.FunctionDeclaration.from_callable(
+            client=client, callable=web_ops.fetch_url
         ),
     ]
 

@@ -12,7 +12,14 @@ from collections import defaultdict
 
 from google.genai import types
 
-from app.services import git_ops, chat_manager, rag_manager, llm_service, code_executor
+from app.services import (
+    git_ops,
+    chat_manager,
+    rag_manager,
+    llm_service,
+    code_executor,
+    web_ops,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +65,7 @@ TOOL_MAP = {
     "search_codebase_semantic": rag_manager.search_codebase_semantic,
     "code_execution": code_executor.execute_code,
     "run_programming_task": code_executor.execute_code,
+    "fetch_url": web_ops.fetch_url,
 }
 
 
