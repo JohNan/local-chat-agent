@@ -27,6 +27,8 @@ class LSPServer:
         self.conditions: Dict[int, threading.Condition] = {}
         self.stderr_buffer = collections.deque(maxlen=20)
         self.lock = threading.Lock()
+        self.status = "initializing"
+        self.initialization_error: Optional[str] = None
         self.reader_thread = threading.Thread(target=self._read_loop, daemon=True)
         self.reader_thread.start()
         self.stderr_thread = threading.Thread(target=self._stderr_loop, daemon=True)
@@ -178,7 +180,10 @@ class LSPManager:
         servers = []
         with self._lock:
             for _, server in self._servers.items():
-                status = "running" if server.process.poll() is None else "stopped"
+                if server.process.poll() is not None:
+                    status = "stopped"
+                else:
+                    status = server.status
                 servers.append(
                     {
                         "language": server.language,
@@ -188,6 +193,58 @@ class LSPManager:
                     }
                 )
         return servers
+
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    def _initialize_server_bg(
+        self, server: LSPServer, key: str, language: str, root_path: str, timeout: float
+    ):
+        """Runs the initialization sequence in the background."""
+        init_params = {
+            "processId": os.getpid(),
+            "rootUri": f"file://{root_path}",
+            "capabilities": {},
+        }
+
+        resp = server.send_request("initialize", init_params, timeout=timeout)
+
+        if resp is None:
+            # Timeout
+            server.status = "failed"
+            server.initialization_error = (
+                f"failed to initialize within {timeout} seconds"
+            )
+            logger.error(
+                "%s LSP failed to initialize within %s seconds",
+                language.capitalize(),
+                timeout,
+            )
+            # Remove from servers dict to allow retry
+            with self._lock:
+                if key in self._servers:
+                    del self._servers[key]
+            server.process.terminate()
+            return
+
+        if "error" not in resp:
+            server.send_notification("initialized", {})
+            server.status = "running"
+            return
+
+        # Initialization failed with an error in response
+        server.status = "failed"
+        server.initialization_error = f"Initialization error: {resp.get('error')}"
+        with server.lock:
+            stderr_output = "\n".join(server.stderr_buffer)
+        logger.error(
+            "Failed to initialize LSP server for %s.\nResponse: %s\nRecent stderr:\n%s",
+            language,
+            resp,
+            stderr_output,
+        )
+        with self._lock:
+            if key in self._servers:
+                del self._servers[key]
+        server.process.terminate()
 
     def start_server(self, language: str, root_path: str) -> Optional[LSPServer]:
         """Starts or retrieves an existing LSP server."""
@@ -214,6 +271,7 @@ class LSPManager:
 
             bin_name = config["bin"]
             args = config.get("args", [])
+            timeout = config.get("timeout", 300.0)
             cmd = [bin_name] + args
 
             try:
@@ -234,30 +292,17 @@ class LSPManager:
                 )
 
                 server = LSPServer(process, language, root_path)
+                self._servers[key] = server
 
-                # Initialize
-                init_params = {
-                    "processId": os.getpid(),
-                    "rootUri": f"file://{root_path}",
-                    "capabilities": {},
-                }
-                # Increase timeout for initialization (some servers are slow)
-                resp = server.send_request("initialize", init_params, timeout=120.0)
-                if resp and "error" not in resp:
-                    server.send_notification("initialized", {})
-                    self._servers[key] = server
-                    return server
-
-                with server.lock:
-                    stderr_output = "\n".join(server.stderr_buffer)
-                logger.error(
-                    "Failed to initialize LSP server for %s.\nResponse: %s\nRecent stderr:\n%s",
-                    language,
-                    resp,
-                    stderr_output,
+                # Start initialization in background
+                init_thread = threading.Thread(
+                    target=self._initialize_server_bg,
+                    args=(server, key, language, root_path, timeout),
+                    daemon=True,
                 )
-                process.terminate()
-                return None
+                init_thread.start()
+
+                return server
 
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Failed to start LSP server for %s: %s", language, e)
@@ -331,6 +376,12 @@ class LSPManager:
         server = self.start_server(language, root_path)
         if not server:
             return {"error": "Failed to start LSP server"}
+
+        if server.status == "initializing":
+            return {"error": "Server is starting..."}
+
+        if server.status == "failed":
+            return {"error": f"Server failed to start: {server.initialization_error}"}
 
         return self._request_definition(server, abs_path, language, line, col)
 

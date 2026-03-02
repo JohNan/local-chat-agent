@@ -15,6 +15,7 @@
     "bin": "kotlin-lsp",
     "args": [],
     "extensions": [".kt", ".kts"],
-    "root_markers": ["build.gradle", "pom.xml", "settings.gradle"]
+    "root_markers": ["build.gradle", "pom.xml", "settings.gradle"],
+    "timeout": 300
   }
 }

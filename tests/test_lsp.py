@@ -79,17 +79,30 @@ def test_lsp_manager_start_server(MockRegistry, MockPopen, mock_lsp_manager):
         }  # Success response
         MockLSPServer.return_value = server_instance
 
-        server = mock_lsp_manager.start_server("python", "/root")
+        # We patch threading.Thread so the background task runs inline synchronously
+        with patch("threading.Thread") as mock_thread:
+            # When Thread() is called, create a mock thread that just executes its target immediately when start() is called
+            class FakeThread:
+                def __init__(self, target, args, daemon):
+                    self.target = target
+                    self.args = args
 
-        assert server is not None
-        assert MockPopen.called
-        assert server_instance.send_request.called  # initialize called
+                def start(self):
+                    self.target(*self.args)
 
-        # Verify initialization timeout is 120.0
-        # server_instance.send_request.call_args is a tuple (args, kwargs)
-        args, kwargs = server_instance.send_request.call_args
-        assert args[0] == "initialize"
-        assert kwargs["timeout"] == 120.0
+            mock_thread.side_effect = FakeThread
+
+            server = mock_lsp_manager.start_server("python", "/root")
+
+            assert server is not None
+            assert MockPopen.called
+            assert server_instance.send_request.called  # initialize called
+
+            # Verify initialization timeout is 300.0 (the new default from config)
+            # server_instance.send_request.call_args is a tuple (args, kwargs)
+            args, kwargs = server_instance.send_request.call_args
+            assert args[0] == "initialize"
+            assert kwargs["timeout"] == 300.0
 
 
 @patch("app.services.git_ops.LSPManager")
