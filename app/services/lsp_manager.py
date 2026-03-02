@@ -213,7 +213,11 @@ class LSPManager:
             server.initialization_error = (
                 f"failed to initialize within {timeout} seconds"
             )
-            logger.error("%s LSP failed to initialize within %s seconds", language.capitalize(), timeout)
+            logger.error(
+                "%s LSP failed to initialize within %s seconds",
+                language.capitalize(),
+                timeout,
+            )
             # Remove from servers dict to allow retry
             with self._lock:
                 if key in self._servers:

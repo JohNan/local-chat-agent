@@ -86,6 +86,7 @@ def test_lsp_manager_start_server(MockRegistry, MockPopen, mock_lsp_manager):
                 def __init__(self, target, args, daemon):
                     self.target = target
                     self.args = args
+
                 def start(self):
                     self.target(*self.args)
 
