@@ -43,3 +43,11 @@ def clean_db(tmp_path):
 
     # Reset singleton after test so subsequent tests don't use this instance
     DatabaseManager.reset_instance()
+
+
+@pytest.fixture(autouse=True)
+def mock_lifespan_components(mocker):
+    """Mock lifespan components to avoid timeouts."""
+    mocker.patch("app.main.get_mcp_servers", return_value={})
+    mocker.patch("app.main.rag_manager.index_codebase_task")
+    mocker.patch("app.main.LSPManager")
