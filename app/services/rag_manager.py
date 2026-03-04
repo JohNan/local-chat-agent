@@ -46,8 +46,8 @@ class RAGManager:
                 self.genai_client = None
 
     def _calculate_hash(self, content: str) -> str:
-        """Calculates MD5 hash of content."""
-        return hashlib.md5(content.encode("utf-8")).hexdigest()
+        """Calculates SHA-256 hash of content."""
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
     def _get_embeddings(self, texts: list[str]) -> list[list[float]] | None:
         """Generates embeddings for the given list of texts."""
