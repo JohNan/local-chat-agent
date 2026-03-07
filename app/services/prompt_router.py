@@ -47,6 +47,10 @@ PERSONA_PROMPTS = {
     ),
     "ARCHITECT": "Focus on system design, modularity, and `AGENTS.md` compliance.",
     "CI_CD": "Focus on build stability, Docker, and GitHub Actions.",
+    "PLANNER": (
+        "Focus on requirements, architecture, and roadmaps. "
+        "Use the write_to_docs tool for any documentation."
+    ),
     "GENERAL": "",
 }
 
@@ -92,8 +96,10 @@ def classify_intent(user_query: str) -> str:
 
     prompt = (
         "Classify this developer query into exactly one category: "
-        "[UI, MOBILE, ARCHITECT, CI_CD, GENERAL]. "
+        "[UI, MOBILE, ARCHITECT, CI_CD, PLANNER, GENERAL]. "
         "Return ONLY the category name.\n\n"
+        "Use PLANNER if the user query contains words like 'plan', 'document', "
+        "'architecture', or 'requirements'.\n\n"
         f"Query: {user_query}"
     )
 
