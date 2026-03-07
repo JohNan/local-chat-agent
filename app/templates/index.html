@@ -214,6 +214,13 @@
                     <line x1="12" y1="15" x2="12" y2="3"></line>
                 </svg>
             </button>
+            <button onclick="getGitStatus()" class="icon-btn" title="Git Push">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+            </button>
             <button onclick="clearHistory()" class="icon-btn" title="Clear History">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="3 6 5 6 21 6"></polyline>
@@ -482,6 +489,87 @@
             }
         }
 
+
+        async function getGitStatus() {
+            const btn = document.querySelector('button[title="Git Push"]');
+            if(btn) btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/git_status');
+                const data = await res.json();
+
+                if (data.status && data.status.length > 0) {
+                    showPushModal(data.status);
+                } else {
+                    alert("No changes to push");
+                }
+            } catch(e) {
+                alert("Error: " + e.message);
+            } finally {
+                if(btn) btn.disabled = false;
+            }
+        }
+
+        function showPushModal(files) {
+            const list = document.getElementById('push-files-list');
+            list.innerHTML = '';
+            files.forEach(f => {
+                const li = document.createElement('li');
+                li.style.padding = '5px 10px';
+                li.style.borderBottom = '1px solid var(--border-color)';
+                li.style.fontFamily = 'monospace';
+                li.style.fontSize = '0.9em';
+                li.innerText = f;
+                list.appendChild(li);
+            });
+
+            const timestamp = new Date().getTime();
+            document.getElementById('push-branch').value = `docs-update-${timestamp}`;
+            document.getElementById('push-commit').value = "docs: update documentation";
+
+            document.getElementById('push-modal').style.display = 'flex';
+        }
+
+        function closePushModal() {
+            document.getElementById('push-modal').style.display = 'none';
+        }
+
+        async function submitPush() {
+            const branch = document.getElementById('push-branch').value.trim();
+            const message = document.getElementById('push-commit').value.trim();
+
+            if (!branch || !message) {
+                alert("Branch and commit message are required.");
+                return;
+            }
+
+            const btn = document.getElementById('confirm-push-btn');
+            btn.innerText = 'Pushing...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/git_push', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ branch_name: branch, commit_message: message })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    alert("Push successful\n" + data.output);
+                    closePushModal();
+                    updateStatus();
+                } else {
+                    alert("Push failed\n" + data.output);
+                }
+            } catch(e) {
+                alert("Error: " + e.message);
+            } finally {
+                btn.innerText = 'Confirm Push';
+                btn.disabled = false;
+            }
+        }
+
         async function gitPull() {
              const btn = document.querySelector('button[title="Git Pull"]');
              if(!btn) return;
@@ -528,5 +616,30 @@
         updateStatus();
         loadHistory(false);
     </script>
+
+    <!-- Push Modal -->
+    <div id="push-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background-color: var(--chat-bg); padding: 20px; border-radius: 8px; width: 400px; max-width: 90%; border: 1px solid var(--border-color);">
+            <h3 style="margin-top: 0;">Push Changes</h3>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px;">Changed Files</label>
+                <ul id="push-files-list" style="list-style: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto; background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px;">
+                </ul>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px;">Branch Name</label>
+                <input type="text" id="push-branch" style="width: calc(100% - 22px); padding: 10px;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px;">Commit Message</label>
+                <input type="text" id="push-commit" style="width: calc(100% - 22px); padding: 10px;">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="primary-btn" style="background-color: transparent; border: 1px solid var(--border-color);" onclick="closePushModal()">Cancel</button>
+                <button class="primary-btn" id="confirm-push-btn" onclick="submitPush()">Confirm Push</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

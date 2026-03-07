@@ -147,6 +147,109 @@ def get_repo_info():
         return {"project": "No Git Repo", "branch": "-", "source_id": ""}
 
 
+def get_git_status() -> list[str]:
+    """
+    Returns a list of changed, added, or deleted files using git status.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=CODEBASE_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        if not result.stdout.strip():
+            return []
+
+        files = []
+        for line in result.stdout.splitlines():
+            if len(line) > 3:
+                # Format is usually ' M filepath' or '?? filepath'
+                # We can just take the whole line to show status and path,
+                # or just extract the path.
+                # Let's return the raw porcelain lines for the frontend to display.
+                files.append(line)
+        return files
+    except subprocess.CalledProcessError as e:
+        logger.error("Git status failed: %s", e.stderr)
+        return []
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error getting git status: %s", e)
+        return []
+
+
+def perform_git_push(branch_name: str, commit_message: str) -> dict:
+    """
+    Executes git checkout -b, git add ., git commit -m, and git push.
+    """
+    logger.info("Starting git push to branch %s...", branch_name)
+    try:
+        # Check if branch exists
+        branch_exists = False
+        try:
+            subprocess.run(
+                ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"],
+                cwd=CODEBASE_ROOT,
+                check=True,
+            )
+            branch_exists = True
+        except subprocess.CalledProcessError:
+            pass
+
+        if branch_exists:
+            # Checkout existing branch
+            subprocess.run(
+                ["git", "checkout", branch_name],
+                cwd=CODEBASE_ROOT,
+                check=True,
+                capture_output=True,
+            )
+        else:
+            # Create and checkout new branch
+            subprocess.run(
+                ["git", "checkout", "-b", branch_name],
+                cwd=CODEBASE_ROOT,
+                check=True,
+                capture_output=True,
+            )
+
+        # Add all changes
+        subprocess.run(
+            ["git", "add", "."], cwd=CODEBASE_ROOT, check=True, capture_output=True
+        )
+
+        # Commit
+        subprocess.run(
+            ["git", "commit", "-m", commit_message],
+            cwd=CODEBASE_ROOT,
+            check=True,
+            capture_output=True,
+        )
+
+        # Push
+        result = subprocess.run(
+            ["git", "push", "-u", "origin", branch_name],
+            cwd=CODEBASE_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        output = result.stdout
+        if result.stderr:
+            output += "\n" + result.stderr
+
+        return {"success": True, "output": output}
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr or e.stdout
+        logger.error("Git push sequence failed: %s", error_msg)
+        return {"success": False, "output": error_msg}
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Git push sequence failed: %s", e)
+        return {"success": False, "output": str(e)}
+
+
 def perform_git_pull():
     """
     Executes 'git pull' in the codebase root.

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, List, LayoutTemplate, Smartphone, Box, Server, MessageSquare, FileText } from 'lucide-react';
+import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, List, LayoutTemplate, Smartphone, Box, Server, MessageSquare, FileText, Upload } from 'lucide-react';
 import type { RepoStatus } from '../types';
 
 interface HeaderProps {
@@ -23,6 +23,13 @@ export const Header: React.FC<HeaderProps> = ({
     const [loading, setLoading] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showPersonaName, setShowPersonaName] = useState(false);
+
+    const [showPushModal, setShowPushModal] = useState(false);
+    const [pushFiles, setPushFiles] = useState<string[]>([]);
+    const [pushBranchName, setPushBranchName] = useState("");
+    const [pushCommitMessage, setPushCommitMessage] = useState("");
+    const [pushing, setPushing] = useState(false);
+
     const [availableModels, setAvailableModels] = useState<string[]>([
         "gemini-3-pro-preview",
         "gemini-2.0-flash-exp",
@@ -56,6 +63,56 @@ export const Header: React.FC<HeaderProps> = ({
         }
     };
 
+
+    const gitStatus = async () => {
+        if (loading) return;
+        setLoading(true);
+        try {
+            const res = await fetch('/api/git_status');
+            const data = await res.json();
+            if (data.status && data.status.length > 0) {
+                setPushFiles(data.status);
+                const timestamp = new Date().getTime();
+                setPushBranchName(`docs-update-${timestamp}`);
+                setPushCommitMessage("docs: update documentation");
+                setShowPushModal(true);
+            } else {
+                alert("No changes to push");
+            }
+        } catch (e) {
+            alert('Error: ' + (e as Error).message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const submitPush = async () => {
+        if (pushing) return;
+        setPushing(true);
+        try {
+            const res = await fetch('/api/git_push', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    branch_name: pushBranchName,
+                    commit_message: pushCommitMessage
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert("Push successful\n" + data.output);
+                setShowPushModal(false);
+                updateStatus();
+            } else {
+                alert("Push failed\n" + data.output);
+            }
+        } catch (e) {
+            alert('Error: ' + (e as Error).message);
+        } finally {
+            setPushing(false);
+        }
+    };
+
     const gitPull = async () => {
         if (loading) return;
         setLoading(true);
@@ -65,8 +122,8 @@ export const Header: React.FC<HeaderProps> = ({
             alert(data.output);
             updateStatus();
         } catch (e) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            alert('Error: ' + (e as any).message);
+
+            alert('Error: ' + (e as Error).message);
         } finally {
             setLoading(false);
         }
@@ -244,22 +301,42 @@ export const Header: React.FC<HeaderProps> = ({
                             </div>
 
                             <div className="setting-actions" style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                <button
-                                    onClick={gitPull}
-                                    className="icon-btn"
-                                    title="Git Pull"
-                                    disabled={loading}
-                                    style={{
-                                        border: '1px solid #454545',
-                                        width: '100%',
-                                        justifyContent: 'center',
-                                        gap: '10px',
-                                        padding: '8px'
-                                    }}
-                                >
-                                    <GitPullRequestArrow size={20} />
-                                    <span>Git Pull</span>
-                                </button>
+
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button
+                                        onClick={gitPull}
+                                        className="icon-btn"
+                                        title="Git Pull"
+                                        disabled={loading}
+                                        style={{
+                                            border: '1px solid #454545',
+                                            flex: 1,
+                                            justifyContent: 'center',
+                                            gap: '10px',
+                                            padding: '8px'
+                                        }}
+                                    >
+                                        <GitPullRequestArrow size={20} />
+                                        <span>Git Pull</span>
+                                    </button>
+                                    <button
+                                        onClick={gitStatus}
+                                        className="icon-btn"
+                                        title="Git Push"
+                                        disabled={loading}
+                                        style={{
+                                            border: '1px solid #454545',
+                                            flex: 1,
+                                            justifyContent: 'center',
+                                            gap: '10px',
+                                            padding: '8px'
+                                        }}
+                                    >
+                                        <Upload size={20} />
+                                        <span>Git Push</span>
+                                    </button>
+                                </div>
+
                                 <button
                                     onClick={clearHistory}
                                     className="icon-btn"
@@ -280,6 +357,70 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                 </div>
             )}
+
+            {showPushModal && (
+                <div className="settings-overlay" style={{ zIndex: 1100 }}>
+                    <div className="settings-modal" style={{ maxWidth: '500px' }}>
+                        <div className="settings-header">
+                            <h3>Push Changes</h3>
+                            <button onClick={() => setShowPushModal(false)} className="icon-btn" disabled={pushing}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="settings-content">
+                            <div className="setting-item">
+                                <label>Changed Files</label>
+                                <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '150px', overflowY: 'auto', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                                    {pushFiles.map((file, idx) => (
+                                        <li key={idx} style={{ padding: '5px 10px', fontSize: '0.9rem', borderBottom: idx < pushFiles.length - 1 ? '1px solid var(--border-color)' : 'none', fontFamily: 'monospace' }}>
+                                            {file}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                            <div className="setting-item">
+                                <label>Branch Name</label>
+                                <input
+                                    type="text"
+                                    value={pushBranchName}
+                                    onChange={(e) => setPushBranchName(e.target.value)}
+                                    disabled={pushing}
+                                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--chat-bg)', color: 'var(--text-color)' }}
+                                />
+                            </div>
+                            <div className="setting-item">
+                                <label>Commit Message</label>
+                                <input
+                                    type="text"
+                                    value={pushCommitMessage}
+                                    onChange={(e) => setPushCommitMessage(e.target.value)}
+                                    disabled={pushing}
+                                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--chat-bg)', color: 'var(--text-color)' }}
+                                />
+                            </div>
+                            <div className="setting-actions" style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                                <button
+                                    onClick={() => setShowPushModal(false)}
+                                    className="icon-btn"
+                                    disabled={pushing}
+                                    style={{ padding: '8px 16px', border: '1px solid var(--border-color)' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={submitPush}
+                                    className="icon-btn"
+                                    disabled={pushing || !pushBranchName || !pushCommitMessage}
+                                    style={{ padding: '8px 16px', backgroundColor: 'var(--user-msg-bg)', color: 'white', border: 'none' }}
+                                >
+                                    {pushing ? 'Pushing...' : 'Confirm Push'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </>
     );
 };

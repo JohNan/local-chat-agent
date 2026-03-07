@@ -26,6 +26,29 @@ def api_status():
     return info
 
 
+class GitPushRequest(BaseModel):
+    """Request model for git push."""
+
+    branch_name: str
+    commit_message: str
+
+
+@router.get("/api/git_status")
+def api_git_status():
+    """Returns the git status."""
+    status = git_ops.get_git_status()
+    return {"status": status}
+
+
+@router.post("/api/git_push")
+async def api_git_push(request: GitPushRequest):
+    """Performs a git push."""
+    result = await asyncio.to_thread(
+        git_ops.perform_git_push, request.branch_name, request.commit_message
+    )
+    return result
+
+
 @router.post("/api/git_pull")
 async def api_git_pull():
     """Performs a git pull."""
