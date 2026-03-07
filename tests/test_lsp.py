@@ -114,7 +114,7 @@ def test_git_ops_get_definition(mock_read_file, MockLSPManager):
     mock_result = {
         "result": [
             {
-                "uri": "file:///codebase/test.py",
+                "uri": f"file://{git_ops.CODEBASE_ROOT}/test.py",
                 "range": {
                     "start": {"line": 10, "character": 5},
                     "end": {"line": 10, "character": 15},

@@ -697,6 +697,49 @@ def get_definition(file_path: str, line: int, col: int) -> dict:
     return {"file": rel_target_path, "line": start_line, "content": content_snippet}
 
 
+def write_to_docs(filepath: str, content: str) -> str:
+    """
+    Writes content to a file, restricted strictly to the docs/ directory.
+    Automatically creates necessary subdirectories.
+
+    Args:
+        filepath: The path of the file to write to, relative to CODEBASE_ROOT/docs.
+        content: The text content to write.
+
+    Returns:
+        A success message or an error message.
+    """
+    try:
+        docs_root = os.path.abspath(os.path.join(CODEBASE_ROOT, "docs"))
+
+        # If the user provides a path like "docs/plan.md", we strip the "docs/" prefix
+
+        if filepath.startswith("docs/"):
+            filepath = filepath[5:]
+        elif filepath.startswith("/docs/"):
+            filepath = filepath[6:]
+
+        # Resolve the absolute path
+        full_path = os.path.abspath(os.path.join(docs_root, filepath))
+
+        # Security check: Ensure we are strictly inside docs/ directory
+        if os.path.commonpath([full_path, docs_root]) != docs_root:
+            return "Error: Access denied. Can only write to the docs/ directory."
+
+        # Create directories if they don't exist
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+
+        # Write the file
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        return f"Successfully wrote to {filepath}"
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error writing to docs: %s", e)
+        return f"Error writing file: {str(e)}"
+
+
 def get_pr_diff(pr_number: int) -> str:
     """
     Retrieves the diff for a specific Pull Request.

@@ -66,6 +66,7 @@ TOOL_MAP = {
     "code_execution": code_executor.execute_code,
     "run_programming_task": code_executor.execute_code,
     "fetch_url": web_ops.fetch_url,
+    "write_to_docs": git_ops.write_to_docs,
 }
 
 

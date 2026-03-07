@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, List, LayoutTemplate, Smartphone, Box, Server, MessageSquare } from 'lucide-react';
+import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, List, LayoutTemplate, Smartphone, Box, Server, MessageSquare, FileText } from 'lucide-react';
 import type { RepoStatus } from '../types';
 
 interface HeaderProps {
@@ -99,7 +99,7 @@ export const Header: React.FC<HeaderProps> = ({
 
     useEffect(() => {
         updateStatus();
-    }, []);
+    }, [isGenerating]);
 
     const getPersonaIcon = (persona?: string) => {
         switch (persona) {
@@ -107,6 +107,7 @@ export const Header: React.FC<HeaderProps> = ({
             case 'MOBILE': return <Smartphone size={20} />;
             case 'ARCHITECT': return <Box size={20} />;
             case 'CI_CD': return <Server size={20} />;
+            case 'PLANNER': return <FileText size={20} />;
             default: return <MessageSquare size={20} />;
         }
     };
