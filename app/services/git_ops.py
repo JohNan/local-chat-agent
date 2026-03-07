@@ -142,9 +142,7 @@ def get_repo_info():
             "source_id": source_id,
         }
 
-    except (
-        Exception
-    ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error getting repo info: %s", e)
         return {"project": "No Git Repo", "branch": "-", "source_id": ""}
 
@@ -167,9 +165,7 @@ def perform_git_pull():
     except subprocess.CalledProcessError as e:
         logger.error("Git stderr: %s", e.stderr)
         return {"success": False, "output": e.stderr or e.stdout}
-    except (
-        Exception
-    ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Git pull failed: %s", e)
         return {"success": False, "output": str(e)}
 
@@ -356,9 +352,7 @@ def get_file_history(filepath: str, max_count: int = 10) -> str:
     except subprocess.CalledProcessError as e:
         logger.error("Git log failed: %s", e.stderr)
         return f"Error retrieving history: {e.stderr or e.stdout}"
-    except (
-        Exception
-    ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error retrieving file history: %s", e)
         return f"Error retrieving history: {str(e)}"
 
@@ -392,9 +386,7 @@ def get_recent_commits(max_count: int = 10) -> str:
     except subprocess.CalledProcessError as e:
         logger.error("Git log failed: %s", e.stderr)
         return f"Error retrieving recent commits: {e.stderr or e.stdout}"
-    except (
-        Exception
-    ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error retrieving recent commits: %s", e)
         return f"Error retrieving recent commits: {str(e)}"
 
@@ -459,9 +451,7 @@ def grep_code(query: str, case_sensitive: bool = False) -> str:
 
         return output
 
-    except (
-        Exception
-    ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error searching code: %s", e)
         return f"Error searching code: {str(e)}"
 
@@ -791,8 +781,6 @@ def get_pr_diff(pr_number: int) -> str:
     except subprocess.CalledProcessError as e:
         logger.error("Error getting PR diff: %s", e.stderr)
         return f"Error retrieving PR diff: {e.stderr or e.stdout}"
-    except (
-        Exception
-    ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error getting PR diff: %s", e)
         return f"Error retrieving PR diff: {str(e)}"
