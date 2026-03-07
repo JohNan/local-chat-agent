@@ -75,13 +75,13 @@ The backend exposes several key endpoints:
 
 ## Running the Agent
 
-Run the application using Docker Compose:
+Run the application using Docker Compose (this will start both the main `gemini-agent` container and the `kotlin-lsp` container for Kotlin code intelligence):
 
 ```bash
 docker-compose up --build
 ```
 
-The current directory is mounted to `/codebase` in the container.
+The current directory is mounted to `/codebase` in the containers.
 
 ## Usage
 

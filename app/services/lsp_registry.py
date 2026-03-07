@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
-CATALOG_PATH = os.path.join(os.path.dirname(__file__), "../lsp/catalog.json")
+CATALOG_PATH = os.environ.get("LSP_CATALOG_PATH", os.path.join(os.path.dirname(__file__), "../lsp/catalog.json"))
 
 
 class LSPRegistry:
@@ -36,9 +36,14 @@ class LSPRegistry:
                 raw_config = json.load(f)
 
             for lang, config in raw_config.items():
+                if config.get("connection") == "tcp":
+                    self._config[lang] = config
+                    logger.info("LSP server for %s registered via TCP", lang)
+                    continue
+
                 bin_name = config.get("bin")
                 if not bin_name:
-                    logger.warning("LSP config for %s missing 'bin'", lang)
+                    logger.warning("LSP config for %s missing 'bin' or 'connection: tcp'", lang)
                     continue
 
                 if shutil.which(bin_name):

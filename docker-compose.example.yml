@@ -14,3 +14,14 @@ services:
       # - CHAT_HISTORY_FILE=/config/chat_history.json
       # - JULES_TASKS_FILE=/config/tasks.json
       - SSH_AUTH_SOCK=/ssh-agent
+    depends_on:
+      - kotlin-lsp
+
+  kotlin-lsp:
+    build:
+      context: .
+      dockerfile: Dockerfile.kotlin-lsp
+    ports:
+      - "5005:5005"
+    volumes:
+      - ./:/codebase

@@ -1,0 +1,25 @@
+# Use a lightweight Debian base image
+FROM debian:bullseye-slim
+
+WORKDIR /app
+
+# Install dependencies (wget, unzip for LSP, socat for TCP bridge)
+RUN apt-get update && apt-get install -y \
+    wget \
+    unzip \
+    socat \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Kotlin Language Server
+# Note: It comes with a bundled JRE, so no system OpenJDK is needed.
+RUN wget -q https://download-cdn.jetbrains.com/kotlin-lsp/261.13587.0/kotlin-lsp-261.13587.0-linux-x64.zip -O /tmp/kotlin-lsp.zip \
+    && unzip /tmp/kotlin-lsp.zip -d /opt/kotlin-lsp \
+    && chmod +x /opt/kotlin-lsp/kotlin-lsp.sh \
+    && ln -s /opt/kotlin-lsp/kotlin-lsp.sh /usr/local/bin/kotlin-lsp \
+    && rm /tmp/kotlin-lsp.zip
+
+# Expose the TCP port
+EXPOSE 5005
+
+# Use socat to bridge the TCP port to the Kotlin LSP binary's stdin/stdout
+CMD ["socat", "TCP-LISTEN:5005,fork,reuseaddr", "EXEC:/usr/local/bin/kotlin-lsp"]

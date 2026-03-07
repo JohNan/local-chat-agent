@@ -12,8 +12,11 @@
     "root_markers": ["package.json", "tsconfig.json"]
   },
   "kotlin": {
-    "bin": "kotlin-lsp",
-    "args": [],
+    "name": "kotlin",
+    "connection": "tcp",
+    "host": "kotlin-lsp",
+    "port": 5005,
+    "root_uri_format": "file://{path}",
     "extensions": [".kt", ".kts"],
     "root_markers": ["build.gradle", "pom.xml", "settings.gradle"],
     "timeout": 300
