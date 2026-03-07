@@ -20,8 +20,6 @@ RUN apt-get update && apt-get install -y \
     openssh-client \
     nodejs \
     npm \
-    unzip \
-    wget \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,13 +29,6 @@ RUN pip install python-lsp-server
 
 # TypeScript
 RUN npm install -g typescript typescript-language-server
-
-# Kotlin
-RUN wget -q https://download-cdn.jetbrains.com/kotlin-lsp/261.13587.0/kotlin-lsp-261.13587.0-linux-x64.zip -O /tmp/kotlin-lsp.zip \
-    && unzip /tmp/kotlin-lsp.zip -d /opt/kotlin-lsp \
-    && chmod +x /opt/kotlin-lsp/kotlin-lsp.sh \
-    && ln -s /opt/kotlin-lsp/kotlin-lsp.sh /usr/local/bin/kotlin-lsp \
-    && rm /tmp/kotlin-lsp.zip
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/

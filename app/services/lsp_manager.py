@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import subprocess
+import socket
 import threading
 import time
 from typing import Dict, Any, Optional
@@ -16,11 +17,18 @@ logger = logging.getLogger(__name__)
 
 
 class LSPServer:
-    """Helper class to manage a single LSP process and its I/O."""
+    """Helper class to manage a single LSP process or socket and its I/O."""
 
-    # pylint: disable=too-many-instance-attributes
-    def __init__(self, process: subprocess.Popen, language: str, root_path: str):
+    # pylint: disable=too-many-instance-attributes, too-many-positional-arguments
+    def __init__(
+        self,
+        process: Optional[subprocess.Popen],
+        language: str,
+        root_path: str,
+        sock: Optional[socket.socket] = None,
+    ):
         self.process = process
+        self.sock = sock
         self.language = language
         self.root_path = root_path
         self.responses: Dict[int, Any] = {}
@@ -29,14 +37,44 @@ class LSPServer:
         self.lock = threading.Lock()
         self.status = "initializing"
         self.initialization_error: Optional[str] = None
+        self.running = True
+
         self.reader_thread = threading.Thread(target=self._read_loop, daemon=True)
         self.reader_thread.start()
-        self.stderr_thread = threading.Thread(target=self._stderr_loop, daemon=True)
-        self.stderr_thread.start()
+
+        if self.process:
+            self.stderr_thread = threading.Thread(target=self._stderr_loop, daemon=True)
+            self.stderr_thread.start()
+
+    def is_alive(self) -> bool:
+        """Checks if the underlying process or socket is still alive."""
+        if not self.running:
+            return False
+        if self.process:
+            return self.process.poll() is None
+        if self.sock:
+            # We rely on the reader thread detecting disconnects and setting self.running = False
+            return True
+        return False
+
+    def terminate(self):
+        """Terminates the server."""
+        self.running = False
+        if self.process:
+            self.process.terminate()
+        if self.sock:
+            try:
+                self.sock.shutdown(socket.SHUT_RDWR)
+                self.sock.close()
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
 
     def _stderr_loop(self):
         """Reads stderr to prevent buffer filling and deadlock."""
-        while self.process.poll() is None:
+        if not self.process:
+            return
+
+        while self.running and self.process.poll() is None:
             try:
                 line = self.process.stderr.readline()
                 if not line:
@@ -52,15 +90,24 @@ class LSPServer:
             except Exception:  # pylint: disable=broad-exception-caught
                 break
 
+    # pylint: disable=too-many-branches
     def _read_loop(self):
-        """Reads JSON-RPC messages from stdout."""
-        while self.process.poll() is None:
-            try:
+        """Reads JSON-RPC messages from stdout or socket."""
+        try:
+            if self.process:
+                infile = self.process.stdout
+            elif self.sock:
+                infile = self.sock.makefile("rb")
+            else:
+                return
+
+            while self.running and self.is_alive():
                 # Read headers
                 headers = {}
                 while True:
-                    line = self.process.stdout.readline()
+                    line = infile.readline()
                     if not line:
+                        self.running = False
                         return  # EOF or process died
 
                     line_str = line.decode("utf-8", errors="ignore").strip()
@@ -73,8 +120,9 @@ class LSPServer:
 
                 content_len = int(headers.get("Content-Length", 0))
                 if content_len > 0:
-                    body = self.process.stdout.read(content_len)
+                    body = infile.read(content_len)
                     if not body:
+                        self.running = False
                         break
 
                     try:
@@ -89,17 +137,15 @@ class LSPServer:
                                     with self.conditions[req_id]:
                                         self.conditions[req_id].notify()
                         # Notifications (no id) are currently ignored or just logged
-                        # else:
-                        #    logger.debug("LSP Notification: %s", msg)
 
                     except json.JSONDecodeError as e:
                         logger.error(
                             "Failed to decode JSON from LSP %s: %s", self.language, e
                         )
-
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.error("Error in LSP reader loop for %s: %s", self.language, e)
-                break
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error in LSP reader loop for %s: %s", self.language, e)
+        finally:
+            self.running = False
 
     def send_request(
         self, method: str, params: Any, timeout: float = 30.0
@@ -145,15 +191,22 @@ class LSPServer:
         self._send_payload(payload)
 
     def _send_payload(self, payload: Dict[str, Any]) -> bool:
-        """Encodes and writes payload to stdin."""
+        """Encodes and writes payload to stdin or socket."""
+        if not self.running:
+            return False
         try:
             body = json.dumps(payload)
             message = f"Content-Length: {len(body)}\r\n\r\n{body}"
-            self.process.stdin.write(message.encode("utf-8"))
-            self.process.stdin.flush()
+            data = message.encode("utf-8")
+            if self.process:
+                self.process.stdin.write(data)
+                self.process.stdin.flush()
+            elif self.sock:
+                self.sock.sendall(data)
             return True
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Failed to write to LSP %s: %s", self.language, e)
+            self.running = False
             return False
 
 
@@ -180,7 +233,7 @@ class LSPManager:
         servers = []
         with self._lock:
             for _, server in self._servers.items():
-                if server.process.poll() is not None:
+                if not server.is_alive():
                     status = "stopped"
                 else:
                     status = server.status
@@ -188,7 +241,7 @@ class LSPManager:
                     {
                         "language": server.language,
                         "root_path": server.root_path,
-                        "pid": server.process.pid,
+                        "pid": server.process.pid if server.process else None,
                         "status": status,
                     }
                 )
@@ -222,7 +275,7 @@ class LSPManager:
             with self._lock:
                 if key in self._servers:
                     del self._servers[key]
-            server.process.terminate()
+            server.terminate()
             return
 
         if "error" not in resp:
@@ -244,8 +297,9 @@ class LSPManager:
         with self._lock:
             if key in self._servers:
                 del self._servers[key]
-        server.process.terminate()
+        server.terminate()
 
+    # pylint: disable=too-many-locals
     def start_server(self, language: str, root_path: str) -> Optional[LSPServer]:
         """Starts or retrieves an existing LSP server."""
         root_path = self._get_normalized_path(root_path)
@@ -255,7 +309,7 @@ class LSPManager:
             # Check if existing server is alive
             if key in self._servers:
                 server = self._servers[key]
-                if server.process.poll() is None:
+                if server.is_alive():
                     return server
 
                 logger.warning("LSP server for %s died, restarting...", language)
@@ -269,29 +323,69 @@ class LSPManager:
                 logger.error("No LSP configuration found for language: %s", language)
                 return None
 
-            bin_name = config["bin"]
-            args = config.get("args", [])
             timeout = config.get("timeout", 300.0)
-            cmd = [bin_name] + args
+            connection_type = config.get("connection", "stdio")
 
             try:
-                logger.info(
-                    "Starting LSP server for %s at %s with cmd: %s",
-                    language,
-                    root_path,
-                    cmd,
-                )
-                # pylint: disable=consider-using-with
-                process = subprocess.Popen(
-                    cmd,
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,  # Capture stderr to keep it clean
-                    cwd=root_path,
-                    bufsize=0,
-                )
+                if connection_type == "tcp":
+                    host = config.get("host", "localhost")
+                    port = config.get("port")
+                    if not port:
+                        logger.error("TCP connection requires a port for %s", language)
+                        return None
 
-                server = LSPServer(process, language, root_path)
+                    logger.info(
+                        "Connecting to LSP server for %s at %s:%s", language, host, port
+                    )
+
+                    # Try to connect with retries
+                    sock = None
+                    connected = False
+                    for _ in range(5):
+                        try:
+                            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                            sock.connect((host, port))
+                            connected = True
+                            break
+                        except ConnectionRefusedError:
+                            sock.close()
+                            time.sleep(1)
+
+                    if not connected:
+                        logger.error(
+                            "Failed to connect to %s LSP at %s:%s", language, host, port
+                        )
+                        return None
+
+                    server = LSPServer(
+                        process=None, language=language, root_path=root_path, sock=sock
+                    )
+
+                else:  # stdio
+                    bin_name = config["bin"]
+                    args = config.get("args", [])
+                    cmd = [bin_name] + args
+
+                    logger.info(
+                        "Starting LSP server for %s at %s with cmd: %s",
+                        language,
+                        root_path,
+                        cmd,
+                    )
+                    # pylint: disable=consider-using-with
+                    process = subprocess.Popen(
+                        cmd,
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,  # Capture stderr to keep it clean
+                        cwd=root_path,
+                        bufsize=0,
+                    )
+
+                    server = LSPServer(
+                        process=process, language=language, root_path=root_path
+                    )
+
                 self._servers[key] = server
 
                 # Start initialization in background

@@ -12,7 +12,7 @@ It runs on **Python 3.11+** using **FastAPI** and **Google Gemini API**.
     - `database.py`: Manages SQLite database (`app.db`) for tasks, history, and settings.
     - `git_ops.py`: Git operations and file system tools.
     - `jules_api.py`: Manages integration with Jules API.
-    - `lsp_manager.py` & `lsp_registry.py`: Manages Language Server Protocol (LSP) processes for code intelligence.
+    - `lsp_manager.py` & `lsp_registry.py`: Manages Language Server Protocol (LSP) processes for code intelligence. Supports both local subprocess and TCP connections (e.g. for the isolated Kotlin LSP container).
     - `prompt_router.py`: Handles sticky persona logic and intent classification.
     - `rag_manager.py`: Handles RAG system and codebase indexing (uses ChromaDB).
     - `task_manager.py`: Handles task persistence (via SQLite).
