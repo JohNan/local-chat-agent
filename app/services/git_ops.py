@@ -167,7 +167,7 @@ def get_git_status() -> list[str]:
             if len(line) > 3:
                 # Format is usually ' M filepath' or '?? filepath'
                 # We can just take the whole line to show status and path,
-                # or just extract the path. The prompt says "list of modified, added, or deleted files".
+                # or just extract the path.
                 # Let's return the raw porcelain lines for the frontend to display.
                 files.append(line)
         return files
