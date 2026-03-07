@@ -66,7 +66,7 @@ class LSPServer:
             try:
                 self.sock.shutdown(socket.SHUT_RDWR)
                 self.sock.close()
-            except Exception: # pylint: disable=broad-exception-caught
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
 
     def _stderr_loop(self):
@@ -90,6 +90,7 @@ class LSPServer:
             except Exception:  # pylint: disable=broad-exception-caught
                 break
 
+    # pylint: disable=too-many-branches
     def _read_loop(self):
         """Reads JSON-RPC messages from stdout or socket."""
         try:
@@ -298,6 +299,7 @@ class LSPManager:
                 del self._servers[key]
         server.terminate()
 
+    # pylint: disable=too-many-locals
     def start_server(self, language: str, root_path: str) -> Optional[LSPServer]:
         """Starts or retrieves an existing LSP server."""
         root_path = self._get_normalized_path(root_path)
@@ -332,7 +334,9 @@ class LSPManager:
                         logger.error("TCP connection requires a port for %s", language)
                         return None
 
-                    logger.info("Connecting to LSP server for %s at %s:%s", language, host, port)
+                    logger.info(
+                        "Connecting to LSP server for %s at %s:%s", language, host, port
+                    )
 
                     # Try to connect with retries
                     sock = None
@@ -348,12 +352,16 @@ class LSPManager:
                             time.sleep(1)
 
                     if not connected:
-                        logger.error("Failed to connect to %s LSP at %s:%s", language, host, port)
+                        logger.error(
+                            "Failed to connect to %s LSP at %s:%s", language, host, port
+                        )
                         return None
 
-                    server = LSPServer(process=None, language=language, root_path=root_path, sock=sock)
+                    server = LSPServer(
+                        process=None, language=language, root_path=root_path, sock=sock
+                    )
 
-                else: # stdio
+                else:  # stdio
                     bin_name = config["bin"]
                     args = config.get("args", [])
                     cmd = [bin_name] + args
@@ -374,7 +382,9 @@ class LSPManager:
                         bufsize=0,
                     )
 
-                    server = LSPServer(process=process, language=language, root_path=root_path)
+                    server = LSPServer(
+                        process=process, language=language, root_path=root_path
+                    )
 
                 self._servers[key] = server
 
