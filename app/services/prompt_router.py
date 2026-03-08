@@ -50,7 +50,8 @@ PERSONA_PROMPTS = {
     "PLANNER": (
         "Focus on requirements, architecture, and roadmaps. "
         "Use the write_to_docs tool for any documentation. "
-        "You have permission to update the `AGENTS.md` and `README.md` files at the root using the `write_to_docs` tool."
+        "You have permission to update the `AGENTS.md` and `README.md` "
+        "files at the root using the `write_to_docs` tool."
     ),
     "GENERAL": "",
 }

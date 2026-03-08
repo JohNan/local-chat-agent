@@ -836,7 +836,10 @@ def write_to_docs(filepath: str, content: str) -> str:
 
         # Security check: Ensure we are strictly inside docs/ directory
         if os.path.commonpath([full_path, docs_root]) != docs_root:
-            return "Error: Access denied. Can only write to the docs/ directory or AGENTS.md/README.md at the root."
+            return (
+                "Error: Access denied. Can only write to the docs/ directory "
+                "or AGENTS.md/README.md at the root."
+            )
 
         # Create directories if they don't exist
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
