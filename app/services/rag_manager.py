@@ -9,11 +9,13 @@ import hashlib
 import chromadb
 from google import genai
 
+from app.services.git_ops import get_repo_info
+
 logger = logging.getLogger(__name__)
 
 # Constants
 CHROMA_DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
-COLLECTION_NAME = "codebase"
+COLLECTION_NAME = "company_codebase"
 # Try 004 first, fallback to 001 if needed.
 EMBEDDING_MODEL_PRIMARY = "gemini-embedding-001"
 EMBEDDING_MODEL_FALLBACK = "text-embedding-001"
@@ -23,12 +25,31 @@ class RAGManager:
     """Manages the vector store and embedding generation."""
 
     def __init__(self):
+        chroma_host = os.environ.get("CHROMA_HOST")
+        chroma_port = os.environ.get("CHROMA_PORT", "8000")
+
         try:
-            self.chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-            self.collection = self.chroma_client.get_or_create_collection(
-                name=COLLECTION_NAME
-            )
-            logger.info("ChromaDB initialized at %s", CHROMA_DB_PATH)
+            if chroma_host:
+                self.chroma_client = chromadb.HttpClient(
+                    host=chroma_host, port=chroma_port
+                )
+                logger.info(
+                    "ChromaDB initialized via HTTP Client at %s:%s",
+                    chroma_host,
+                    chroma_port,
+                )
+                self.collection = self.chroma_client.get_or_create_collection(
+                    name=COLLECTION_NAME
+                )
+                self._migrate_if_needed()
+            else:
+                self.chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+                logger.info(
+                    "ChromaDB initialized via Persistent Client at %s", CHROMA_DB_PATH
+                )
+                self.collection = self.chroma_client.get_or_create_collection(
+                    name=COLLECTION_NAME
+                )
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Failed to initialize ChromaDB: %s", e)
             self.chroma_client = None
@@ -44,6 +65,99 @@ class RAGManager:
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Failed to initialize Gemini Client: %s", e)
                 self.genai_client = None
+
+    def _migrate_if_needed(self):
+        """Migrates data from local PersistentClient to shared HttpClient if needed."""
+        # pylint: disable=too-many-locals, too-many-branches
+        if not os.path.exists(CHROMA_DB_PATH):
+            return
+
+        try:
+            repo_info = get_repo_info()
+            project_name = repo_info.get("project", "Unknown")
+
+            # Check if shared collection already has data for this repo
+            existing_shared_data = self.collection.get(
+                where={"repo": project_name}, limit=1
+            )
+            if existing_shared_data and existing_shared_data.get("ids"):
+                return  # Data already exists for this repo in shared DB
+
+            logger.info(
+                "Starting automatic migration from local ChromaDB to shared server..."
+            )
+            local_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+
+            # Since local DB used 'codebase', not 'company_codebase', we might need to handle both
+            # Let's check collections
+            collections = local_client.list_collections()
+            local_collection = None
+            for c in collections:
+                # The name could be 'codebase' or 'company_codebase'
+                if c.name in ("codebase", COLLECTION_NAME):
+                    local_collection = local_client.get_collection(c.name)
+                    break
+
+            if not local_collection:
+                logger.info("No local collection found to migrate.")
+                return
+
+            local_data = local_collection.get(
+                include=["metadatas", "documents", "embeddings"]
+            )
+            if not local_data or not local_data.get("ids"):
+                return
+
+            ids = local_data["ids"]
+            metadatas = local_data["metadatas"]
+            documents = local_data["documents"]
+            embeddings = local_data.get("embeddings")
+
+            new_metadatas = []
+            for meta in metadatas:
+                # Ensure the new enriched schema is present
+                new_meta = meta.copy() if meta else {}
+                new_meta["repo"] = project_name
+
+                filepath = new_meta.get("filepath", "unknown")
+                if "language" not in new_meta:
+                    _, ext = os.path.splitext(filepath)
+                    new_meta["language"] = ext[1:] if ext else "unknown"
+
+                if "start_line" not in new_meta:
+                    new_meta["start_line"] = 0
+                if "end_line" not in new_meta:
+                    new_meta["end_line"] = 0
+                if "entity_type" not in new_meta:
+                    new_meta["entity_type"] = "chunk"
+                if "last_modified" not in new_meta:
+                    try:
+                        new_meta["last_modified"] = os.path.getmtime(filepath)
+                    except Exception:  # pylint: disable=broad-exception-caught
+                        new_meta["last_modified"] = 0.0
+
+                new_metadatas.append(new_meta)
+
+            # Perform upsert in batches
+            batch_size = 100
+            for i in range(0, len(ids), batch_size):
+                upsert_kwargs = {
+                    "ids": ids[i : i + batch_size],
+                    "documents": documents[i : i + batch_size],
+                    "metadatas": new_metadatas[i : i + batch_size],
+                }
+                if embeddings:
+                    upsert_kwargs["embeddings"] = embeddings[i : i + batch_size]
+
+                self.collection.upsert(**upsert_kwargs)
+
+            logger.info(
+                "Successfully migrated %d chunks from local to shared ChromaDB.",
+                len(ids),
+            )
+
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error during ChromaDB migration: %s", e)
 
     def _calculate_hash(self, content: str) -> str:
         """Calculates MD5 hash of content."""
@@ -106,13 +220,29 @@ class RAGManager:
             if orphaned_ids:
                 pending_data["deletions"].extend(orphaned_ids)
 
-            for i, chunk in enumerate(chunks):
+            repo_info = get_repo_info()
+            project_name = repo_info.get("project", "Unknown")
+            _, ext = os.path.splitext(filepath)
+            language = ext[1:] if ext else "unknown"
+
+            try:
+                last_modified = os.path.getmtime(filepath)
+            except Exception:  # pylint: disable=broad-exception-caught
+                last_modified = 0.0
+
+            for i, (chunk, start_line, end_line) in enumerate(chunks):
                 chunk_id = f"{filepath}:{i}"
                 pending_data["ids"].append(chunk_id)
                 pending_data["documents"].append(chunk)
                 pending_data["metadatas"].append(
                     {
+                        "repo": project_name,
                         "filepath": filepath,
+                        "language": language,
+                        "start_line": start_line,
+                        "end_line": end_line,
+                        "entity_type": "chunk",
+                        "last_modified": last_modified,
                         "chunk_index": i,
                         "file_hash": file_hash,
                     }
@@ -241,8 +371,8 @@ class RAGManager:
 
     def _chunk_text(
         self, text: str, chunk_size: int = 2000, overlap: int = 200
-    ) -> list[str]:
-        """Splits text into chunks."""
+    ) -> list[tuple[str, int, int]]:
+        """Splits text into chunks, returning (chunk_text, start_line, end_line)."""
         if not text:
             return []
 
@@ -251,17 +381,25 @@ class RAGManager:
         text_len = len(text)
 
         if text_len <= chunk_size:
-            return [text]
+            start_line = 1
+            end_line = text.count("\n") + 1
+            return [(text, start_line, end_line)]
 
         while start < text_len:
             end = min(start + chunk_size, text_len)
-            chunks.append(text[start:end])
+            chunk = text[start:end]
+            start_line = text[:start].count("\n") + 1
+            end_line = start_line + chunk.count("\n")
+            chunks.append((chunk, start_line, end_line))
             start += chunk_size - overlap
 
         return chunks
 
-    def search_codebase_semantic(self, query: str, n_results: int = 5) -> str:
+    def search_codebase_semantic(
+        self, query: str, n_results: int = 5, filters: dict = None
+    ) -> str:
         """Retrieves relevant code snippets for a query."""
+        # pylint: disable=too-many-locals
         if not self.collection:
             return "Error: ChromaDB not initialized."
 
@@ -271,9 +409,11 @@ class RAGManager:
         embedding = embeddings[0]
 
         try:
-            results = self.collection.query(
-                query_embeddings=[embedding], n_results=n_results
-            )
+            query_kwargs = {"query_embeddings": [embedding], "n_results": n_results}
+            if filters:
+                query_kwargs["where"] = filters
+
+            results = self.collection.query(**query_kwargs)
 
             # Format results
             formatted_results = []
@@ -316,12 +456,13 @@ def index_codebase_task():
     return manager.index_codebase()
 
 
-def search_codebase_semantic(query: str):
+def search_codebase_semantic(query: str, filters: dict = None):
     """
     Searches the codebase using semantic vector embeddings.
     Use this tool to find relevant code snippets based on natural language queries,
     high-level concepts, or functionality descriptions (e.g., 'how does auth work',
     'user login logic').
+    Optionally accepts complex metadata filters using Chroma's syntax.
     """
     manager = get_rag_manager()
-    return manager.search_codebase_semantic(query)
+    return manager.search_codebase_semantic(query, filters=filters)
