@@ -14,8 +14,11 @@ services:
       # - CHAT_HISTORY_FILE=/config/chat_history.json
       # - JULES_TASKS_FILE=/config/tasks.json
       - SSH_AUTH_SOCK=/ssh-agent
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
     depends_on:
       - kotlin-lsp
+      - chromadb
 
   kotlin-lsp:
     build:
@@ -25,3 +28,10 @@ services:
       - "5005:5005"
     volumes:
       - ./:/codebase
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./shared_chroma_data:/chroma/chroma

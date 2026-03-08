@@ -68,8 +68,10 @@ def test_rag_manager_safe_delete(mock_chroma, mock_genai):
                 mock_file.read.return_value = "new_content"  # small content -> 1 chunk
                 mock_open.return_value.__enter__.return_value = mock_file
 
-                # Force _chunk_text to return 1 chunk
-                with patch.object(manager, "_chunk_text", return_value=["new_chunk"]):
+                # Force _chunk_text to return 1 chunk tuple
+                with patch.object(
+                    manager, "_chunk_text", return_value=[("new_chunk", 1, 1)]
+                ):
                     manager.index_codebase()
 
         # Check calls

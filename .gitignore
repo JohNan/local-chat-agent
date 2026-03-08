@@ -13,3 +13,5 @@ logs/
 *.log
 node_modules/
 chroma_db/
+
+shared_chroma_data/
