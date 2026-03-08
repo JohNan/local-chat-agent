@@ -802,17 +802,26 @@ def get_definition(file_path: str, line: int, col: int) -> dict:
 
 def write_to_docs(filepath: str, content: str) -> str:
     """
-    Writes content to a file, restricted strictly to the docs/ directory.
-    Automatically creates necessary subdirectories.
+    Writes content to a file, restricted strictly to the docs/ directory,
+    OR directly to AGENTS.md and README.md at the root directory.
+    Automatically creates necessary subdirectories for docs.
 
     Args:
-        filepath: The path of the file to write to, relative to CODEBASE_ROOT/docs.
+        filepath: The path of the file to write to, relative to CODEBASE_ROOT/docs,
+                  or simply "AGENTS.md" or "README.md" for root access.
         content: The text content to write.
 
     Returns:
         A success message or an error message.
     """
     try:
+        if filepath in ("AGENTS.md", "README.md"):
+            full_path = os.path.abspath(os.path.join(CODEBASE_ROOT, filepath))
+            # Write the file directly
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            return f"Successfully wrote to {filepath}"
+
         docs_root = os.path.abspath(os.path.join(CODEBASE_ROOT, "docs"))
 
         # If the user provides a path like "docs/plan.md", we strip the "docs/" prefix
@@ -827,7 +836,10 @@ def write_to_docs(filepath: str, content: str) -> str:
 
         # Security check: Ensure we are strictly inside docs/ directory
         if os.path.commonpath([full_path, docs_root]) != docs_root:
-            return "Error: Access denied. Can only write to the docs/ directory."
+            return (
+                "Error: Access denied. Can only write to the docs/ directory "
+                "or AGENTS.md/README.md at the root."
+            )
 
         # Create directories if they don't exist
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
