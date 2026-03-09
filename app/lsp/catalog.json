@@ -15,7 +15,7 @@
     "name": "kotlin",
     "connection": "tcp",
     "host": "kotlin-lsp",
-    "port": 5005,
+    "port": 5008,
     "root_uri_format": "file://{path}",
     "extensions": [".kt", ".kts"],
     "root_markers": ["build.gradle", "pom.xml", "settings.gradle"],

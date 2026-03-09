@@ -25,7 +25,7 @@ services:
       context: .
       dockerfile: Dockerfile.kotlin-lsp
     ports:
-      - "5005:5005"
+      - "5008:5008"
     volumes:
       - ./:/codebase
 
