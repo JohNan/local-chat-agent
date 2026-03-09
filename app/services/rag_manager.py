@@ -109,7 +109,11 @@ class RAGManager:
             local_data = local_collection.get(
                 include=["metadatas", "documents", "embeddings"]
             )
-            if not local_data or local_data.get("ids") is None or len(local_data.get("ids")) == 0:
+            if (
+                not local_data
+                or local_data.get("ids") is None
+                or len(local_data.get("ids")) == 0
+            ):
                 return
 
             ids = local_data["ids"]
