@@ -80,7 +80,11 @@ class RAGManager:
             existing_shared_data = self.collection.get(
                 where={"repo": project_name}, limit=1
             )
-            if existing_shared_data and existing_shared_data.get("ids"):
+            if (
+                existing_shared_data
+                and existing_shared_data.get("ids") is not None
+                and len(existing_shared_data.get("ids")) > 0
+            ):
                 return  # Data already exists for this repo in shared DB
 
             logger.info(
@@ -105,7 +109,7 @@ class RAGManager:
             local_data = local_collection.get(
                 include=["metadatas", "documents", "embeddings"]
             )
-            if not local_data or not local_data.get("ids"):
+            if not local_data or local_data.get("ids") is None or len(local_data.get("ids")) == 0:
                 return
 
             ids = local_data["ids"]
@@ -146,7 +150,7 @@ class RAGManager:
                     "documents": documents[i : i + batch_size],
                     "metadatas": new_metadatas[i : i + batch_size],
                 }
-                if embeddings:
+                if embeddings is not None and len(embeddings) > 0:
                     upsert_kwargs["embeddings"] = embeddings[i : i + batch_size]
 
                 self.collection.upsert(**upsert_kwargs)
