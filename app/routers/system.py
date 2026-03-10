@@ -69,6 +69,17 @@ async def rag_reindex():
     return {"status": "indexing started"}
 
 
+@router.post("/api/rag/clear_and_reindex")
+async def clear_and_reindex_rag():
+    """Clears the RAG index for the current repository and rebuilds it."""
+    logger.info("Clearing and rebuilding RAG index...")
+    rag_manager.clear_repo_index()
+
+    # Run re-indexing in background
+    asyncio.create_task(asyncio.to_thread(rag_manager.index_codebase_task))
+    return {"status": "Index cleared. Rebuilding in background..."}
+
+
 class SettingsRequest(BaseModel):
     """Request model for updating settings."""
 

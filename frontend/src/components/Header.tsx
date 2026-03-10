@@ -154,6 +154,17 @@ export const Header: React.FC<HeaderProps> = ({
         }
     };
 
+    const clearAndRebuildRag = async () => {
+        if (!window.confirm("Are you sure you want to clear and rebuild the RAG index for this repository?")) return;
+        try {
+            const res = await fetch('/api/rag/clear_and_reindex', { method: 'POST' });
+            const data = await res.json();
+            alert(data.status || data.error || "Unknown response");
+        } catch (e) {
+            alert("Error clearing and rebuilding RAG index: " + (e as Error).message);
+        }
+    };
+
     useEffect(() => {
         updateStatus();
     }, [isGenerating]);
@@ -298,6 +309,24 @@ export const Header: React.FC<HeaderProps> = ({
                                 <label htmlFor="web-search-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
                                     Enable Web Search
                                 </label>
+                            </div>
+
+                            <div className="setting-item">
+                                <button
+                                    onClick={clearAndRebuildRag}
+                                    className="icon-btn"
+                                    title="Clear & Rebuild RAG Index"
+                                    style={{
+                                        border: '1px solid #454545',
+                                        width: '100%',
+                                        justifyContent: 'center',
+                                        gap: '10px',
+                                        padding: '8px'
+                                    }}
+                                >
+                                    <Server size={20} />
+                                    <span>Clear & Rebuild RAG Index</span>
+                                </button>
                             </div>
 
                             <div className="setting-actions" style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
