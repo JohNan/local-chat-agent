@@ -403,6 +403,24 @@ class RAGManager:
 
         return chunks
 
+    def clear_repo_index(self):
+        """Clears the RAG index for the current repository."""
+        if not self.collection:
+            logger.error("Cannot clear index: ChromaDB not initialized")
+            return {"status": "error", "message": "ChromaDB not initialized"}
+
+        try:
+            repo_info = get_repo_info()
+            project_name = repo_info.get("project", "Unknown")
+
+            logger.info("Clearing RAG index for project: %s", project_name)
+            self.collection.delete(where={"repo": project_name})
+
+            return {"status": "success", "message": f"Index cleared for {project_name}"}
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error clearing repo index: %s", e)
+            return {"status": "error", "message": str(e)}
+
     def search_codebase_semantic(
         self, query: str, n_results: int = 5, filters: dict = None
     ) -> str:
@@ -462,6 +480,12 @@ def index_codebase_task():
     """Wrapper for async task."""
     manager = get_rag_manager()
     return manager.index_codebase()
+
+
+def clear_repo_index():
+    """Wrapper for clearing the repo index."""
+    manager = get_rag_manager()
+    return manager.clear_repo_index()
 
 
 def search_codebase_semantic(query: str, filters: dict = None):
