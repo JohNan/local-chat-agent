@@ -31,6 +31,7 @@ class GitPushRequest(BaseModel):
 
     branch_name: str
     commit_message: str
+    switch_back: bool = True
 
 
 @router.get("/api/git_status")
@@ -44,7 +45,10 @@ def api_git_status():
 async def api_git_push(request: GitPushRequest):
     """Performs a git push."""
     result = await asyncio.to_thread(
-        git_ops.perform_git_push, request.branch_name, request.commit_message
+        git_ops.perform_git_push,
+        request.branch_name,
+        request.commit_message,
+        request.switch_back,
     )
     return result
 
