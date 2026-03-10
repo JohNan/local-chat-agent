@@ -238,6 +238,8 @@ class RAGManager:
             except Exception:  # pylint: disable=broad-exception-caught
                 last_modified = 0.0
 
+            module = filepath.split(os.sep)[0] if os.sep in filepath else "root"
+
             for i, (chunk, start_line, end_line) in enumerate(chunks):
                 chunk_id = f"{filepath}:{i}"
                 pending_data["ids"].append(chunk_id)
@@ -253,6 +255,7 @@ class RAGManager:
                         "last_modified": last_modified,
                         "chunk_index": i,
                         "file_hash": file_hash,
+                        "module": module,
                     }
                 )
 
@@ -290,6 +293,10 @@ class RAGManager:
             "__pycache__",
             "chroma_db",
             "site-packages",
+            "build",
+            "dist",
+            ".gradle",
+            "out",
         }
 
         pending_data = {
@@ -306,6 +313,11 @@ class RAGManager:
                 continue
 
             for file in files:
+                if file.endswith(".min.js") or file.endswith(".bundle.js"):
+                    continue
+                if file in ("package-lock.json", "yarn.lock"):
+                    continue
+
                 if not any(file.endswith(ext) for ext in valid_extensions):
                     continue
 
