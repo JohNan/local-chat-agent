@@ -179,12 +179,18 @@ def get_git_status() -> list[str]:
         return []
 
 
-def perform_git_push(branch_name: str, commit_message: str) -> dict:
+def perform_git_push(
+    branch_name: str, commit_message: str, switch_back: bool = True
+) -> dict:
     """
     Executes git checkout -b, git add ., git commit -m, and git push.
+    Optionally switches back to original branch.
     """
     logger.info("Starting git push to branch %s...", branch_name)
     try:
+        # Capture the original active branch
+        original_branch = _get_current_branch()
+
         # Check if branch exists
         branch_exists = False
         try:
@@ -239,6 +245,14 @@ def perform_git_push(branch_name: str, commit_message: str) -> dict:
         output = result.stdout
         if result.stderr:
             output += "\n" + result.stderr
+
+        if switch_back and original_branch != branch_name:
+            subprocess.run(
+                ["git", "checkout", original_branch],
+                cwd=CODEBASE_ROOT,
+                check=True,
+                capture_output=True,
+            )
 
         return {"success": True, "output": output}
     except subprocess.CalledProcessError as e:

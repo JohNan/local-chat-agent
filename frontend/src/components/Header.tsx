@@ -29,6 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
     const [pushBranchName, setPushBranchName] = useState("");
     const [pushCommitMessage, setPushCommitMessage] = useState("");
     const [pushing, setPushing] = useState(false);
+    const [switchBack, setSwitchBack] = useState(true);
 
     const [availableModels, setAvailableModels] = useState<string[]>([
         "gemini-3-pro-preview",
@@ -95,7 +96,8 @@ export const Header: React.FC<HeaderProps> = ({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     branch_name: pushBranchName,
-                    commit_message: pushCommitMessage
+                    commit_message: pushCommitMessage,
+                    switch_back: switchBack
                 })
             });
             const data = await res.json();
@@ -426,6 +428,19 @@ export const Header: React.FC<HeaderProps> = ({
                                     disabled={pushing}
                                     style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--chat-bg)', color: 'var(--text-color)' }}
                                 />
+                            </div>
+                            <div className="setting-item" style={{ flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    id="switch-back-checkbox"
+                                    checked={switchBack}
+                                    onChange={(e) => setSwitchBack(e.target.checked)}
+                                    disabled={pushing}
+                                    style={{ width: 'auto' }}
+                                />
+                                <label htmlFor="switch-back-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
+                                    Switch back to previous branch after push
+                                </label>
                             </div>
                             <div className="setting-actions" style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                                 <button
