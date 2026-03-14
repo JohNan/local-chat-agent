@@ -22,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [loading, setLoading] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
-    const [showPersonaName, setShowPersonaName] = useState(false);
+    const [showAgentInfo, setShowAgentInfo] = useState(false);
 
     const [showPushModal, setShowPushModal] = useState(false);
     const [pushFiles, setPushFiles] = useState<string[]>([]);
@@ -185,41 +185,44 @@ export const Header: React.FC<HeaderProps> = ({
     return (
         <>
             <div className="header">
-                <div className="header-title">
+                <div className="header-title" onClick={() => setShowAgentInfo(!showAgentInfo)} style={{ cursor: 'pointer', position: 'relative' }}>
                     <Bot size={24} className={isGenerating ? "animate-pulse" : ""} color={isGenerating ? "#4caf50" : "currentColor"} />
                     <span>Gemini Agent</span>
                     <div
                         title={status?.active_persona || "General"}
-                        onClick={() => setShowPersonaName(!showPersonaName)}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
                             marginLeft: '10px',
                             cursor: 'pointer',
-                            position: 'relative'
                         }}
                     >
                         {getPersonaIcon(status?.active_persona)}
-                        {showPersonaName && (
-                            <div style={{
-                                position: 'absolute',
-                                top: '120%',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                backgroundColor: 'var(--chat-bg)',
-                                border: '1px solid var(--border-color)',
-                                padding: '5px 10px',
-                                borderRadius: '4px',
-                                zIndex: 1000,
-                                whiteSpace: 'nowrap',
-                                boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
-                                color: 'var(--text-color)',
-                                fontSize: '0.8rem'
-                            }}>
-                                {status?.active_persona || "General"}
-                            </div>
-                        )}
                     </div>
+                    {showAgentInfo && (
+                        <div className="agent-info-popover" onClick={(e) => e.stopPropagation()}>
+                            <div className="agent-info-item">
+                                <span className="agent-info-label">Model:</span>
+                                <span className="agent-info-value">{model}</span>
+                            </div>
+                            <div className="agent-info-item">
+                                <span className="agent-info-label">Project:</span>
+                                <span className="agent-info-value">{status?.project || 'N/A'}</span>
+                            </div>
+                            <div className="agent-info-item">
+                                <span className="agent-info-label">Branch:</span>
+                                <span className="agent-info-value">{status?.branch || 'N/A'}</span>
+                            </div>
+                            <div className="agent-info-item">
+                                <span className="agent-info-label">Persona:</span>
+                                <span className="agent-info-value">{status?.active_persona || 'General'}</span>
+                            </div>
+                            <div className="agent-info-item">
+                                <span className="agent-info-label">Context Size:</span>
+                                <span className="agent-info-value">{status?.token_count != null ? `${status.token_count.toLocaleString()} tokens` : 'Loading...'}</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
                 <div className="header-controls">
                     <button onClick={onToggleTasks} className="icon-btn" title="Tasks">

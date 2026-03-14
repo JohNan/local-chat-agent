@@ -25,6 +25,7 @@ export interface RepoStatus {
     branch: string;
     active_persona?: string;
     lsp_servers?: LSPServerInfo[];
+    token_count?: number;
 }
 
 export interface LSPServerInfo {
