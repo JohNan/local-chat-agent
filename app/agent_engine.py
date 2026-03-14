@@ -324,7 +324,13 @@ async def _run_loop(
         )
 
         if turn == 50:
-            final_answer = "I've reached the maximum number of steps (50) for this turn. I've performed several actions, which you can see in the reasoning trace below. Would you like me to continue where I left off?"
+            # pylint: disable=line-too-long
+            final_answer = (
+                "I've reached the maximum number of steps (50) for this turn. "
+                "I've performed several actions, which you can see in the reasoning trace below. "
+                "Would you like me to continue where I left off?"
+            )
+            # pylint: enable=line-too-long
             await task_state.broadcast(
                 f"event: message\ndata: {json.dumps(final_answer)}\n\n"
             )
