@@ -325,7 +325,9 @@ async def _run_loop(
 
         if turn == 50:
             final_answer = "I've reached the maximum number of steps (50) for this turn. I've performed several actions, which you can see in the reasoning trace below. Would you like me to continue where I left off?"
-            await task_state.broadcast(f"event: message\ndata: {json.dumps(final_answer)}\n\n")
+            await task_state.broadcast(
+                f"event: message\ndata: {json.dumps(final_answer)}\n\n"
+            )
 
     return tool_usage_counts, reasoning_trace, final_answer
 

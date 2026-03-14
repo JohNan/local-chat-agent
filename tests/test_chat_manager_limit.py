@@ -89,13 +89,13 @@ def test_load_history_explicit_none(clean_db):
     Test explicit limit=None to load all messages.
     """
     now = datetime.now(timezone.utc)
-    # Insert 30 messages
-    for i in range(30):
+    # Insert 60 messages
+    for i in range(60):
         ts = (now + timedelta(seconds=i)).isoformat()
         insert_message(clean_db, "user", f"Message {i}", ts)
 
     # Call with limit=None, should be unlimited
     history = chat_manager.load_chat_history(limit=None)
-    assert len(history) == 30
+    assert len(history) == 60
     assert history[0]["parts"][0]["text"] == "Message 0"
-    assert history[-1]["parts"][0]["text"] == "Message 29"
+    assert history[-1]["parts"][0]["text"] == "Message 59"
