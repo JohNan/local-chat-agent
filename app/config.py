@@ -19,7 +19,7 @@ ENABLE_GOOGLE_SEARCH = os.environ.get("ENABLE_GOOGLE_SEARCH", "false").lower() i
 )
 
 # Application Constants
-HISTORY_LIMIT = 20
+HISTORY_LIMIT = 50
 DEFAULT_MODEL = "gemini-3-pro-preview"
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "5000"))
