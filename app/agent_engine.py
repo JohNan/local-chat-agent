@@ -297,7 +297,7 @@ async def _run_loop(
     reasoning_trace = []
     final_answer = ""
 
-    while turn < 30:
+    while turn < 50:
         turn += 1
         logger.debug("[TURN %d] Sending message to SDK", turn)
 
@@ -322,6 +322,10 @@ async def _run_loop(
         current_msg = await _execute_turn_tools(
             tool_calls, turn, task_state, tool_usage_counts
         )
+
+        if turn == 50:
+            final_answer = "I've reached the maximum number of steps (50) for this turn. I've performed several actions, which you can see in the reasoning trace below. Would you like me to continue where I left off?"
+            await task_state.broadcast(f"event: message\ndata: {json.dumps(final_answer)}\n\n")
 
     return tool_usage_counts, reasoning_trace, final_answer
 
