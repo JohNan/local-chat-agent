@@ -68,20 +68,20 @@ def test_load_history_small_count(clean_db):
 
 def test_load_history_default_limit_large(clean_db):
     """
-    Test that default load_chat_history uses the limit (HISTORY_LIMIT=20).
+    Test that default load_chat_history uses the limit (HISTORY_LIMIT=50).
     """
     now = datetime.now(timezone.utc)
-    # Insert 30 messages
-    for i in range(30):
+    # Insert 60 messages
+    for i in range(60):
         ts = (now + timedelta(seconds=i)).isoformat()
         insert_message(clean_db, "user", f"Message {i}", ts)
 
-    # Call without arguments, should be limited to 20
+    # Call without arguments, should be limited to 50
     history = chat_manager.load_chat_history()
-    assert len(history) == 20
-    # Should be the last 20 messages (10 to 29)
+    assert len(history) == 50
+    # Should be the last 50 messages (10 to 59)
     assert history[0]["parts"][0]["text"] == "Message 10"
-    assert history[-1]["parts"][0]["text"] == "Message 29"
+    assert history[-1]["parts"][0]["text"] == "Message 59"
 
 
 def test_load_history_explicit_none(clean_db):
@@ -89,13 +89,13 @@ def test_load_history_explicit_none(clean_db):
     Test explicit limit=None to load all messages.
     """
     now = datetime.now(timezone.utc)
-    # Insert 30 messages
-    for i in range(30):
+    # Insert 60 messages
+    for i in range(60):
         ts = (now + timedelta(seconds=i)).isoformat()
         insert_message(clean_db, "user", f"Message {i}", ts)
 
     # Call with limit=None, should be unlimited
     history = chat_manager.load_chat_history(limit=None)
-    assert len(history) == 30
+    assert len(history) == 60
     assert history[0]["parts"][0]["text"] == "Message 0"
-    assert history[-1]["parts"][0]["text"] == "Message 29"
+    assert history[-1]["parts"][0]["text"] == "Message 59"
