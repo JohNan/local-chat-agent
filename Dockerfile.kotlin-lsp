@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install Kotlin Language Server
 # Note: It comes with a bundled JRE, so no system OpenJDK is needed.
-RUN wget -q https://download-cdn.jetbrains.com/kotlin-lsp/261.13587.0/kotlin-lsp-261.13587.0-linux-x64.zip -O /tmp/kotlin-lsp.zip \
+RUN wget -q https://download-cdn.jetbrains.com/kotlin-lsp/262.1817.0/kotlin-lsp-262.1817.0-linux-x64.zip -O /tmp/kotlin-lsp.zip \
     && unzip /tmp/kotlin-lsp.zip -d /opt/kotlin-lsp \
     && chmod +x /opt/kotlin-lsp/kotlin-lsp.sh \
     && ln -s /opt/kotlin-lsp/kotlin-lsp.sh /usr/local/bin/kotlin-lsp \
