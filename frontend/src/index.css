@@ -38,6 +38,37 @@ body {
     align-items: center;
     gap: 10px;
 }
+
+.agent-info-popover {
+    position: absolute;
+    top: 120%;
+    left: 0;
+    background-color: var(--chat-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 250px;
+}
+
+.agent-info-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+}
+
+.agent-info-label {
+    color: #aaa;
+}
+
+.agent-info-value {
+    color: var(--text-color);
+    font-weight: normal;
+}
 .header-controls {
     display: flex;
     align-items: center;

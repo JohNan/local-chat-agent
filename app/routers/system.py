@@ -7,9 +7,10 @@ import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from google.genai import types
 
 from app.config import CLIENT, DEFAULT_MODEL
-from app.services import git_ops, rag_manager, prompt_router, chat_manager
+from app.services import git_ops, rag_manager, prompt_router, chat_manager, llm_service
 from app.services.lsp_manager import LSPManager
 
 logger = logging.getLogger(__name__)
@@ -19,10 +20,33 @@ router = APIRouter()
 
 @router.get("/api/status")
 def api_status():
-    """Returns repository status."""
+    """Returns repository status including token count."""
     info = git_ops.get_repo_info()
     info["active_persona"] = prompt_router.load_active_persona()
     info["lsp_servers"] = LSPManager().get_active_servers()
+
+    # Calculate token count
+    try:
+        if CLIENT:
+            history = chat_manager.load_chat_history()
+            formatted_history = llm_service.format_history(history, include_last=True)
+            active_persona = info["active_persona"]
+            system_instruction = prompt_router.get_system_instruction(active_persona)
+
+            model = chat_manager.get_setting("default_model", DEFAULT_MODEL)
+            config = types.CountTokensConfig(system_instruction=system_instruction)
+            response = CLIENT.models.count_tokens(
+                model=model,
+                contents=formatted_history,
+                config=config,
+            )
+            info["token_count"] = response.total_tokens
+        else:
+            info["token_count"] = None
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Failed to count tokens: %s", e)
+        info["token_count"] = None
+
     return info
 
 

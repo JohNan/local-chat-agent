@@ -102,7 +102,9 @@ def prepare_messages(user_msg, media):
     return storage_parts, gemini_msg
 
 
-def format_history(history):
+def format_history(
+    history, include_last: bool = False
+):  # pylint: disable=too-many-branches
     """Formats chat history for Gemini API, ensuring valid roles."""
     # Find last system message index
     start_index = 0
@@ -116,7 +118,11 @@ def format_history(history):
     formatted_history = []
     # We need to exclude the very last message (current user msg)
     # when initializing history, because send_message(user_msg) will add it again.
-    history_for_gemini = history_subset[:-1] if history_subset else []
+    # If include_last is True, we keep it (useful for counting tokens of the entire history).
+    if include_last:
+        history_for_gemini = history_subset
+    else:
+        history_for_gemini = history_subset[:-1] if history_subset else []
 
     for h in history_for_gemini:
         role = h["role"]
