@@ -34,9 +34,7 @@ def api_status():
             system_instruction = prompt_router.get_system_instruction(active_persona)
 
             model = chat_manager.get_setting("default_model", DEFAULT_MODEL)
-            config = types.CountTokensConfig(
-                system_instruction=system_instruction
-            )
+            config = types.CountTokensConfig(system_instruction=system_instruction)
             response = CLIENT.models.count_tokens(
                 model=model,
                 contents=formatted_history,
