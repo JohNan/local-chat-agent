@@ -25,4 +25,4 @@ RUN wget -q https://download-cdn.jetbrains.com/kotlin-lsp/262.1817.0/kotlin-lsp-
 EXPOSE 5008
 
 # Use socat to bridge the TCP port to the Kotlin LSP binary's stdin/stdout
-CMD ["sh", "-c", "while true; do socat -d -d TCP4-LISTEN:5008,reuseaddr EXEC:'/opt/kotlin-lsp/kotlin-lsp.sh',sigint,sigterm; done"]
+CMD ["sh", "-c", "while true; do socat -d -d TCP4-LISTEN:5008,reuseaddr EXEC:'/opt/kotlin-lsp/kotlin-lsp.sh',sigint; done"]
