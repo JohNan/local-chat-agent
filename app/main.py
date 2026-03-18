@@ -16,7 +16,7 @@ from google.genai import types
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from app.config import get_mcp_servers, HOST, PORT
+from app.config import get_mcp_servers, HOST, PORT, CORS_ALLOWED_ORIGINS
 from app.services import rag_manager, llm_service
 from app.services.database import DatabaseManager
 from app.services.git_ops import CODEBASE_ROOT
@@ -105,7 +105,7 @@ app = FastAPI(lifespan=lifespan)
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
