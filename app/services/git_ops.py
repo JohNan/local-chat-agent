@@ -748,7 +748,7 @@ def _validate_definition_target(target_path: str) -> None:
         raise ValueError("Access denied. Definition is outside of codebase.") from e
 
 
-def get_definition(file_path: str, line: int, col: int) -> dict:
+async def get_definition(file_path: str, line: int, col: int) -> dict:
     """
     Finds the definition of a symbol using the Language Server Protocol (LSP).
     This tool uses a robust language server to precisely locate definitions,
@@ -769,7 +769,7 @@ def get_definition(file_path: str, line: int, col: int) -> dict:
         return {"error": str(e)}
 
     manager = LSPManager()
-    result = manager.get_definition(full_path, line, col)
+    result = await manager.get_definition(full_path, line, col)
 
     if "error" in result:
         return result

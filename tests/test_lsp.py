@@ -56,9 +56,10 @@ def mock_lsp_manager():
     return LSPManager()
 
 
+@pytest.mark.asyncio
 @patch("subprocess.Popen")
 @patch("app.services.lsp_manager.LSPRegistry")
-def test_lsp_manager_start_server(MockRegistry, MockPopen, mock_lsp_manager):
+async def test_lsp_manager_start_server(MockRegistry, MockPopen, mock_lsp_manager):
     # Setup Registry Mock
     registry_instance = MagicMock()
     registry_instance._config = {"python": {"bin": "pylsp", "args": []}}
@@ -92,7 +93,7 @@ def test_lsp_manager_start_server(MockRegistry, MockPopen, mock_lsp_manager):
 
             mock_thread.side_effect = FakeThread
 
-            server = mock_lsp_manager.start_server("python", "/root")
+            server = await mock_lsp_manager.start_server("python", "/root")
 
             assert server is not None
             assert MockPopen.called
@@ -105,9 +106,10 @@ def test_lsp_manager_start_server(MockRegistry, MockPopen, mock_lsp_manager):
             assert kwargs["timeout"] == 300.0
 
 
+@pytest.mark.asyncio
 @patch("app.services.git_ops.LSPManager")
 @patch("app.services.git_ops.read_file")
-def test_git_ops_get_definition(mock_read_file, MockLSPManager):
+async def test_git_ops_get_definition(mock_read_file, MockLSPManager):
     manager_instance = MagicMock()
     MockLSPManager.return_value = manager_instance
 
@@ -122,7 +124,11 @@ def test_git_ops_get_definition(mock_read_file, MockLSPManager):
             }
         ]
     }
-    manager_instance.get_definition.return_value = mock_result
+
+    async def mock_get_definition(*args, **kwargs):
+        return mock_result
+
+    manager_instance.get_definition.side_effect = mock_get_definition
     mock_read_file.return_value = "def my_func():\n    pass"
 
     # We also need to mock os.path.relpath behavior since CODEBASE_ROOT is used
@@ -130,7 +136,7 @@ def test_git_ops_get_definition(mock_read_file, MockLSPManager):
     # Assuming test env has reasonable path handling.
 
     with patch("os.path.relpath", return_value="test.py"):
-        result = git_ops.get_definition("main.py", 1, 1)
+        result = await git_ops.get_definition("main.py", 1, 1)
 
     assert result["file"] == "test.py"
     assert result["line"] == 11  # 10 + 1
