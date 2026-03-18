@@ -47,9 +47,7 @@ async def lifespan(_app: FastAPI):
 
     # Initialize LSP Servers
     logger.info("Initializing LSP servers...")
-    asyncio.create_task(
-        asyncio.to_thread(LSPManager().start_supported_servers, CODEBASE_ROOT)
-    )
+    asyncio.create_task(LSPManager().start_supported_servers(CODEBASE_ROOT))
 
     # Initialize MCP Clients
     async with AsyncExitStack() as stack:

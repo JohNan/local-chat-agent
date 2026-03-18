@@ -92,13 +92,15 @@ def _extract_error_message(error_text: str) -> str:
 
 async def _execute_tool(fc):
     """
-    Executes a single tool call safely in a thread.
+    Executes a single tool call safely.
     Returns the result.
     """
     logger.info("Executing tool: %s args=%s", fc.name, fc.args)
     tool_func = TOOL_MAP.get(fc.name)
     if tool_func:
         try:
+            if asyncio.iscoroutinefunction(tool_func):
+                return await tool_func(**fc.args)
             # Tools are synchronous and blocking (e.g. file I/O).
             # Run them in a thread.
             return await asyncio.to_thread(tool_func, **fc.args)
