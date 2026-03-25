@@ -58,6 +58,9 @@ def get_tool_config(client, enable_search):
         types.FunctionDeclaration.from_callable(
             client=client, callable=web_ops.fetch_url
         ),
+        types.FunctionDeclaration.from_callable(
+            client=client, callable=git_ops.write_to_docs
+        ),
     ]
 
     # Append MCP tools
