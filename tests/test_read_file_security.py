@@ -89,7 +89,7 @@ async def test_get_definition_external_target(mock_codebase, mocker):
     filepath = "some_file.py"
 
     # Create dummy file inside codebase so input validation passes
-    with open(os.path.join(mock_codebase, filepath), "w") as f:
+    with open(os.path.join(mock_codebase, filepath), "w", encoding="utf-8") as f:
         f.write("content")
 
     # Mock LSPManager to return a definition outside codebase
@@ -100,7 +100,9 @@ async def test_get_definition_external_target(mock_codebase, mocker):
 
     async def mock_get_definition(*args, **kwargs):
         return {
-            "result": [{"uri": f"file://{external_path}", "range": {"start": {"line": 0}}}]
+            "result": [
+                {"uri": f"file://{external_path}", "range": {"start": {"line": 0}}}
+            ]
         }
 
     mock_lsp_instance.get_definition.side_effect = mock_get_definition

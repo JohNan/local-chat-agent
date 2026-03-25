@@ -2,9 +2,12 @@
 Test for LSP boot logic.
 """
 
+import os
 import unittest
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 from app.services.lsp_manager import LSPManager
 
 
@@ -12,6 +15,7 @@ class TestLSPBoot(unittest.IsolatedAsyncioTestCase):
     """Tests for LSP boot logic."""
 
     async def asyncSetUp(self):
+        """Reset singleton before each test."""
         # Reset singleton
         # pylint: disable=protected-access
         LSPManager._instance = None
@@ -25,7 +29,6 @@ class TestLSPBoot(unittest.IsolatedAsyncioTestCase):
         self, mock_start_server, mock_walk, mock_registry_cls
     ):
         """Tests that start_supported_servers correctly identifies and starts servers."""
-        import os
 
         # Setup Registry Mock
         mock_registry = mock_registry_cls.return_value
@@ -48,8 +51,10 @@ class TestLSPBoot(unittest.IsolatedAsyncioTestCase):
 
         manager = LSPManager()
 
-        async def mock_start_server_func(*args, **kwargs):
+        async def mock_start_server_func(*_args, **_kwargs):
+            """Mock start_server function."""
             return None
+
         mock_start_server.side_effect = mock_start_server_func
 
         await manager.start_supported_servers(".")

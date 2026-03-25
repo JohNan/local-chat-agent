@@ -448,7 +448,9 @@ class LSPManager:
                 )
                 await self.start_server(language, root_path)
 
-    async def get_definition(self, file_path: str, line: int, col: int) -> Dict[str, Any]:
+    async def get_definition(
+        self, file_path: str, line: int, col: int
+    ) -> Dict[str, Any]:
         """
         Finds the definition of the symbol at the given location.
         line and col are 1-based.

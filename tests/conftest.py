@@ -57,4 +57,5 @@ def mock_lifespan_components(mocker):
 
     async def mock_start_supported_servers(*args, **kwargs):
         return None
+
     mock_instance.start_supported_servers.side_effect = mock_start_supported_servers

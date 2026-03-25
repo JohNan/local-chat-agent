@@ -1,4 +1,3 @@
-
 import time
 import threading
 import socket
@@ -6,21 +5,22 @@ from unittest.mock import MagicMock, patch
 from app.services.lsp_manager import LSPManager
 from app.services.lsp_registry import LSPRegistry
 
+
 def benchmark_blocking():
     # 1. Setup Mock Registry
     mock_config = {
         "lang1": {
             "connection": "tcp",
             "host": "localhost",
-            "port": 12345, # No server listening here
-            "timeout": 10.0
+            "port": 12345,  # No server listening here
+            "timeout": 10.0,
         },
         "lang2": {
             "connection": "tcp",
             "host": "localhost",
-            "port": 12346, # No server listening here
-            "timeout": 10.0
-        }
+            "port": 12346,  # No server listening here
+            "timeout": 10.0,
+        },
     }
 
     manager = LSPManager()
@@ -28,6 +28,7 @@ def benchmark_blocking():
     LSPManager._servers = {}
 
     with patch.object(LSPRegistry, "_config", mock_config):
+
         def start_lang(lang, results):
             start_time = time.time()
             print(f"[{lang}] Starting at {start_time}")
@@ -43,7 +44,7 @@ def benchmark_blocking():
 
         total_start = time.time()
         t1.start()
-        time.sleep(0.1) # Ensure t1 starts first
+        time.sleep(0.1)  # Ensure t1 starts first
         t2.start()
 
         t1.join()
@@ -59,6 +60,7 @@ def benchmark_blocking():
         # and Total time should be Lang 1 duration + Lang 2 duration (roughly)
         # If it's non-blocking, Lang 2 should take roughly 5s (retry loop)
         # and Total time should be roughly 5s.
+
 
 if __name__ == "__main__":
     benchmark_blocking()
