@@ -39,10 +39,16 @@ async def api_status():
                 chat_manager.get_setting, "default_model", DEFAULT_MODEL
             )
             config = types.CountTokensConfig(system_instruction=system_instruction)
+            if system_instruction:
+                formatted_history.insert(
+                    0,
+                    types.Content(
+                        role="user", parts=[types.Part(text=system_instruction)]
+                    ),
+                )
             response = CLIENT.models.count_tokens(
                 model=model,
                 contents=formatted_history,
-                config=config,
             )
             info["token_count"] = response.total_tokens
         else:
