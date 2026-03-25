@@ -7,6 +7,7 @@ import json
 import os
 import logging
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from app.config import CLIENT
 
@@ -59,6 +60,7 @@ PERSONA_PROMPTS = {
 PERSONA_FILE = "storage/persona_state.json"
 
 
+@lru_cache(maxsize=1)
 def load_active_persona() -> str | None:
     """Reads the saved persona key."""
     if not os.path.exists(PERSONA_FILE):
@@ -78,6 +80,7 @@ def save_active_persona(key: str):
         os.makedirs(os.path.dirname(PERSONA_FILE), exist_ok=True)
         with open(PERSONA_FILE, "w", encoding="utf-8") as f:
             json.dump({"active_persona": key}, f)
+        load_active_persona.cache_clear()
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Failed to save active persona: %s", e)
 
@@ -87,6 +90,7 @@ def clear_active_persona():
     if os.path.exists(PERSONA_FILE):
         try:
             os.remove(PERSONA_FILE)
+            load_active_persona.cache_clear()
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Failed to clear active persona: %s", e)
 
