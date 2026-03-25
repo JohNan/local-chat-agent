@@ -38,7 +38,6 @@ async def api_status():
             model = await asyncio.to_thread(
                 chat_manager.get_setting, "default_model", DEFAULT_MODEL
             )
-            config = types.CountTokensConfig(system_instruction=system_instruction)
             if system_instruction:
                 formatted_history.insert(
                     0,
