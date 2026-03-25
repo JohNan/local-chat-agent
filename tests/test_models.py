@@ -5,8 +5,6 @@ Unit tests for the /api/models endpoint.
 import sys
 import os
 from unittest.mock import MagicMock
-import pytest
-from fastapi.testclient import TestClient
 
 # Ensure we can import app from the root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
