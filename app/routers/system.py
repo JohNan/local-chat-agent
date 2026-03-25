@@ -33,12 +33,18 @@ def api_status():
             active_persona = info["active_persona"]
             system_instruction = prompt_router.get_system_instruction(active_persona)
 
+            if system_instruction:
+                formatted_history.insert(
+                    0,
+                    types.Content(
+                        role="user", parts=[types.Part(text=system_instruction)]
+                    ),
+                )
+
             model = chat_manager.get_setting("default_model", DEFAULT_MODEL)
-            config = types.CountTokensConfig(system_instruction=system_instruction)
             response = CLIENT.models.count_tokens(
                 model=model,
                 contents=formatted_history,
-                config=config,
             )
             info["token_count"] = response.total_tokens
         else:
