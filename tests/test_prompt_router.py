@@ -15,6 +15,7 @@ from app.services.prompt_router import (
 
 def test_load_active_persona_file_not_found():
     """Test that load_active_persona returns None when the file does not exist."""
+    load_active_persona.cache_clear()
     with patch(
         "app.services.prompt_router.os.path.exists", return_value=False
     ) as mock_exists:
@@ -24,6 +25,7 @@ def test_load_active_persona_file_not_found():
 
 def test_load_active_persona_success():
     """Test that load_active_persona returns the persona when the file exists and is valid."""
+    load_active_persona.cache_clear()
     mock_data = json.dumps({"active_persona": "UI"})
     with patch(
         "app.services.prompt_router.os.path.exists", return_value=True
@@ -36,6 +38,7 @@ def test_load_active_persona_success():
 
 def test_load_active_persona_invalid_json():
     """Test that load_active_persona returns None when the file contains invalid JSON."""
+    load_active_persona.cache_clear()
     with patch("app.services.prompt_router.os.path.exists", return_value=True):
         with patch("builtins.open", mock_open(read_data="invalid json")):
             assert load_active_persona() is None
@@ -43,6 +46,7 @@ def test_load_active_persona_invalid_json():
 
 def test_load_active_persona_io_error():
     """Test that load_active_persona returns None when an IOError occurs."""
+    load_active_persona.cache_clear()
     with patch("app.services.prompt_router.os.path.exists", return_value=True):
         with patch("builtins.open", side_effect=IOError("Mocked IO Error")):
             assert load_active_persona() is None
