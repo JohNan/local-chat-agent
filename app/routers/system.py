@@ -19,20 +19,25 @@ router = APIRouter()
 
 
 @router.get("/api/status")
-def api_status():
+async def api_status():
     """Returns repository status including token count."""
-    info = git_ops.get_repo_info()
-    info["active_persona"] = prompt_router.load_active_persona()
+    info = await asyncio.to_thread(git_ops.get_repo_info)
+    info["active_persona"] = await asyncio.to_thread(prompt_router.load_active_persona)
     info["lsp_servers"] = LSPManager().get_active_servers()
 
     # Calculate token count
     try:
         if CLIENT:
-            history = chat_manager.load_chat_history()
-            formatted_history = llm_service.format_history(history, include_last=True)
+            history = await asyncio.to_thread(chat_manager.load_chat_history)
+            formatted_history = await asyncio.to_thread(
+                llm_service.format_history, history, include_last=True
+            )
             active_persona = info["active_persona"]
             system_instruction = prompt_router.get_system_instruction(active_persona)
 
+            model = await asyncio.to_thread(
+                chat_manager.get_setting, "default_model", DEFAULT_MODEL
+            )
             if system_instruction:
                 formatted_history.insert(
                     0,
@@ -40,8 +45,6 @@ def api_status():
                         role="user", parts=[types.Part(text=system_instruction)]
                     ),
                 )
-
-            model = chat_manager.get_setting("default_model", DEFAULT_MODEL)
             response = CLIENT.models.count_tokens(
                 model=model,
                 contents=formatted_history,

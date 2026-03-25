@@ -1,8 +1,13 @@
-import os
+"""
+Tests for LSP manager and related Git operations.
+"""
+
 import json
-import pytest
-import shutil
+import unittest.mock
 from unittest.mock import MagicMock, patch, mock_open
+
+import pytest
+
 from app.services.lsp_registry import LSPRegistry
 from app.services.lsp_manager import LSPManager
 from app.services import git_ops
@@ -16,27 +21,30 @@ MOCK_CATALOG = {
 
 @pytest.fixture
 def mock_registry():
+    """Fixture to provide a mock LSP registry."""
     # Reset singleton
-    LSPRegistry._instance = None
-    LSPRegistry._config = {}
+    LSPRegistry._instance = None  # pylint: disable=protected-access
+    LSPRegistry._config = {}  # pylint: disable=protected-access
     with patch("builtins.open", mock_open(read_data=json.dumps(MOCK_CATALOG))), patch(
         "os.path.exists", return_value=True
     ), patch("shutil.which", return_value="/usr/bin/test-ls"):
         registry = LSPRegistry()
         yield registry
-    LSPRegistry._instance = None
-    LSPRegistry._config = {}
+    LSPRegistry._instance = None  # pylint: disable=protected-access
+    LSPRegistry._config = {}  # pylint: disable=protected-access
 
 
 def test_registry_loading(mock_registry):
+    """Test that the registry loads configurations correctly."""
     config = mock_registry.get_config_by_extension(".py")
     assert config is not None
     assert config["bin"] == "pylsp"
 
 
 def test_registry_missing_binary():
-    LSPRegistry._instance = None
-    LSPRegistry._config = {}
+    """Test that the registry handles missing binaries correctly."""
+    LSPRegistry._instance = None  # pylint: disable=protected-access
+    LSPRegistry._config = {}  # pylint: disable=protected-access
     with patch("builtins.open", mock_open(read_data=json.dumps(MOCK_CATALOG))), patch(
         "os.path.exists", return_value=True
     ), patch(
@@ -45,57 +53,69 @@ def test_registry_missing_binary():
         registry = LSPRegistry()
         config = registry.get_config_by_extension(".py")
         assert config is None
-    LSPRegistry._instance = None
-    LSPRegistry._config = {}
+    LSPRegistry._instance = None  # pylint: disable=protected-access
+    LSPRegistry._config = {}  # pylint: disable=protected-access
 
 
 @pytest.fixture
 def mock_lsp_manager():
-    LSPManager._instance = None
-    LSPManager._servers = {}
+    """Fixture to provide a mock LSP manager."""
+    LSPManager._instance = None  # pylint: disable=protected-access
+    LSPManager._servers = {}  # pylint: disable=protected-access
     return LSPManager()
 
 
+@pytest.mark.asyncio
 @patch("subprocess.Popen")
 @patch("app.services.lsp_manager.LSPRegistry")
-def test_lsp_manager_start_server(MockRegistry, MockPopen, mock_lsp_manager):
+async def test_lsp_manager_start_server(
+    mock_registry_cls, mock_popen, mock_lsp_manager
+):
+    """Test starting an LSP server via LSPManager."""
     # Setup Registry Mock
     registry_instance = MagicMock()
-    registry_instance._config = {"python": {"bin": "pylsp", "args": []}}
+    registry_instance._config = {  # pylint: disable=protected-access
+        "python": {"bin": "pylsp", "args": []}
+    }
     # We need to make sure get_config_by_extension works or just relying on _config access
-    MockRegistry.return_value = registry_instance
+    mock_registry_cls.return_value = registry_instance
 
     # Setup Popen Mock
     process_mock = MagicMock()
     process_mock.poll.return_value = None
-    MockPopen.return_value = process_mock
+    mock_popen.return_value = process_mock
 
     # We patch LSPServer to avoid threading issues in tests
-    with patch("app.services.lsp_manager.LSPServer") as MockLSPServer:
+    with patch("app.services.lsp_manager.LSPServer") as mock_lspserver_cls:
         server_instance = MagicMock()
         server_instance.process = process_mock
         server_instance.send_request.return_value = {
             "result": {"capabilities": {}}
         }  # Success response
-        MockLSPServer.return_value = server_instance
+        mock_lspserver_cls.return_value = server_instance
 
         # We patch threading.Thread so the background task runs inline synchronously
         with patch("threading.Thread") as mock_thread:
-            # When Thread() is called, create a mock thread that just executes its target immediately when start() is called
-            class FakeThread:
+
+            # When Thread() is called, create a mock thread that just executes its target
+            # immediately when start() is called
+            class FakeThread:  # pylint: disable=too-few-public-methods
+                """Fake thread class to execute target immediately."""
+
                 def __init__(self, target, args, daemon):
                     self.target = target
                     self.args = args
 
                 def start(self):
+                    """Execute the target with provided arguments."""
                     self.target(*self.args)
 
             mock_thread.side_effect = FakeThread
 
-            server = mock_lsp_manager.start_server("python", "/root")
+            server = await mock_lsp_manager.start_server("python", "/root")
 
             assert server is not None
-            assert MockPopen.called
+            assert mock_popen.called
             assert server_instance.send_request.called  # initialize called
 
             # Verify initialization timeout is 300.0 (the new default from config)
@@ -105,11 +125,13 @@ def test_lsp_manager_start_server(MockRegistry, MockPopen, mock_lsp_manager):
             assert kwargs["timeout"] == 300.0
 
 
+@pytest.mark.asyncio
 @patch("app.services.git_ops.LSPManager")
 @patch("app.services.git_ops.read_file")
-def test_git_ops_get_definition(mock_read_file, MockLSPManager):
+async def test_git_ops_get_definition(mock_read_file, mock_lsp_manager_cls):
+    """Test getting definition via Git operations."""
     manager_instance = MagicMock()
-    MockLSPManager.return_value = manager_instance
+    mock_lsp_manager_cls.return_value = manager_instance
 
     mock_result = {
         "result": [
@@ -122,7 +144,12 @@ def test_git_ops_get_definition(mock_read_file, MockLSPManager):
             }
         ]
     }
-    manager_instance.get_definition.return_value = mock_result
+
+    async def mock_get_definition(*_args, **_kwargs):
+        """Mocked get_definition method."""
+        return mock_result
+
+    manager_instance.get_definition.side_effect = mock_get_definition
     mock_read_file.return_value = "def my_func():\n    pass"
 
     # We also need to mock os.path.relpath behavior since CODEBASE_ROOT is used
@@ -130,7 +157,7 @@ def test_git_ops_get_definition(mock_read_file, MockLSPManager):
     # Assuming test env has reasonable path handling.
 
     with patch("os.path.relpath", return_value="test.py"):
-        result = git_ops.get_definition("main.py", 1, 1)
+        result = await git_ops.get_definition("main.py", 1, 1)
 
     assert result["file"] == "test.py"
     assert result["line"] == 11  # 10 + 1

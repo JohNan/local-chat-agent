@@ -2,6 +2,7 @@
 Service for managing Language Server Protocol (LSP) processes.
 """
 
+import asyncio
 import collections
 import json
 import logging
@@ -300,7 +301,7 @@ class LSPManager:
         server.terminate()
 
     # pylint: disable=too-many-locals
-    def start_server(self, language: str, root_path: str) -> Optional[LSPServer]:
+    async def start_server(self, language: str, root_path: str) -> Optional[LSPServer]:
         """Starts or retrieves an existing LSP server."""
         root_path = self._get_normalized_path(root_path)
         key = self._get_server_key(language, root_path)
@@ -315,94 +316,96 @@ class LSPManager:
                 logger.warning("LSP server for %s died, restarting...", language)
                 del self._servers[key]
 
-            registry = LSPRegistry()
-            # pylint: disable=protected-access
-            config = registry._config.get(language)
+        registry = LSPRegistry()
+        # pylint: disable=protected-access
+        config = registry._config.get(language)
 
-            if not config:
-                logger.error("No LSP configuration found for language: %s", language)
-                return None
+        if not config:
+            logger.error("No LSP configuration found for language: %s", language)
+            return None
 
-            timeout = config.get("timeout", 300.0)
-            connection_type = config.get("connection", "stdio")
+        timeout = config.get("timeout", 300.0)
+        connection_type = config.get("connection", "stdio")
 
-            try:
-                if connection_type == "tcp":
-                    host = config.get("host", "localhost")
-                    port = config.get("port")
-                    if not port:
-                        logger.error("TCP connection requires a port for %s", language)
-                        return None
+        try:
+            if connection_type == "tcp":
+                host = config.get("host", "localhost")
+                port = config.get("port")
+                if not port:
+                    logger.error("TCP connection requires a port for %s", language)
+                    return None
 
-                    logger.info(
-                        "Connecting to LSP server for %s at %s:%s", language, host, port
+                logger.info(
+                    "Connecting to LSP server for %s at %s:%s", language, host, port
+                )
+
+                # Try to connect with retries
+                sock = None
+                connected = False
+                for _ in range(5):
+                    try:
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        # connect is blocking. Run in thread.
+                        await asyncio.to_thread(sock.connect, (host, port))
+                        connected = True
+                        break
+                    except ConnectionRefusedError:
+                        sock.close()
+                        await asyncio.sleep(1)
+
+                if not connected:
+                    logger.error(
+                        "Failed to connect to %s LSP at %s:%s", language, host, port
                     )
+                    return None
 
-                    # Try to connect with retries
-                    sock = None
-                    connected = False
-                    for _ in range(5):
-                        try:
-                            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                            sock.connect((host, port))
-                            connected = True
-                            break
-                        except ConnectionRefusedError:
-                            sock.close()
-                            time.sleep(1)
+                server = LSPServer(
+                    process=None, language=language, root_path=root_path, sock=sock
+                )
 
-                    if not connected:
-                        logger.error(
-                            "Failed to connect to %s LSP at %s:%s", language, host, port
-                        )
-                        return None
+            else:  # stdio
+                bin_name = config["bin"]
+                args = config.get("args", [])
+                cmd = [bin_name] + args
 
-                    server = LSPServer(
-                        process=None, language=language, root_path=root_path, sock=sock
-                    )
+                logger.info(
+                    "Starting LSP server for %s at %s with cmd: %s",
+                    language,
+                    root_path,
+                    cmd,
+                )
+                # pylint: disable=consider-using-with
+                process = subprocess.Popen(
+                    cmd,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,  # Capture stderr to keep it clean
+                    cwd=root_path,
+                    bufsize=0,
+                )
 
-                else:  # stdio
-                    bin_name = config["bin"]
-                    args = config.get("args", [])
-                    cmd = [bin_name] + args
+                server = LSPServer(
+                    process=process, language=language, root_path=root_path
+                )
 
-                    logger.info(
-                        "Starting LSP server for %s at %s with cmd: %s",
-                        language,
-                        root_path,
-                        cmd,
-                    )
-                    # pylint: disable=consider-using-with
-                    process = subprocess.Popen(
-                        cmd,
-                        stdin=subprocess.PIPE,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,  # Capture stderr to keep it clean
-                        cwd=root_path,
-                        bufsize=0,
-                    )
-
-                    server = LSPServer(
-                        process=process, language=language, root_path=root_path
-                    )
-
+            with self._lock:
                 self._servers[key] = server
 
-                # Start initialization in background
-                init_thread = threading.Thread(
-                    target=self._initialize_server_bg,
-                    args=(server, key, language, root_path, timeout),
-                    daemon=True,
-                )
-                init_thread.start()
+            # Start initialization in background
+            init_thread = threading.Thread(
+                target=self._initialize_server_bg,
+                args=(server, key, language, root_path, timeout),
+                daemon=True,
+            )
+            init_thread.start()
 
-                return server
+            return server
 
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.error("Failed to start LSP server for %s: %s", language, e)
-                return None
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Failed to start LSP server for %s: %s", language, e)
+            return None
 
-    def start_supported_servers(self, root_path: str):
+    async def start_supported_servers(self, root_path: str):
         """
         Scans the root path for supported files and starts corresponding LSP servers.
         """
@@ -443,9 +446,11 @@ class LSPManager:
                     min_file_threshold,
                     language,
                 )
-                self.start_server(language, root_path)
+                await self.start_server(language, root_path)
 
-    def get_definition(self, file_path: str, line: int, col: int) -> Dict[str, Any]:
+    async def get_definition(
+        self, file_path: str, line: int, col: int
+    ) -> Dict[str, Any]:
         """
         Finds the definition of the symbol at the given location.
         line and col are 1-based.
@@ -467,7 +472,7 @@ class LSPManager:
         root_path = self._find_root(
             abs_path, config.get("root_markers", [])
         ) or os.path.dirname(abs_path)
-        server = self.start_server(language, root_path)
+        server = await self.start_server(language, root_path)
         if not server:
             return {"error": "Failed to start LSP server"}
 

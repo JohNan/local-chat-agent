@@ -50,4 +50,12 @@ def mock_lifespan_components(mocker):
     """Mock lifespan components to avoid timeouts."""
     mocker.patch("app.main.get_mcp_servers", return_value={})
     mocker.patch("app.main.rag_manager.index_codebase_task")
-    mocker.patch("app.main.LSPManager")
+
+    # We need to mock start_supported_servers as a coroutine
+    mock_lsp_manager_cls = mocker.patch("app.main.LSPManager")
+    mock_instance = mock_lsp_manager_cls.return_value
+
+    async def mock_start_supported_servers(*args, **kwargs):
+        return None
+
+    mock_instance.start_supported_servers.side_effect = mock_start_supported_servers
