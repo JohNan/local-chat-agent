@@ -274,7 +274,7 @@ class RAGManager:
         logger.info("Starting codebase indexing...")
 
         files_indexed = 0
-        valid_extensions = {
+        valid_extensions = (
             ".py",
             ".js",
             ".ts",
@@ -285,7 +285,7 @@ class RAGManager:
             ".html",
             ".css",
             ".json",
-        }
+        )
         ignore_dirs = {
             "venv",
             ".git",
@@ -318,7 +318,7 @@ class RAGManager:
                 if file in ("package-lock.json", "yarn.lock"):
                     continue
 
-                if not any(file.endswith(ext) for ext in valid_extensions):
+                if not file.endswith(valid_extensions):
                     continue
 
                 filepath = os.path.relpath(os.path.join(root, file), ".")
