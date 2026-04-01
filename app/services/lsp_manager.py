@@ -417,6 +417,7 @@ class LSPManager:
             extensions = config.get("extensions", [])
             if not extensions:
                 continue
+            extensions_tuple = tuple(extensions)
 
             file_count = 0
             found_threshold = False
@@ -432,7 +433,7 @@ class LSPManager:
                 ]
 
                 for file in files:
-                    if any(file.endswith(ext) for ext in extensions):
+                    if file.endswith(extensions_tuple):
                         file_count += 1
                         if file_count >= min_file_threshold:
                             found_threshold = True
