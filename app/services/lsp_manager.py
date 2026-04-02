@@ -248,11 +248,12 @@ class LSPManager:
                 )
         return servers
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
-    def _initialize_server_bg(
-        self, server: LSPServer, key: str, language: str, root_path: str, timeout: float
-    ):
+    def _initialize_server_bg(self, server: LSPServer, timeout: float):
         """Runs the initialization sequence in the background."""
+        language = server.language
+        root_path = server.root_path
+        key = self._get_server_key(language, root_path)
+
         init_params = {
             "processId": os.getpid(),
             "rootUri": f"file://{root_path}",
@@ -394,7 +395,7 @@ class LSPManager:
             # Start initialization in background
             init_thread = threading.Thread(
                 target=self._initialize_server_bg,
-                args=(server, key, language, root_path, timeout),
+                args=(server, timeout),
                 daemon=True,
             )
             init_thread.start()
