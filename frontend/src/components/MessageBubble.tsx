@@ -163,6 +163,8 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
     const hasJulesPrompt = text.includes("## Jules Prompt");
 
     const deploy = async () => {
+        setDeployResult(null);
+        setIsError(false);
         setDeploying(true);
         const marker = "## Jules Prompt";
         const markerIndex = text.indexOf(marker);
@@ -413,12 +415,18 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                                      {deployResult}
                                  </button>
 
-                                 {sessionId && !isError && (
-                                     <button className="deploy-btn" onClick={checkStatus} disabled={checkingStatus} style={{ background: '#f0f0f0', color: '#333', border: '1px solid #ccc' }}>
-                                         {checkingStatus ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                                         Check Status
+                                 <div style={{ display: 'flex', gap: '8px' }}>
+                                     {sessionId && !isError && (
+                                         <button className="deploy-btn" onClick={checkStatus} disabled={checkingStatus} style={{ flex: 1, background: '#f0f0f0', color: '#333', border: '1px solid #ccc' }}>
+                                             {checkingStatus ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                                             Check Status
+                                         </button>
+                                     )}
+                                     <button className="deploy-btn" onClick={deploy} disabled={deploying} style={{ flex: 1, background: '#fff', color: '#0969da', border: '1px solid #0969da' }}>
+                                         {deploying ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} />}
+                                         Resend
                                      </button>
-                                 )}
+                                 </div>
 
                                  {renderStatus()}
                              </div>
