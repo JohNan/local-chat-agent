@@ -15,7 +15,7 @@ from app.main import app
 @pytest.fixture(autouse=True)
 def mock_rag_task():
     """Mock the RAG indexing task."""
-    with patch("app.services.rag_manager.index_codebase_task") as mock:
+    with patch("app.main.rag_manager.index_codebase_task") as mock:
         yield mock
 
 
