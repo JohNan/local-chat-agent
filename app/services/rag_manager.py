@@ -9,7 +9,7 @@ import hashlib
 import chromadb
 from google import genai
 
-from app.services.git_ops import get_repo_info
+from app.services.git_ops import get_repo_info, CODEBASE_ROOT, load_gitignore_spec
 
 logger = logging.getLogger(__name__)
 
@@ -208,8 +208,11 @@ class RAGManager:
     def _process_file_indexing(self, filepath, pending_data, existing_info=None):
         """Processes a single file for indexing."""
         # pylint: disable=too-many-locals
+
+        full_path = os.path.join(CODEBASE_ROOT, filepath)
+
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
+            with open(full_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
             file_hash = self._calculate_hash(content)
@@ -234,7 +237,7 @@ class RAGManager:
             language = ext[1:] if ext else "unknown"
 
             try:
-                last_modified = os.path.getmtime(filepath)
+                last_modified = os.path.getmtime(full_path)
             except Exception:  # pylint: disable=broad-exception-caught
                 last_modified = 0.0
 
@@ -307,13 +310,33 @@ class RAGManager:
         }
 
         existing_files = self._fetch_existing_metadata()
+        spec = load_gitignore_spec()
 
-        for root, _, files in os.walk("."):
-            if any(ignore in root for ignore in ignore_dirs):
-                continue
+        for root, dirs, files in os.walk(CODEBASE_ROOT):
+            # Calculate relative path from CODEBASE_ROOT to current 'root'
+            rel_root = os.path.relpath(root, CODEBASE_ROOT)
+            if rel_root == ".":
+                rel_root = ""
+
+            # Filter directories in-place to prevent recursion into ignored ones
+            valid_dirs = []
+            for d in dirs:
+                # Construct path relative to repo root
+                d_path = os.path.join(rel_root, d)
+
+                # Check explicit ignore list first
+                if d in ignore_dirs:
+                    continue
+
+                # Check against .gitignore (append slash for directory match)
+                if not spec.match_file(d_path + "/"):
+                    valid_dirs.append(d)
+
+            # Update dirs in-place to prune traversal
+            dirs[:] = valid_dirs
 
             for file in files:
-                if file.endswith(".min.js") or file.endswith(".bundle.js"):
+                if file.endswith((".min.js", ".bundle.js")):
                     continue
                 if file in ("package-lock.json", "yarn.lock"):
                     continue
@@ -321,7 +344,11 @@ class RAGManager:
                 if not file.endswith(valid_extensions):
                     continue
 
-                filepath = os.path.relpath(os.path.join(root, file), ".")
+                rel_path = os.path.join(rel_root, file)
+                if spec.match_file(rel_path):
+                    continue
+
+                filepath = rel_path
                 existing_info = existing_files.get(filepath)
                 if self._process_file_indexing(filepath, pending_data, existing_info):
                     files_indexed += 1

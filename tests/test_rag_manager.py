@@ -55,27 +55,34 @@ def test_index_codebase(mock_chroma, mock_genai):
 
         # Mock os.walk
         with patch("os.walk") as mock_walk:
-            mock_walk.return_value = [(".", [], ["test.py"])]
-            with patch("builtins.open", new_callable=MagicMock) as mock_open:
-                mock_file = MagicMock()
-                mock_file.read.return_value = "print('hello')"
-                mock_open.return_value.__enter__.return_value = mock_file
+            # We must mock os.walk to return CODEBASE_ROOT as the root dir
+            from app.services.rag_manager import CODEBASE_ROOT
+            mock_walk.return_value = [(CODEBASE_ROOT, [], ["test.py"])]
+            with patch("app.services.rag_manager.load_gitignore_spec") as mock_spec:
+                mock_spec_inst = MagicMock()
+                mock_spec_inst.match_file.return_value = False
+                mock_spec.return_value = mock_spec_inst
 
-                # Mock collection.get returning empty (new file)
-                mock_collection.get.return_value = {"metadatas": [], "ids": []}
+                with patch("builtins.open", new_callable=MagicMock) as mock_open:
+                    mock_file = MagicMock()
+                    mock_file.read.return_value = "print('hello')"
+                    mock_open.return_value.__enter__.return_value = mock_file
 
-                result = manager.index_codebase()
+                    # Mock collection.get returning empty (new file)
+                    mock_collection.get.return_value = {"metadatas": [], "ids": []}
 
-                assert result["status"] == "success"
-                assert result["files_indexed"] == 1
+                    result = manager.index_codebase()
 
-                # Verify embed_content called with list
-                manager.genai_client.models.embed_content.assert_called()
-                call_args = manager.genai_client.models.embed_content.call_args
-                assert isinstance(call_args.kwargs["contents"], list)
-                assert call_args.kwargs["contents"] == ["print('hello')"]
+                    assert result["status"] == "success"
+                    assert result["files_indexed"] == 1
 
-                mock_collection.upsert.assert_called_once()
+                    # Verify embed_content called with list
+                    manager.genai_client.models.embed_content.assert_called()
+                    call_args = manager.genai_client.models.embed_content.call_args
+                    assert isinstance(call_args.kwargs["contents"], list)
+                    assert call_args.kwargs["contents"] == ["print('hello')"]
+
+                    mock_collection.upsert.assert_called_once()
 
 
 def test_search_codebase_semantic(mock_chroma, mock_genai):
@@ -122,52 +129,57 @@ def test_index_codebase_optimization(mock_chroma, mock_genai):
 
             # Mock os.walk
             with patch("os.walk") as mock_walk:
-                mock_walk.return_value = [(".", [], ["test.py"])]
-                with patch("builtins.open", new_callable=MagicMock) as mock_open:
-                    mock_file = MagicMock()
-                    mock_file.read.return_value = "content"
-                    mock_open.return_value.__enter__.return_value = mock_file
+                from app.services.rag_manager import CODEBASE_ROOT
+                mock_walk.return_value = [(CODEBASE_ROOT, [], ["test.py"])]
+                with patch("app.services.rag_manager.load_gitignore_spec") as mock_spec:
+                    mock_spec_inst = MagicMock()
+                    mock_spec_inst.match_file.return_value = False
+                    mock_spec.return_value = mock_spec_inst
+                    with patch("builtins.open", new_callable=MagicMock) as mock_open:
+                        mock_file = MagicMock()
+                        mock_file.read.return_value = "content"
+                        mock_open.return_value.__enter__.return_value = mock_file
 
-                    # Case 1: File exists and hash matches
-                    # We must include filepath in metadata because index_codebase uses it
-                    mock_collection.get.return_value = {
-                        "metadatas": [
-                            {"filepath": "test.py", "file_hash": "dummy_hash"}
-                        ],
-                        "ids": ["test.py:0"],
-                    }
+                        # Case 1: File exists and hash matches
+                        # We must include filepath in metadata because index_codebase uses it
+                        mock_collection.get.return_value = {
+                            "metadatas": [
+                                {"filepath": "test.py", "file_hash": "dummy_hash"}
+                            ],
+                            "ids": ["test.py:0"],
+                        }
 
-                    result = manager.index_codebase()
+                        result = manager.index_codebase()
 
-                    # Should skip upsert and delete
-                    mock_collection.upsert.assert_not_called()
-                    mock_collection.delete.assert_not_called()
-                    assert result["files_indexed"] == 0
+                        # Should skip upsert and delete
+                        mock_collection.upsert.assert_not_called()
+                        mock_collection.delete.assert_not_called()
+                        assert result["files_indexed"] == 0
 
-                    # Case 2: File exists but hash mismatch
-                    mock_collection.get.return_value = {
-                        "metadatas": [{"filepath": "test.py", "file_hash": "old_hash"}],
-                        "ids": ["test.py:0"],
-                    }
+                        # Case 2: File exists but hash mismatch
+                        mock_collection.get.return_value = {
+                            "metadatas": [{"filepath": "test.py", "file_hash": "old_hash"}],
+                            "ids": ["test.py:0"],
+                        }
 
-                    # Mock embedding for upsert
-                    mock_embedding = MagicMock()
-                    mock_embedding.embeddings = [MagicMock(values=[0.1])]
-                    manager.genai_client.models.embed_content.return_value = (
-                        mock_embedding
-                    )
+                        # Mock embedding for upsert
+                        mock_embedding = MagicMock()
+                        mock_embedding.embeddings = [MagicMock(values=[0.1])]
+                        manager.genai_client.models.embed_content.return_value = (
+                            mock_embedding
+                        )
 
-                    result = manager.index_codebase()
+                        result = manager.index_codebase()
 
-                    # In this case, new content generates 1 chunk (test.py:0).
-                    # Old content had 1 chunk (test.py:0).
-                    # Orphans = {test.py:0} - {test.py:0} = empty.
-                    # So delete should NOT be called.
-                    mock_collection.delete.assert_not_called()
+                        # In this case, new content generates 1 chunk (test.py:0).
+                        # Old content had 1 chunk (test.py:0).
+                        # Orphans = {test.py:0} - {test.py:0} = empty.
+                        # So delete should NOT be called.
+                        mock_collection.delete.assert_not_called()
 
-                    # Upsert should still happen
-                    mock_collection.upsert.assert_called_once()
-                    assert result["files_indexed"] == 1
+                        # Upsert should still happen
+                        mock_collection.upsert.assert_called_once()
+                        assert result["files_indexed"] == 1
 
 
 def test_index_codebase_batching(mock_chroma, mock_genai):
@@ -186,22 +198,27 @@ def test_index_codebase_batching(mock_chroma, mock_genai):
 
         # Mock os.walk returning 2 files
         with patch("os.walk") as mock_walk:
-            mock_walk.return_value = [(".", [], ["test1.py", "test2.py"])]
+            from app.services.rag_manager import CODEBASE_ROOT
+            mock_walk.return_value = [(CODEBASE_ROOT, [], ["test1.py", "test2.py"])]
 
-            with patch("builtins.open") as mock_open:
-                f1 = MagicMock()
-                f1.__enter__.return_value.read.return_value = "content1"
-                f2 = MagicMock()
-                f2.__enter__.return_value.read.return_value = "content2"
-                mock_open.side_effect = [f1, f2]
+            with patch("app.services.rag_manager.load_gitignore_spec") as mock_spec:
+                mock_spec_inst = MagicMock()
+                mock_spec_inst.match_file.return_value = False
+                mock_spec.return_value = mock_spec_inst
+                with patch("builtins.open") as mock_open:
+                    f1 = MagicMock()
+                    f1.__enter__.return_value.read.return_value = "content1"
+                    f2 = MagicMock()
+                    f2.__enter__.return_value.read.return_value = "content2"
+                    mock_open.side_effect = [f1, f2]
 
-                mock_collection.get.return_value = {"metadatas": [], "ids": []}
+                    mock_collection.get.return_value = {"metadatas": [], "ids": []}
 
-                result = manager.index_codebase()
+                    result = manager.index_codebase()
 
-                assert result["files_indexed"] == 2
+                    assert result["files_indexed"] == 2
 
-                # Verify embed_content called once with 2 contents (batch)
-                manager.genai_client.models.embed_content.assert_called_once()
-                call_args = manager.genai_client.models.embed_content.call_args
-                assert call_args.kwargs["contents"] == ["content1", "content2"]
+                    # Verify embed_content called once with 2 contents (batch)
+                    manager.genai_client.models.embed_content.assert_called_once()
+                    call_args = manager.genai_client.models.embed_content.call_args
+                    assert call_args.kwargs["contents"] == ["content1", "content2"]

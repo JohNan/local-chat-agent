@@ -62,19 +62,24 @@ def test_rag_manager_safe_delete(mock_chroma, mock_genai):
 
         # Mock os.walk to find 1 file
         with patch("os.walk") as mock_walk:
-            mock_walk.return_value = [(".", [], ["test.py"])]
-            with patch("builtins.open", new_callable=MagicMock) as mock_open:
-                mock_file = MagicMock()
-                mock_file.read.return_value = "new_content"  # small content -> 1 chunk
-                mock_open.return_value.__enter__.return_value = mock_file
+            from app.services.rag_manager import CODEBASE_ROOT
+            mock_walk.return_value = [(CODEBASE_ROOT, [], ["test.py"])]
+            with patch("app.services.rag_manager.load_gitignore_spec") as mock_spec:
+                mock_spec_inst = MagicMock()
+                mock_spec_inst.match_file.return_value = False
+                mock_spec.return_value = mock_spec_inst
+                with patch("builtins.open", new_callable=MagicMock) as mock_open:
+                    mock_file = MagicMock()
+                    mock_file.read.return_value = "new_content"  # small content -> 1 chunk
+                    mock_open.return_value.__enter__.return_value = mock_file
 
-                # Force _chunk_text to return 1 chunk tuple
-                with patch.object(
-                    manager, "_chunk_text", return_value=[("new_chunk", 1, 1)]
-                ):
-                    manager.index_codebase()
+                    # Force _chunk_text to return 1 chunk tuple
+                    with patch.object(
+                        manager, "_chunk_text", return_value=[("new_chunk", 1, 1)]
+                    ):
+                        manager.index_codebase()
 
-        # Check calls
+            # Check calls
         upsert_calls = [c for c in mock_collection.mock_calls if c[0] == "upsert"]
         delete_calls = [c for c in mock_collection.mock_calls if c[0] == "delete"]
 

@@ -12,9 +12,9 @@ from app.services import git_ops
 def temp_codebase(tmp_path, mocker):
     """Sets up a temporary codebase root with .gitignore."""
     mocker.patch("app.services.git_ops.CODEBASE_ROOT", str(tmp_path))
-    git_ops._load_gitignore_spec.cache_clear()
+    git_ops.load_gitignore_spec.cache_clear()
     yield tmp_path
-    git_ops._load_gitignore_spec.cache_clear()
+    git_ops.load_gitignore_spec.cache_clear()
 
 
 def test_list_files_respects_gitignore(temp_codebase):
@@ -101,7 +101,7 @@ def test_list_files_nested_ignore(temp_codebase):
     assert "src/temp/data.tmp" not in files
 
     # Clear cache because we modified .gitignore
-    git_ops._load_gitignore_spec.cache_clear()
+    git_ops.load_gitignore_spec.cache_clear()
 
     # Case 2: "/temp/" should ONLY ignore root temp
     (temp_codebase / ".gitignore").write_text("/temp/", encoding="utf-8")
