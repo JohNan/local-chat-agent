@@ -190,7 +190,7 @@ def get_cached_content_config(
             try:
                 docs_content += f"\n\n--- {doc_file.name} ---\n"
                 docs_content += doc_file.read_text(encoding="utf-8")
-            except Exception as e: # pylint: disable=broad-exception-caught
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.warning("Failed to read %s: %s", doc_file, e)
 
     if docs_content:

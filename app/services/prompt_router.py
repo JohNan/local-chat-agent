@@ -113,6 +113,7 @@ class Intent(BaseModel):
     persona: str
     task_type: str
 
+
 def classify_intent(user_query: str) -> str:
     """Classifies the user query into a persona category."""
     if not CLIENT:
@@ -135,7 +136,7 @@ def classify_intent(user_query: str) -> str:
                 response_mime_type="application/json",
                 response_schema=Intent,
                 temperature=0.0,
-            )
+            ),
         )
         if response.parsed and isinstance(response.parsed, Intent):
             category = response.parsed.persona.strip().upper()

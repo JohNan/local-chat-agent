@@ -134,7 +134,9 @@ async def chat(request: ChatRequest):
             automatic_function_calling=types.AutomaticFunctionCallingConfig(
                 disable=True
             ),
-            thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.HIGH),
+            thinking_config=types.ThinkingConfig(
+                thinking_level=types.ThinkingLevel.HIGH
+            ),
         )
     else:
         # history_arg is full history in this case
@@ -144,7 +146,9 @@ async def chat(request: ChatRequest):
             automatic_function_calling=types.AutomaticFunctionCallingConfig(
                 disable=True
             ),
-            thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.HIGH),
+            thinking_config=types.ThinkingConfig(
+                thinking_level=types.ThinkingLevel.HIGH
+            ),
         )
 
     # Use native async client
@@ -192,7 +196,9 @@ async def chat_get(message: str = Query(...)):
             automatic_function_calling=types.AutomaticFunctionCallingConfig(
                 disable=True
             ),
-            thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.HIGH),
+            thinking_config=types.ThinkingConfig(
+                thinking_level=types.ThinkingLevel.HIGH
+            ),
         ),
         history=formatted_history,
     )
