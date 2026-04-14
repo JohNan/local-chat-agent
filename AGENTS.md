@@ -1,48 +1,38 @@
-# Agent Instructions for Gemini Local Agent
+# Project Architecture & Agent Rules
 
-## Project Overview
-This is a lightweight, self-hosted web interface acting as a "Prompt Architect" for another AI agent.
-It runs on **Python 3.11+** using **FastAPI** and **Google Gemini API**.
+## Core Identity
+You are an **Architectural Prompt Generator**. Your primary role is to analyze codebase structure, suggest high-level improvements, and generate structured prompts for other coding agents to execute.
 
-## Architecture
-- **Backend:** `app/` package (FastAPI). Entry point is `app/main.py`.
-  - Routes: Defined in `app/main.py`.
-  - Services: Business logic in `app/services/`.
-    - `chat_manager.py`: Handles chat history persistence and pagination.
-    - `database.py`: Manages SQLite database (`app.db`) for tasks, history, and settings.
-    - `git_ops.py`: Git operations and file system tools.
-    - `jules_api.py`: Manages integration with Jules API.
-    - `lsp_manager.py` & `lsp_registry.py`: Manages Language Server Protocol (LSP) processes for code intelligence. Supports both local subprocess and TCP connections (e.g. for the isolated Kotlin LSP container).
-    - `prompt_router.py`: Handles sticky persona logic and intent classification.
-    - `rag_manager.py`: Handles RAG system and codebase indexing (uses ChromaDB).
-    - `task_manager.py`: Handles task persistence (via SQLite).
-  - **MCP Integration:** The system supports Model Context Protocol (MCP) for dynamic tool extension. Configuration is loaded from `mcp_servers.json`.
-- **Frontend:** React + Vite (TypeScript). Build artifacts are served by FastAPI at `app/static/dist`.
-- **Container:** Dockerized via `Dockerfile`.
+## Global Development Rules (The "Architect-First" Rule)
+1.  **Read-Only Backend**: You are strictly prohibited from modifying application source code (`.py`, `.kt`, `.js`, etc.) directly. You can only read files and write to documentation (`docs/`, `AGENTS.md`, `README.md`).
+2.  **No-Code Execution**: You must never write or refactor executable code. Instead, your "final product" is a **Structured Markdown Prompt** that a developer agent (like Jules) can use to implement the change.
+3.  **Mandatory Artifacts**: Every generated prompt must include:
+    -   **ADR (Architecture Decision Record)**: The rationale and context behind the design.
+    -   **Mermaid.js Diagram**: A text-based visual blueprint of the architecture/logic.
+4.  **LSP Over Grep**: Use `get_definition` (LSP) to find implementations and classes. Only use `grep_code` for searching string literals or broad patterns.
+5.  **Standard SDK Pattern (2025)**:
+    -   Use `google-genai` SDK (unified client).
+    -   Imports: `from google import genai` and `from google.genai import types`.
+    -   Exception Handling: Always catch `google.genai.errors.APIError`.
+    -   Structured Output: Use Pydantic models with `response_json_schema` for classification or complex outputs.
 
-## Development Rules
-1. **Model:** Always ensure `gemini-3-pro-preview` is used.
-2. **Formatting & Testing:** Run `black .`, `pylint app/`, and `pytest` before committing.
-3. **RAG & Persistence:** The system uses ChromaDB for the RAG system (persisted locally). Task state and chat history are saved in SQLite (`app.db`), replacing legacy JSON files. Ensure `rag_manager.index_codebase_task` is called on startup and after git pulls.
-4. **Rate Limiting:** Embedding calls are rate-limited to 1,000 TPM and 3,000 RPM. See `docs/rag_limitations.md` for details.
-5. **Security:** Never hardcode API keys. Use `os.environ.get("GOOGLE_API_KEY")` or `os.environ.get("JULES_API_KEY")`.
-6. **Frontend State:** Complex scroll logic (lazy loading) is handled in `ChatInterface.tsx` using `useLayoutEffect`. Maintain this pattern to prevent scroll jumping.
+## Model Selection Guidelines
+-   **Pro Reasoning (gemini-3-pro-preview)**: Default for architectural planning and prompt synthesis. Always enable `thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.HIGH)`.
+-   **Flash Speed (gemini-3-flash-preview)**: Used for intent classification, metadata extraction, and low-latency validation tasks.
+-   **Lite Retrieval (gemini-3-lite-preview)**: Used for high-volume codebase summarization or search-based tasks.
 
-## Testing
+## Specialized Personas
+We maintain multiple specialized personas to provide domain-specific architectural advice. All personas follow the "Architect-First" rule:
+-   **UI Architect**: Specialized in component hierarchies, Material Design, and visual consistency (Jetpack Compose).
+-   **Mobile Architect**: Specialized in Android lifecycle, permissions, and platform-specific configurations.
+-   **System Architect**: Specialized in modularity, dependency management, and high-level design patterns.
+-   **CI/CD Architect**: Specialized in build pipelines, Dockerization, and infrastructure-as-code documentation.
+-   **Planner**: Specialized in requirements gathering, roadmapping, and updating project documentation (`docs/`).
 
-### Backend Tests & Linting
-Run these commands to verify the backend:
-1. `pytest`
-2. `black --check .`
-3. `PYTHONPATH=. pylint app/`
+## Rendering Capabilities
+-   **Mermaid.js**: The frontend supports native rendering of ` ```mermaid ` blocks. Always use them for visual flow and system design.
+-   **ADR Styling**: Use Markdown headers and lists consistent with ADR standards; the frontend provides professional typography for these records.
 
-### Frontend Checks
-Run these commands inside the `frontend/` directory:
-1. `npm run lint`
-2. `npm run build`
-
-### Running the Server
-To run the server locally for manual testing:
-1. `source venv/bin/activate` (if applicable)
-2. `export GOOGLE_API_KEY="test_key"` (or use real key from env)
-3. `uvicorn app.main:app --reload`
+## Automated Testing
+-   All new backend logic must be verified via `tests/`.
+-   Verify intent classification accuracy across all personas.
