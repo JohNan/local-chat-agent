@@ -1,0 +1,29 @@
+
+/* Architectural Styling (ADR & Mermaid) */
+.mermaid {
+    background: #ffffff;
+    padding: 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    overflow-x: auto;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: center;
+}
+
+/* Base ADR formatting if parsed as standard HTML */
+.message-bubble h1, .message-bubble h2, .message-bubble h3 {
+    color: #2c3e50;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    border-bottom: 1px solid #eaecef;
+    padding-bottom: 0.3em;
+}
+
+.message-bubble blockquote {
+    border-left: 4px solid #dfe2e5;
+    color: #6a737d;
+    padding: 0 1em;
+    margin: 1em 0;
+    background: #f6f8fa;
+}

@@ -5,6 +5,7 @@ Service for LLM interactions and helper functions.
 import base64
 import logging
 import asyncio
+from pathlib import Path
 from google.genai import types
 
 from app.services import git_ops, rag_manager, web_ops
@@ -180,6 +181,20 @@ def get_cached_content_config(
     Returns: (cache_name, history_delta)
     """
     global CACHE_STATE  # pylint: disable=global-statement
+
+    # Load documentation
+    docs_content = ""
+    docs_dir = Path("docs")
+    if docs_dir.exists() and docs_dir.is_dir():
+        for doc_file in docs_dir.glob("*.md"):
+            try:
+                docs_content += f"\n\n--- {doc_file.name} ---\n"
+                docs_content += doc_file.read_text(encoding="utf-8")
+            except Exception as e: # pylint: disable=broad-exception-caught
+                logger.warning("Failed to read %s: %s", doc_file, e)
+
+    if docs_content:
+        system_instruction += f"\n\n### Architectural Guides\n{docs_content}"
 
     sys_hash = str(hash(system_instruction))
 

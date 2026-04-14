@@ -5,7 +5,11 @@ Manages sticky personas and intent classification for the agent.
 
 import json
 import os
+
 import logging
+from pydantic import BaseModel
+from google.genai import types
+
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -37,24 +41,33 @@ def load_core_instruction() -> str:
 
 CORE_INSTRUCTION = load_core_instruction()
 
+ARCHITECT_RULES = (
+    "You are a Distinguished Architect, not a developer. You MUST NOT write executable application code. "
+    "Every Final Prompt generated must include a Markdown ADR (Architecture Decision Record) "
+    "and a Mermaid.js diagram specific to your domain."
+)
+
 PERSONA_PROMPTS = {
     "UI": (
+        f"{ARCHITECT_RULES} "
         "Focus on visual consistency, responsiveness, and Material Design. "
         "Includes Rule 7 (Visualizing Compose UI)."
     ),
     "MOBILE": (
+        f"{ARCHITECT_RULES} "
         "Focus on Android best practices, lifecycle, and permissions. "
         "Includes Rule 8 (Android Configuration)."
     ),
-    "ARCHITECT": "Focus on system design, modularity, and `AGENTS.md` compliance.",
-    "CI_CD": "Focus on build stability, Docker, and GitHub Actions.",
+    "ARCHITECT": f"{ARCHITECT_RULES} Focus on system design, modularity, and `AGENTS.md` compliance.",
+    "CI_CD": f"{ARCHITECT_RULES} Focus on build stability, Docker, and GitHub Actions.",
     "PLANNER": (
+        f"{ARCHITECT_RULES} "
         "Focus on requirements, architecture, and roadmaps. "
         "Use the write_to_docs tool for any documentation. "
         "You have permission to update the `AGENTS.md` and `README.md` "
         "files at the root using the `write_to_docs` tool."
     ),
-    "GENERAL": "",
+    "GENERAL": ARCHITECT_RULES,
 }
 
 PERSONA_FILE = "storage/persona_state.json"
@@ -95,6 +108,10 @@ def clear_active_persona():
             logger.error("Failed to clear active persona: %s", e)
 
 
+class Intent(BaseModel):
+    persona: str
+    task_type: str
+
 def classify_intent(user_query: str) -> str:
     """Classifies the user query into a persona category."""
     if not CLIENT:
@@ -103,7 +120,7 @@ def classify_intent(user_query: str) -> str:
     prompt = (
         "Classify this developer query into exactly one category: "
         "[UI, MOBILE, ARCHITECT, CI_CD, PLANNER, GENERAL]. "
-        "Return ONLY the category name.\n\n"
+        "Also determine the task_type (e.g., 'question', 'feature', 'bug').\n\n"
         "Use PLANNER if the user query contains words like 'plan', 'document', "
         "'architecture', or 'requirements'.\n\n"
         f"Query: {user_query}"
@@ -111,12 +128,21 @@ def classify_intent(user_query: str) -> str:
 
     try:
         response = CLIENT.models.generate_content(
-            model="gemini-3-pro-preview",
+            model="gemini-3-flash-preview",
             contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=Intent,
+                temperature=0.0,
+            )
         )
-        category = response.text.strip().upper()
-        if category in PERSONA_PROMPTS:
-            return category
+        if response.parsed and isinstance(response.parsed, Intent):
+            category = response.parsed.persona.strip().upper()
+            if category in PERSONA_PROMPTS:
+                return category
+        return "GENERAL"
+    except types.errors.APIError as e:
+        logger.error("APIError classifying intent: %s", e)
         return "GENERAL"
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Failed to classify intent: %s", e)

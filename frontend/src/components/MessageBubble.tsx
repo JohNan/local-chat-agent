@@ -1,14 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js';
+import mermaid from 'mermaid';
 import { Bot, Loader2, Rocket, Check, X, User, GitPullRequestArrow, RefreshCw, Copy, FileText, Search } from 'lucide-react';
 import type { Message } from '../types';
 
-// Configure marked with highlight.js
+mermaid.initialize({ startOnLoad: false });
+
+// Configure marked with highlight.js and mermaid
 marked.use({
     renderer: {
         code({ text, lang }: { text: string, lang?: string }) {
+            if (lang === 'mermaid') {
+                return `<div class="mermaid">${text}</div>`;
+            }
             const language = lang || 'plaintext';
             const validLanguage = hljs.getLanguage(language) ? language : 'plaintext';
             const highlighted = hljs.highlight(text, { language: validLanguage }).value;
@@ -56,6 +62,20 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
     const [copied, setCopied] = useState(false);
     const [copyError, setCopyError] = useState(false);
 
+    const isAi = message.role === 'model' || message.role === 'ai';
+    const text = message.text || message.parts?.[0]?.text || "";
+
+    useEffect(() => {
+        if (text) {
+            setTimeout(() => {
+                mermaid.run({
+                    nodes: document.querySelectorAll('.mermaid'),
+                    suppressErrors: true
+                }).catch(e => console.error('Mermaid render error', e));
+            }, 100);
+        }
+    }, [text]);
+
     if (message.role === 'system') {
         return (
             <div className="context-reset-divider">
@@ -63,9 +83,6 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
             </div>
         );
     }
-
-    const isAi = message.role === 'model' || message.role === 'ai';
-    const text = message.text || message.parts?.[0]?.text || "";
 
     const copyToClipboard = (textToCopy: string, onSuccess: () => void, onError: (err: unknown) => void) => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
