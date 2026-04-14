@@ -314,6 +314,7 @@ class RAGManager:
 
         for root, dirs, files in os.walk(CODEBASE_ROOT):
             # Calculate relative path from CODEBASE_ROOT to current 'root'
+            # pylint: disable=duplicate-code
             rel_root = os.path.relpath(root, CODEBASE_ROOT)
             if rel_root == ".":
                 rel_root = ""
@@ -334,6 +335,7 @@ class RAGManager:
 
             # Update dirs in-place to prune traversal
             dirs[:] = valid_dirs
+            # pylint: enable=duplicate-code
 
             for file in files:
                 if file.endswith((".min.js", ".bundle.js")):
