@@ -9,6 +9,7 @@ import os
 import logging
 from pydantic import BaseModel
 from google.genai import types
+from google.genai import errors
 
 from datetime import datetime
 from functools import lru_cache
@@ -141,7 +142,7 @@ def classify_intent(user_query: str) -> str:
             if category in PERSONA_PROMPTS:
                 return category
         return "GENERAL"
-    except types.errors.APIError as e:
+    except errors.APIError as e:
         logger.error("APIError classifying intent: %s", e)
         return "GENERAL"
     except Exception as e:  # pylint: disable=broad-exception-caught
