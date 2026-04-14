@@ -57,6 +57,7 @@ def test_index_codebase(mock_chroma, mock_genai):
         with patch("os.walk") as mock_walk:
             # We must mock os.walk to return CODEBASE_ROOT as the root dir
             from app.services.rag_manager import CODEBASE_ROOT
+
             mock_walk.return_value = [(CODEBASE_ROOT, [], ["test.py"])]
             with patch("app.services.rag_manager.load_gitignore_spec") as mock_spec:
                 mock_spec_inst = MagicMock()
@@ -130,6 +131,7 @@ def test_index_codebase_optimization(mock_chroma, mock_genai):
             # Mock os.walk
             with patch("os.walk") as mock_walk:
                 from app.services.rag_manager import CODEBASE_ROOT
+
                 mock_walk.return_value = [(CODEBASE_ROOT, [], ["test.py"])]
                 with patch("app.services.rag_manager.load_gitignore_spec") as mock_spec:
                     mock_spec_inst = MagicMock()
@@ -158,7 +160,9 @@ def test_index_codebase_optimization(mock_chroma, mock_genai):
 
                         # Case 2: File exists but hash mismatch
                         mock_collection.get.return_value = {
-                            "metadatas": [{"filepath": "test.py", "file_hash": "old_hash"}],
+                            "metadatas": [
+                                {"filepath": "test.py", "file_hash": "old_hash"}
+                            ],
                             "ids": ["test.py:0"],
                         }
 
@@ -199,6 +203,7 @@ def test_index_codebase_batching(mock_chroma, mock_genai):
         # Mock os.walk returning 2 files
         with patch("os.walk") as mock_walk:
             from app.services.rag_manager import CODEBASE_ROOT
+
             mock_walk.return_value = [(CODEBASE_ROOT, [], ["test1.py", "test2.py"])]
 
             with patch("app.services.rag_manager.load_gitignore_spec") as mock_spec:
