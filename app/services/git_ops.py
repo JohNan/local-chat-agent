@@ -288,7 +288,7 @@ def perform_git_pull():
 
 
 @lru_cache(maxsize=1)
-def _load_gitignore_spec() -> pathspec.PathSpec:
+def load_gitignore_spec() -> pathspec.PathSpec:
     """Loads .gitignore patterns and returns a PathSpec."""
     ignore_patterns = [".git/", "__pycache__/", "node_modules/", "venv/", ".env"]
     gitignore_path = os.path.join(CODEBASE_ROOT, ".gitignore")
@@ -317,7 +317,7 @@ def list_files(directory: str = ".") -> list[str]:
     if not os.path.exists(base_path):
         return [f"Error: Directory {directory} does not exist."]
 
-    spec = _load_gitignore_spec()
+    spec = load_gitignore_spec()
 
     for root, dirs, files in os.walk(base_path):
         # Calculate relative path from CODEBASE_ROOT to current 'root'
