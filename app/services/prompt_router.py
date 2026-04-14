@@ -7,13 +7,13 @@ import json
 import os
 
 import logging
+from datetime import datetime
+from functools import lru_cache
+from pathlib import Path
 from pydantic import BaseModel
 from google.genai import types
 from google.genai import errors
 
-from datetime import datetime
-from functools import lru_cache
-from pathlib import Path
 from app.config import CLIENT
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,8 @@ def load_core_instruction() -> str:
 CORE_INSTRUCTION = load_core_instruction()
 
 ARCHITECT_RULES = (
-    "You are a Distinguished Architect, not a developer. You MUST NOT write executable application code. "
+    "You are a Distinguished Architect, not a developer. "
+    "You MUST NOT write executable application code. "
     "Every Final Prompt generated must include a Markdown ADR (Architecture Decision Record) "
     "and a Mermaid.js diagram specific to your domain."
 )
@@ -59,8 +60,10 @@ PERSONA_PROMPTS = {
         "Focus on Android best practices, lifecycle, and permissions. "
         "Includes Rule 8 (Android Configuration)."
     ),
-    "ARCHITECT": f"{ARCHITECT_RULES} Focus on system design, modularity, and `AGENTS.md` compliance.",
-    "CI_CD": f"{ARCHITECT_RULES} Focus on build stability, Docker, and GitHub Actions.",
+    "ARCHITECT": f"{ARCHITECT_RULES} "
+    "Focus on system design, modularity, and `AGENTS.md` compliance.",
+    "CI_CD": f"{ARCHITECT_RULES} "
+    "Focus on build stability, Docker, and GitHub Actions.",
     "PLANNER": (
         f"{ARCHITECT_RULES} "
         "Focus on requirements, architecture, and roadmaps. "
@@ -110,6 +113,8 @@ def clear_active_persona():
 
 
 class Intent(BaseModel):
+    """Pydantic model for structured intent classification."""
+
     persona: str
     task_type: str
 
