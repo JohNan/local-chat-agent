@@ -6,8 +6,11 @@ Handles indexing and retrieval of code snippets using ChromaDB and Gemini Embedd
 import os
 import logging
 import hashlib
+import threading
+import time
 import chromadb
 from google import genai
+from google.genai import types
 
 from app.services.git_ops import get_repo_info, CODEBASE_ROOT, load_gitignore_spec
 
@@ -16,15 +19,57 @@ logger = logging.getLogger(__name__)
 # Constants
 CHROMA_DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
 COLLECTION_NAME = "company_codebase"
-# Try 004 first, fallback to 001 if needed.
+# Try 001 first, fallback to 004 if needed.
 EMBEDDING_MODEL_PRIMARY = "gemini-embedding-001"
-EMBEDDING_MODEL_FALLBACK = "text-embedding-001"
+EMBEDDING_MODEL_FALLBACK = "text-embedding-004"
+
+
+class RateLimiter:
+    """Thread-safe rate limiter using a token bucket algorithm for TPM and RPM."""
+
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, tpm: int, rpm: int):
+        self.tpm = tpm
+        self.rpm = rpm
+        self.tokens = tpm
+        self.requests = rpm
+        self.last_update = time.time()
+        self.lock = threading.Lock()
+
+    def acquire(self, tokens: int):
+        """Waits until enough tokens and requests are available."""
+        # Ensure we don't ask for more tokens than the max bucket size
+        tokens_to_acquire = min(tokens, self.tpm)
+
+        while True:
+            with self.lock:
+                now = time.time()
+                elapsed = now - self.last_update
+
+                # Replenish tokens and requests based on elapsed time
+                self.tokens = min(self.tpm, self.tokens + elapsed * (self.tpm / 60.0))
+                self.requests = min(
+                    self.rpm, self.requests + elapsed * (self.rpm / 60.0)
+                )
+                self.last_update = now
+
+                # If enough tokens and requests, consume them and proceed
+                if self.tokens >= tokens_to_acquire and self.requests >= 1:
+                    self.tokens -= tokens_to_acquire
+                    self.requests -= 1
+                    return
+
+            # Not enough resources, wait a bit OUTSIDE the lock
+            time.sleep(0.1)
 
 
 class RAGManager:
     """Manages the vector store and embedding generation."""
 
     def __init__(self):
+        self.rate_limiter = RateLimiter(tpm=1000, rpm=3000)
+
         chroma_host = os.environ.get("CHROMA_HOST")
         chroma_port = os.environ.get("CHROMA_PORT", "8000")
 
@@ -171,15 +216,23 @@ class RAGManager:
         """Calculates MD5 hash of content."""
         return hashlib.md5(content.encode("utf-8")).hexdigest()
 
-    def _get_embeddings(self, texts: list[str]) -> list[list[float]] | None:
+    def _get_embeddings(
+        self, texts: list[str], task_type: str = "RETRIEVAL_DOCUMENT"
+    ) -> list[list[float]] | None:
         """Generates embeddings for the given list of texts."""
         if not self.genai_client:
             return None
 
+        total_characters = sum(len(text) for text in texts)
+        tokens = max(1, int(total_characters / 4))
+        self.rate_limiter.acquire(tokens)
+
         # Try primary model
         try:
             result = self.genai_client.models.embed_content(
-                model=EMBEDDING_MODEL_PRIMARY, contents=texts
+                model=EMBEDDING_MODEL_PRIMARY,
+                contents=texts,
+                config=types.EmbedContentConfig(task_type=task_type),
             )
             if hasattr(result, "embeddings") and result.embeddings:
                 return [e.values for e in result.embeddings]
@@ -194,7 +247,9 @@ class RAGManager:
             # Try fallback model
             try:
                 result = self.genai_client.models.embed_content(
-                    model=EMBEDDING_MODEL_FALLBACK, contents=texts
+                    model=EMBEDDING_MODEL_FALLBACK,
+                    contents=texts,
+                    config=types.EmbedContentConfig(task_type=task_type),
                 )
                 if hasattr(result, "embeddings") and result.embeddings:
                     return [e.values for e in result.embeddings]
@@ -470,7 +525,7 @@ class RAGManager:
         if not self.collection:
             return "Error: ChromaDB not initialized."
 
-        embeddings = self._get_embeddings([query])
+        embeddings = self._get_embeddings([query], task_type="CODE_RETRIEVAL_QUERY")
         if not embeddings or not embeddings[0]:
             return "Error: Could not generate embedding for query."
         embedding = embeddings[0]
