@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 # Constants
 CHROMA_DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
 COLLECTION_NAME = "company_codebase"
-# Try 004 first, fallback to 001 if needed.
-EMBEDDING_MODEL_PRIMARY = "text-embedding-004"
-EMBEDDING_MODEL_FALLBACK = "gemini-embedding-001"
+# Try 001 first, fallback to 004 if needed.
+EMBEDDING_MODEL_PRIMARY = "gemini-embedding-001"
+EMBEDDING_MODEL_FALLBACK = "text-embedding-004"
 
 
 class RateLimiter:
