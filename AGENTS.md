@@ -24,8 +24,9 @@ It runs on **Python 3.11+** using **FastAPI** and **Google Gemini API**.
 1. **Model:** Always ensure `gemini-3-pro-preview` is used.
 2. **Formatting & Testing:** Run `black .`, `pylint app/`, and `pytest` before committing.
 3. **RAG & Persistence:** The system uses ChromaDB for the RAG system (persisted locally). Task state and chat history are saved in SQLite (`app.db`), replacing legacy JSON files. Ensure `rag_manager.index_codebase_task` is called on startup and after git pulls.
-4. **Security:** Never hardcode API keys. Use `os.environ.get("GOOGLE_API_KEY")` or `os.environ.get("JULES_API_KEY")`.
-5. **Frontend State:** Complex scroll logic (lazy loading) is handled in `ChatInterface.tsx` using `useLayoutEffect`. Maintain this pattern to prevent scroll jumping.
+4. **Rate Limiting:** Embedding calls are rate-limited to 1,000 TPM and 3,000 RPM. See `docs/rag_limitations.md` for details.
+5. **Security:** Never hardcode API keys. Use `os.environ.get("GOOGLE_API_KEY")` or `os.environ.get("JULES_API_KEY")`.
+6. **Frontend State:** Complex scroll logic (lazy loading) is handled in `ChatInterface.tsx` using `useLayoutEffect`. Maintain this pattern to prevent scroll jumping.
 
 ## Testing
 
