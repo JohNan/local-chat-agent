@@ -172,7 +172,7 @@ def format_history(
     return formatted_history
 
 
-def get_cached_content_config(
+def get_cached_content_config(  # pylint: disable=too-many-locals
     client, full_history, system_instruction, model, ttl_minutes=60
 ):
     """
