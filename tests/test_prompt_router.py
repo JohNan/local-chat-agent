@@ -128,3 +128,37 @@ def test_get_system_instruction_includes_date():
 
         instruction = get_system_instruction("GENERAL")
         assert f"Today's date is {expected_date_str}." in instruction
+
+
+from app.services.prompt_router import classify_intent, Intent
+
+
+def test_classify_intent_success():
+    """Test that classify_intent correctly extracts persona using Intent schema."""
+    with patch("app.services.prompt_router.CLIENT") as mock_client:
+        mock_response = MagicMock()
+        mock_response.parsed = Intent(persona="UI", task_type="feature")
+        mock_client.models.generate_content.return_value = mock_response
+
+        result = classify_intent("Make this button blue")
+        assert result == "UI"
+
+
+def test_classify_intent_fallback():
+    """Test that classify_intent falls back to GENERAL when response is missing parsed intent."""
+    with patch("app.services.prompt_router.CLIENT") as mock_client:
+        mock_response = MagicMock()
+        mock_response.parsed = None
+        mock_client.models.generate_content.return_value = mock_response
+
+        result = classify_intent("Unknown request")
+        assert result == "GENERAL"
+
+
+def test_classify_intent_exception():
+    """Test that classify_intent falls back to GENERAL on exception."""
+    with patch("app.services.prompt_router.CLIENT") as mock_client:
+        mock_client.models.generate_content.side_effect = Exception("API Error")
+
+        result = classify_intent("Unknown request")
+        assert result == "GENERAL"
