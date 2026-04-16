@@ -4,6 +4,7 @@ import time
 from unittest.mock import MagicMock, patch
 from app.services.lsp_manager import LSPManager
 
+
 async def benchmark_walk():
     manager = LSPManager()
 
@@ -59,6 +60,7 @@ async def benchmark_walk():
                 # because it yields back to the event loop while waiting for the thread.
                 # Actually, os.walk itself is blocking, so if we just call it in the loop,
                 # the counter won't increment at all during the walk.
+
 
 if __name__ == "__main__":
     asyncio.run(benchmark_walk())
