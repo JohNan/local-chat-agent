@@ -199,6 +199,10 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
         promptText = promptText.replace(/\s*```$/, '');
         promptText = promptText.trim();
 
+        // Strip <details> blocks and their contents
+        promptText = promptText.replace(/<details>[\s\S]*?<\/details>/g, '');
+        promptText = promptText.trim();
+
         if (promptText) {
             const lines = promptText.split('\n');
             let title = lines[0];

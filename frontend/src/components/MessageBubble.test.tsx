@@ -156,6 +156,37 @@ describe('MessageBubble', () => {
         }));
     });
 
+    it('strips details tags from the prompt before deploying', async () => {
+        const message: Message = {
+            id: '7',
+            role: 'model',
+            text: '## Jules Prompt\nTask content\n<details>\n<summary>Details</summary>\nMore info\n</details>',
+            parts: [{ text: '## Jules Prompt\nTask content\n<details>\n<summary>Details</summary>\nMore info\n</details>' }]
+        };
+
+        const mockResponse = {
+            success: true,
+            result: { name: 'session-124' }
+        };
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (globalThis.fetch as any).mockResolvedValue({
+            json: () => Promise.resolve(mockResponse),
+        });
+
+        render(<MessageBubble message={message} />);
+
+        const deployButton = screen.getByText('Start Jules Task');
+        fireEvent.click(deployButton);
+
+        await waitFor(() => {
+            expect(globalThis.fetch).toHaveBeenCalledWith('/api/deploy_to_jules', expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ prompt: 'Task content' })
+            }));
+        });
+    });
+
     it('handles deployment error', async () => {
         const message: Message = {
             id: '7',
