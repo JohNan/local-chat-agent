@@ -406,49 +406,67 @@ class LSPManager:
             logger.error("Failed to start LSP server for %s: %s", language, e)
             return None
 
+    def _get_supported_languages_in_path(self, root_path: str) -> list[str]:
+        """
+        Scans the root path once for supported files and returns languages to start.
+        """
+        registry = LSPRegistry()
+        # pylint: disable=protected-access
+        configs = registry._config
+
+        lang_to_extensions = {}
+        for lang, config in configs.items():
+            exts = config.get("extensions", [])
+            if exts:
+                lang_to_extensions[lang] = tuple(exts)
+
+        if not lang_to_extensions:
+            return []
+
+        lang_counts = {lang: 0 for lang in lang_to_extensions}
+        found_languages = []
+        min_file_threshold = 2
+
+        for _, dirs, files in os.walk(root_path):
+            # Skip common ignored directories
+            dirs[:] = [
+                d
+                for d in dirs
+                if d not in {".git", "node_modules", "venv", "__pycache__", "dist"}
+            ]
+
+            for file in files:
+                for lang, extensions in lang_to_extensions.items():
+                    if lang in found_languages:
+                        continue
+                    if file.endswith(extensions):
+                        lang_counts[lang] += 1
+                        if lang_counts[lang] >= min_file_threshold:
+                            found_languages.append(lang)
+
+            if len(found_languages) == len(lang_to_extensions):
+                break
+
+        return found_languages
+
     async def start_supported_servers(self, root_path: str):
         """
         Scans the root path for supported files and starts corresponding LSP servers.
         """
         root_path = self._get_normalized_path(root_path)
         logger.info("Scanning for supported languages to start LSP servers...")
-        registry = LSPRegistry()
-        # pylint: disable=protected-access
-        for language, config in registry._config.items():
-            extensions = config.get("extensions", [])
-            if not extensions:
-                continue
-            extensions_tuple = tuple(extensions)
 
-            file_count = 0
-            found_threshold = False
-            min_file_threshold = 2
+        # Run directory scan in a separate thread to avoid blocking the event loop
+        found_languages = await asyncio.to_thread(
+            self._get_supported_languages_in_path, root_path
+        )
 
-            # Walk the directory to find a matching file
-            for _, dirs, files in os.walk(root_path):
-                # Skip common ignored directories
-                dirs[:] = [
-                    d
-                    for d in dirs
-                    if d not in {".git", "node_modules", "venv", "__pycache__", "dist"}
-                ]
-
-                for file in files:
-                    if file.endswith(extensions_tuple):
-                        file_count += 1
-                        if file_count >= min_file_threshold:
-                            found_threshold = True
-                            break
-                if found_threshold:
-                    break
-
-            if found_threshold:
-                logger.info(
-                    "Found >= %d %s files, starting LSP server...",
-                    min_file_threshold,
-                    language,
-                )
-                await self.start_server(language, root_path)
+        for language in found_languages:
+            logger.info(
+                "Found required files for %s, starting LSP server...",
+                language,
+            )
+            await self.start_server(language, root_path)
 
     async def get_definition(
         self, file_path: str, line: int, col: int
