@@ -1,4 +1,4 @@
-# Agent Instructions for Gemini Local Agent
+# Agent Instructions for Jules (Coding Agent)
 
 ## Project Overview
 This is a lightweight, self-hosted web interface acting as a "Prompt Architect" for another AI agent.
@@ -27,6 +27,7 @@ It runs on **Python 3.11+** using **FastAPI** and **Google Gemini API**.
 4. **Rate Limiting:** Embedding calls are rate-limited to 1,000 TPM and 3,000 RPM. See `docs/rag_limitations.md` for details.
 5. **Security:** Never hardcode API keys. Use `os.environ.get("GOOGLE_API_KEY")` or `os.environ.get("JULES_API_KEY")`.
 6. **Frontend State:** Complex scroll logic (lazy loading) is handled in `ChatInterface.tsx` using `useLayoutEffect`. Maintain this pattern to prevent scroll jumping.
+7. **Prompt Extraction:** When deploying to Jules, the frontend must strip any `<details>` blocks (containing reasoning traces) from the extracted prompt text to avoid polluting Jules' context.
 
 ## Testing
 
