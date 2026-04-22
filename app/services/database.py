@@ -210,10 +210,7 @@ class DatabaseManager:
                 parts = msg.get("parts", [])
 
                 # Extract content (text) from parts for easier querying if available
-                content = ""
-                for part in parts:
-                    if "text" in part:
-                        content += part["text"]
+                content = "".join(part["text"] for part in parts if "text" in part)
 
                 created_at = datetime.now(timezone.utc).isoformat()
 
