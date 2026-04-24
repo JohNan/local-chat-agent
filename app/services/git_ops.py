@@ -142,7 +142,7 @@ def get_repo_info():
             "source_id": source_id,
         }
 
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except (subprocess.SubprocessError, OSError) as e:
         logger.error("Error getting repo info: %s", e)
         return {"project": "No Git Repo", "branch": "-", "source_id": ""}
 
@@ -174,7 +174,7 @@ def get_git_status() -> list[str]:
     except subprocess.CalledProcessError as e:
         logger.error("Git status failed: %s", e.stderr)
         return []
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except (subprocess.SubprocessError, OSError) as e:
         logger.error("Error getting git status: %s", e)
         return []
 
@@ -259,7 +259,7 @@ def perform_git_push(
         error_msg = e.stderr or e.stdout
         logger.error("Git push sequence failed: %s", error_msg)
         return {"success": False, "output": error_msg}
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except (subprocess.SubprocessError, OSError) as e:
         logger.error("Git push sequence failed: %s", e)
         return {"success": False, "output": str(e)}
 
@@ -282,7 +282,7 @@ def perform_git_pull():
     except subprocess.CalledProcessError as e:
         logger.error("Git stderr: %s", e.stderr)
         return {"success": False, "output": e.stderr or e.stdout}
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except (subprocess.SubprocessError, OSError) as e:
         logger.error("Git pull failed: %s", e)
         return {"success": False, "output": str(e)}
 
@@ -469,7 +469,7 @@ def get_file_history(filepath: str, max_count: int = 10) -> str:
     except subprocess.CalledProcessError as e:
         logger.error("Git log failed: %s", e.stderr)
         return f"Error retrieving history: {e.stderr or e.stdout}"
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except (subprocess.SubprocessError, OSError) as e:
         logger.error("Error retrieving file history: %s", e)
         return f"Error retrieving history: {str(e)}"
 
@@ -503,7 +503,7 @@ def get_recent_commits(max_count: int = 10) -> str:
     except subprocess.CalledProcessError as e:
         logger.error("Git log failed: %s", e.stderr)
         return f"Error retrieving recent commits: {e.stderr or e.stdout}"
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except (subprocess.SubprocessError, OSError) as e:
         logger.error("Error retrieving recent commits: %s", e)
         return f"Error retrieving recent commits: {str(e)}"
 
@@ -568,7 +568,7 @@ def grep_code(query: str, case_sensitive: bool = False) -> str:
 
         return output
 
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except (subprocess.SubprocessError, OSError) as e:
         logger.error("Error searching code: %s", e)
         return f"Error searching code: {str(e)}"
 
@@ -864,7 +864,7 @@ def write_to_docs(filepath: str, content: str) -> str:
 
         return f"Successfully wrote to {filepath}"
 
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except OSError as e:
         logger.error("Error writing to docs: %s", e)
         return f"Error writing file: {str(e)}"
 
@@ -910,6 +910,6 @@ def get_pr_diff(pr_number: int) -> str:
     except subprocess.CalledProcessError as e:
         logger.error("Error getting PR diff: %s", e.stderr)
         return f"Error retrieving PR diff: {e.stderr or e.stdout}"
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except (subprocess.SubprocessError, OSError) as e:
         logger.error("Error getting PR diff: %s", e)
         return f"Error retrieving PR diff: {str(e)}"
