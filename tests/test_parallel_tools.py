@@ -60,7 +60,7 @@ def test_parallel_tool_execution(client):
         # Patch the tools in TOOL_MAP directly because agent_engine imports them at module level
         # so patching git_ops directly doesn't update TOOL_MAP
         with patch.dict(
-            "app.agent_engine.TOOL_MAP",
+            "app.services.llm_service.TOOL_MAP",
             {"read_file": mock_read_impl, "list_files": mock_list_impl},
         ):
 

@@ -53,23 +53,6 @@ class TaskState:
 CURRENT_STATE: TaskState | None = None
 
 # Helper for tool map
-TOOL_MAP = {
-    "list_files": git_ops.list_files,
-    "read_file": git_ops.read_file,
-    "get_file_history": git_ops.get_file_history,
-    "get_recent_commits": git_ops.get_recent_commits,
-    "grep_code": git_ops.grep_code,
-    "get_file_outline": git_ops.get_file_outline,
-    "read_android_manifest": git_ops.read_android_manifest,
-    "get_definition": git_ops.get_definition,
-    "search_codebase_semantic": rag_manager.search_codebase_semantic,
-    "code_execution": code_executor.execute_code,
-    "run_programming_task": code_executor.execute_code,
-    "fetch_url": web_ops.fetch_url,
-    "write_to_docs": git_ops.write_to_docs,
-}
-
-
 def get_active_stream_queue() -> asyncio.Queue | None:
     """Returns a new queue for the active task stream if it exists."""
     if CURRENT_STATE:
@@ -88,256 +71,6 @@ def _extract_error_message(error_text: str) -> str:
     if match:
         return match.group(1)
     return error_text
-
-
-async def _execute_tool(fc):
-    """
-    Executes a single tool call safely.
-    Returns the result.
-    """
-    logger.info("Executing tool: %s args=%s", fc.name, fc.args)
-    tool_func = TOOL_MAP.get(fc.name)
-    if tool_func:
-        try:
-            if asyncio.iscoroutinefunction(tool_func):
-                return await tool_func(**fc.args)
-            # Tools are synchronous and blocking (e.g. file I/O).
-            # Run them in a thread.
-            return await asyncio.to_thread(tool_func, **fc.args)
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            return f"Error executing {fc.name}: {e}"
-
-    # Check MCP tools
-    session = llm_service.MCP_TOOL_TO_SESSION_MAP.get(fc.name)
-    if session:
-        try:
-            result = await session.call_tool(fc.name, arguments=fc.args)
-            # Extract content from MCP result
-            output_text = []
-            if hasattr(result, "content"):
-                for content in result.content:
-                    if content.type == "text":
-                        output_text.append(content.text)
-                    elif content.type == "image":
-                        output_text.append(f"[Image: {content.mimeType}]")
-                    else:
-                        output_text.append(str(content))
-            else:
-                output_text.append(str(result))
-
-            return "\n".join(output_text)
-
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            return f"Error executing MCP tool {fc.name}: {e}"
-
-    logger.warning("Unknown tool call: %s", fc.name)
-    return f"Error: Tool {fc.name} not found."
-
-
-def cancel_current_task():
-    """Cancels the current running task."""
-    if (
-        CURRENT_STATE
-        and CURRENT_STATE.task_handle
-        and not CURRENT_STATE.task_handle.done()
-    ):
-        logger.info("Cancelling current task...")
-        CURRENT_STATE.task_handle.cancel()
-        return True
-    return False
-
-
-async def _stream_with_retry(
-    chat_session, current_msg, turn: int, task_state: TaskState
-):
-    """
-    Attempts to establish a stream with retry logic for transient errors.
-    """
-    max_retries = 3
-    retry_delay = 2
-
-    for attempt in range(max_retries + 1):
-        try:
-            return await chat_session.send_message_stream(current_msg)
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            error_str = str(e)
-            is_retryable = (
-                "503" in error_str
-                or "Service Unavailable" in error_str
-                or "high demand" in error_str
-            )
-
-            if is_retryable and attempt < max_retries:
-                logger.warning(
-                    "[TURN %d] Gemini 503/Busy. Retrying in %ds (Attempt %d/%d)...",
-                    turn,
-                    retry_delay,
-                    attempt + 1,
-                    max_retries,
-                )
-                # Notify frontend via tool status
-                msg = (
-                    f"Gemini API is busy. Retrying in {retry_delay} seconds... "
-                    f"(Attempt {attempt + 1}/{max_retries})"
-                )
-                await task_state.broadcast(f"event: tool\ndata: {json.dumps(msg)}\n\n")
-                await asyncio.sleep(retry_delay)
-                retry_delay *= 2  # Exponential backoff
-            else:
-                raise e
-
-    raise RuntimeError("Failed to establish stream after retries.")
-
-
-async def _process_turn_stream(
-    chat_session, current_msg, turn: int, task_state: TaskState
-) -> tuple[str, list]:
-    """
-    Handles the streaming interaction with the LLM for a single turn, including retries.
-    Returns the full text of the turn and any tool calls found.
-    """
-    turn_text_parts = []
-    tool_calls = []
-
-    stream = await _stream_with_retry(chat_session, current_msg, turn, task_state)
-
-    async for chunk in stream:
-        # Text processing
-        try:
-            chunk_text = ""
-            # Safely extract text from parts if available
-            if hasattr(chunk, "parts"):
-                for part in chunk.parts:
-                    if part.text:
-                        chunk_text += part.text
-            # Fallback for simple text responses (if parts is missing/empty)
-            elif hasattr(chunk, "text"):
-                try:
-                    chunk_text = chunk.text
-                except Exception:  # pylint: disable=broad-exception-caught
-                    pass
-
-            if chunk_text:
-                turn_text_parts.append(chunk_text)
-                await task_state.broadcast(
-                    f"event: message\ndata: {json.dumps(chunk_text)}\n\n"
-                )
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error("[TURN %d] Error processing chunk text: %s", turn, e)
-
-        # Tool call processing
-        try:
-            # 1. Primary check: chunk.function_calls (Gemini SDK v0.3+)
-            if hasattr(chunk, "function_calls") and chunk.function_calls:
-                tool_calls.extend(chunk.function_calls)
-            # 2. Fallback check: chunk.parts (Legacy)
-            elif hasattr(chunk, "parts"):
-                for part in chunk.parts:
-                    if part.function_call:
-                        tool_calls.append(part.function_call)
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error("[TURN %d] Error processing chunk tool calls: %s", turn, e)
-
-    full_turn_text = "".join(turn_text_parts)
-    return full_turn_text, tool_calls
-
-
-async def _execute_turn_tools(
-    tool_calls: list, turn: int, task_state: TaskState, tool_usage_counts: defaultdict
-) -> list[types.Part]:
-    """
-    Executes the tools for a single turn and returns the response parts.
-    """
-    logger.debug("[TURN %d] Executing tools...", turn)
-    tool_descriptions = []
-    for fc in tool_calls:
-        tool_usage_counts[fc.name] += 1
-        if fc.name == "read_file":
-            tool_descriptions.append(f"Reading file '{fc.args.get('filepath')}'")
-        elif fc.name == "list_files":
-            tool_descriptions.append(f"Listing directory '{fc.args.get('directory')}'")
-        elif fc.name == "get_file_history":
-            tool_descriptions.append(f"Getting history for '{fc.args.get('filepath')}'")
-        elif fc.name == "get_recent_commits":
-            tool_descriptions.append("Getting recent commits")
-        elif fc.name == "get_file_outline":
-            tool_descriptions.append(f"Outlining '{fc.args.get('filepath')}'")
-        elif fc.name == "read_android_manifest":
-            tool_descriptions.append("Reading Android Manifest")
-        elif fc.name == "search_codebase_semantic":
-            tool_descriptions.append(f"Searching codebase for '{fc.args.get('query')}'")
-        elif fc.name in ("code_execution", "run_programming_task"):
-            tool_descriptions.append("Running python code")
-        else:
-            tool_descriptions.append(f"Running {fc.name}")
-
-    joined_descriptions = ", ".join(tool_descriptions)
-    # STRICT JSON ENCODING prevents newlines from breaking SSE
-    tool_status_msg = f"{joined_descriptions}..."
-    await task_state.broadcast(f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n")
-
-    # Parallel Execution
-    tool_results = await asyncio.gather(*[_execute_tool(fc) for fc in tool_calls])
-
-    response_parts = []
-    for fc, result in zip(tool_calls, tool_results):
-        response_parts.append(
-            types.Part.from_function_response(name=fc.name, response={"result": result})
-        )
-    return response_parts
-
-
-async def _run_loop(
-    chat_session, current_msg, task_state: TaskState
-) -> tuple[defaultdict, list[str], str]:
-    """
-    Runs the main agent loop.
-    Returns collected tool usage, reasoning trace, and final answer.
-    """
-    turn = 0
-    tool_usage_counts = defaultdict(int)
-    reasoning_trace = []
-    final_answer = ""
-
-    while turn < 50:
-        turn += 1
-        logger.debug("[TURN %d] Sending message to SDK", turn)
-
-        # _process_turn_stream raises exception on failure, which will be caught by caller
-        try:
-            full_turn_text, tool_calls = await _process_turn_stream(
-                chat_session, current_msg, turn, task_state
-            )
-        except Exception:  # pylint: disable=broad-exception-caught
-            # Log the error with turn context before propagating
-            logger.error("Turn %d Error: %s", turn, traceback.format_exc())
-            raise
-
-        if full_turn_text:
-            reasoning_trace.append(full_turn_text)
-
-        if not tool_calls:
-            if reasoning_trace:
-                final_answer = reasoning_trace.pop()
-            break
-
-        current_msg = await _execute_turn_tools(
-            tool_calls, turn, task_state, tool_usage_counts
-        )
-
-        if turn == 50:
-            # pylint: disable=line-too-long
-            final_answer = (
-                "I've reached the maximum number of steps (50) for this turn. "
-                "I've performed several actions, which you can see in the reasoning trace below. "
-                "Would you like me to continue where I left off?"
-            )
-            # pylint: enable=line-too-long
-            await task_state.broadcast(
-                f"event: message\ndata: {json.dumps(final_answer)}\n\n"
-            )
-
-    return tool_usage_counts, reasoning_trace, final_answer
 
 
 async def _finalize_task(
@@ -393,6 +126,14 @@ async def _finalize_task(
     await task_state.broadcast("event: done\ndata: [DONE]\n\n")
 
 
+
+def cancel_current_task() -> bool:
+    """Cancels the currently running agent task, if any."""
+    if CURRENT_STATE and CURRENT_STATE.task_handle:
+        CURRENT_STATE.task_handle.cancel()
+        return True
+    return False
+
 async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: str):
     """
     Background worker that runs the agent loop and pushes events to the queue.
@@ -405,7 +146,8 @@ async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: s
     task_state.add_listener(initial_queue)
 
     try:
-        tool_usage_counts, reasoning_trace, final_answer = await _run_loop(
+        service = llm_service.get_llm_service()
+        tool_usage_counts, reasoning_trace, final_answer = await service.execute_turn(
             chat_session, user_msg, task_state
         )
         await _finalize_task(
