@@ -17,7 +17,6 @@ from app.services import code_executor, git_ops, rag_manager, web_ops
 from app.config import LLM_ENGINE
 
 
-
 # pylint: disable=too-few-public-methods
 class BaseLLMService(Protocol):
     """Protocol defining the interface for an LLM Service."""
@@ -26,7 +25,6 @@ class BaseLLMService(Protocol):
         self, chat_session: Any, current_msg: str, task_state: Any
     ) -> tuple[defaultdict, list[str], str]:
         """Executes a single turn of the agent loop."""
-
 
 
 logger = logging.getLogger(__name__)
@@ -615,7 +613,6 @@ class CLILLMService(BaseLLMService):
 
 def get_llm_service() -> BaseLLMService:
     """Returns the configured LLM service instance."""
-
 
     if LLM_ENGINE == "cli":
         return CLILLMService()
