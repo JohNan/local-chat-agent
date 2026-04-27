@@ -14,8 +14,9 @@ from typing import Protocol, Any
 from google.genai import types
 from acp import spawn_agent_process, text_block
 from acp.interfaces import Client
+from acp.schema import ClientCapabilities, FileSystemCapabilities
 
-from app.services import code_executor, git_ops, rag_manager, web_ops
+from app.services import chat_manager, code_executor, git_ops, rag_manager, web_ops
 from app.config import LLM_ENGINE
 
 
@@ -602,10 +603,28 @@ class CLILLMService(BaseLLMService):
         client = ACPClientHandler(task_state)
 
         try:
+            model = await asyncio.to_thread(chat_manager.get_setting, "default_model")
+            if not model:
+                model = "gemini-2.5-flash"
+
             async with spawn_agent_process(
-                client, "gemini", "--acp", "--output-format", "stream-json"
+                client,
+                "gemini",
+                "--acp",
+                "--output-format",
+                "stream-json",
+                "--model",
+                model,
             ) as (conn, _proc):
-                await conn.initialize(protocol_version=1)
+                await conn.initialize(
+                    protocol_version=1,
+                    client_capabilities=ClientCapabilities(
+                        fs=FileSystemCapabilities(
+                            read_text_file=True, write_text_file=True
+                        ),
+                        terminal=True,
+                    ),
+                )
                 session = await conn.new_session(cwd=".", mcp_servers=[])
                 await conn.prompt(
                     session_id=session.session_id,
