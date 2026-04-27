@@ -3,27 +3,31 @@ Service for LLM interactions and helper functions.
 """
 
 import base64
-import logging
 import asyncio
+import json
+import logging
+import traceback
+from collections import defaultdict
 from pathlib import Path
+from typing import Protocol, Any
+
 from google.genai import types
 
-from typing import Protocol, Any
-from collections import defaultdict
+from app.services import code_executor, git_ops, rag_manager, web_ops
+from app.config import LLM_ENGINE
 
 
+
+# pylint: disable=too-few-public-methods
 class BaseLLMService(Protocol):
+    """Protocol defining the interface for an LLM Service."""
+
     async def execute_turn(
         self, chat_session: Any, current_msg: str, task_state: Any
     ) -> tuple[defaultdict, list[str], str]:
         """Executes a single turn of the agent loop."""
-        ...
 
 
-import json
-import traceback
-from collections import defaultdict
-from app.services import git_ops, rag_manager, web_ops, code_executor
 
 logger = logging.getLogger(__name__)
 
@@ -344,6 +348,7 @@ async def _execute_tool(fc):
     return f"Error: Tool {fc.name} not found."
 
 
+# pylint: disable=too-few-public-methods
 class SDKLLMService(BaseLLMService):
     """Implementation of the LLM service using the Google GenAI SDK."""
 
@@ -560,14 +565,13 @@ class SDKLLMService(BaseLLMService):
         return tool_usage_counts, reasoning_trace, final_answer
 
 
+# pylint: disable=too-few-public-methods
 class CLILLMService(BaseLLMService):
     """Implementation of the LLM service using the Gemini CLI."""
 
     async def execute_turn(
         self, chat_session: Any, current_msg: str, task_state: Any
     ) -> tuple[defaultdict, list[str], str]:
-        import asyncio
-        import json
 
         tool_usage_counts = defaultdict(int)
         reasoning_trace = []
@@ -610,7 +614,8 @@ class CLILLMService(BaseLLMService):
 
 
 def get_llm_service() -> BaseLLMService:
-    from app.config import LLM_ENGINE
+    """Returns the configured LLM service instance."""
+
 
     if LLM_ENGINE == "cli":
         return CLILLMService()

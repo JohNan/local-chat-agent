@@ -10,16 +10,8 @@ import asyncio
 import re
 from collections import defaultdict
 
-from google.genai import types
 
-from app.services import (
-    git_ops,
-    chat_manager,
-    rag_manager,
-    llm_service,
-    code_executor,
-    web_ops,
-)
+from app.services import chat_manager, llm_service
 
 logger = logging.getLogger(__name__)
 

@@ -116,7 +116,7 @@ async def test_run_agent_task_tool_execution():
 
     # Mock tool execution
     with patch(
-        "app.agent_engine.git_ops.list_files", return_value=["file1.txt"]
+        "app.services.llm_service.git_ops.list_files", return_value=["file1.txt"]
     ), patch("app.agent_engine.chat_manager.save_message") as mock_save:
 
         await run_agent_task(mock_queue, mock_chat_session, "list files")
