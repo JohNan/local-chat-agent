@@ -45,7 +45,6 @@ class TaskState:
 CURRENT_STATE: TaskState | None = None
 
 
-# Helper for tool map
 def get_active_stream_queue() -> asyncio.Queue | None:
     """Returns a new queue for the active task stream if it exists."""
     if CURRENT_STATE:
@@ -121,7 +120,7 @@ async def _finalize_task(
 
 def cancel_current_task() -> bool:
     """Cancels the currently running agent task, if any."""
-    if CURRENT_STATE and CURRENT_STATE.task_handle:
+    if CURRENT_STATE and CURRENT_STATE.task_handle and not CURRENT_STATE.task_handle.done():
         CURRENT_STATE.task_handle.cancel()
         return True
     return False

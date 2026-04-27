@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y \
 RUN pip install python-lsp-server
 
 # TypeScript
-RUN npm install -g typescript typescript-language-server
+RUN npm install -g typescript typescript-language-server @google/gemini-cli
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
