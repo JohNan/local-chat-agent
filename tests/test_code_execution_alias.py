@@ -12,7 +12,8 @@ def test_tool_map_alias():
     """Verify that run_programming_task maps to code_executor.execute_code."""
     assert "run_programming_task" in app.services.llm_service.TOOL_MAP
     assert (
-        app.services.llm_service.TOOL_MAP["run_programming_task"] == code_executor.execute_code
+        app.services.llm_service.TOOL_MAP["run_programming_task"]
+        == code_executor.execute_code
     )
 
 

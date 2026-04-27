@@ -12,6 +12,7 @@ import logging
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
+
 def main():
     logger.info("MCP Server starting...")
     # TODO: Implement the FastMCP server or similar here
@@ -29,6 +30,7 @@ def main():
                 print(json.dumps(resp), flush=True)
         except json.JSONDecodeError:
             pass
+
 
 if __name__ == "__main__":
     main()

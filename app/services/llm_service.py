@@ -11,10 +11,14 @@ from google.genai import types
 from typing import Protocol, Any
 from collections import defaultdict
 
+
 class BaseLLMService(Protocol):
-    async def execute_turn(self, chat_session: Any, current_msg: str, task_state: Any) -> tuple[defaultdict, list[str], str]:
+    async def execute_turn(
+        self, chat_session: Any, current_msg: str, task_state: Any
+    ) -> tuple[defaultdict, list[str], str]:
         """Executes a single turn of the agent loop."""
         ...
+
 
 import json
 import traceback
@@ -278,6 +282,7 @@ async def stream_generator(queue: asyncio.Queue):
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Stream generator error: %s", e)
 
+
 TOOL_MAP = {
     "list_files": git_ops.list_files,
     "read_file": git_ops.read_file,
@@ -293,6 +298,7 @@ TOOL_MAP = {
     "fetch_url": web_ops.fetch_url,
     "write_to_docs": git_ops.write_to_docs,
 }
+
 
 async def _execute_tool(fc):
     """
@@ -338,18 +344,16 @@ async def _execute_tool(fc):
     return f"Error: Tool {fc.name} not found."
 
 
-
-
-
-
 class SDKLLMService(BaseLLMService):
     """Implementation of the LLM service using the Google GenAI SDK."""
 
-    async def execute_turn(self, chat_session: Any, current_msg: str, task_state: Any) -> tuple[defaultdict, list[str], str]:
+    async def execute_turn(
+        self, chat_session: Any, current_msg: str, task_state: Any
+    ) -> tuple[defaultdict, list[str], str]:
         return await self._run_loop(chat_session, current_msg, task_state)
 
-    async def _stream_with_retry(self,
-        chat_session, current_msg, turn: int, task_state: Any
+    async def _stream_with_retry(
+        self, chat_session, current_msg, turn: int, task_state: Any
     ):
         """
         Attempts to establish a stream with retry logic for transient errors.
@@ -381,7 +385,9 @@ class SDKLLMService(BaseLLMService):
                         f"Gemini API is busy. Retrying in {retry_delay} seconds... "
                         f"(Attempt {attempt + 1}/{max_retries})"
                     )
-                    await task_state.broadcast(f"event: tool\ndata: {json.dumps(msg)}\n\n")
+                    await task_state.broadcast(
+                        f"event: tool\ndata: {json.dumps(msg)}\n\n"
+                    )
                     await asyncio.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
                 else:
@@ -389,11 +395,8 @@ class SDKLLMService(BaseLLMService):
 
         raise RuntimeError("Failed to establish stream after retries.")
 
-
-
-
-    async def _process_turn_stream(self,
-        chat_session, current_msg, turn: int, task_state: Any
+    async def _process_turn_stream(
+        self, chat_session, current_msg, turn: int, task_state: Any
     ) -> tuple[str, list]:
         """
         Handles the streaming interaction with the LLM for a single turn, including retries.
@@ -402,7 +405,9 @@ class SDKLLMService(BaseLLMService):
         turn_text_parts = []
         tool_calls = []
 
-        stream = await self._stream_with_retry(chat_session, current_msg, turn, task_state)
+        stream = await self._stream_with_retry(
+            chat_session, current_msg, turn, task_state
+        )
 
         async for chunk in stream:
             # Text processing
@@ -444,11 +449,12 @@ class SDKLLMService(BaseLLMService):
         full_turn_text = "".join(turn_text_parts)
         return full_turn_text, tool_calls
 
-
-
-
-    async def _execute_turn_tools(self,
-        tool_calls: list, turn: int, task_state: Any, tool_usage_counts: defaultdict
+    async def _execute_turn_tools(
+        self,
+        tool_calls: list,
+        turn: int,
+        task_state: Any,
+        tool_usage_counts: defaultdict,
     ) -> list[types.Part]:
         """
         Executes the tools for a single turn and returns the response parts.
@@ -460,9 +466,13 @@ class SDKLLMService(BaseLLMService):
             if fc.name == "read_file":
                 tool_descriptions.append(f"Reading file '{fc.args.get('filepath')}'")
             elif fc.name == "list_files":
-                tool_descriptions.append(f"Listing directory '{fc.args.get('directory')}'")
+                tool_descriptions.append(
+                    f"Listing directory '{fc.args.get('directory')}'"
+                )
             elif fc.name == "get_file_history":
-                tool_descriptions.append(f"Getting history for '{fc.args.get('filepath')}'")
+                tool_descriptions.append(
+                    f"Getting history for '{fc.args.get('filepath')}'"
+                )
             elif fc.name == "get_recent_commits":
                 tool_descriptions.append("Getting recent commits")
             elif fc.name == "get_file_outline":
@@ -470,7 +480,9 @@ class SDKLLMService(BaseLLMService):
             elif fc.name == "read_android_manifest":
                 tool_descriptions.append("Reading Android Manifest")
             elif fc.name == "search_codebase_semantic":
-                tool_descriptions.append(f"Searching codebase for '{fc.args.get('query')}'")
+                tool_descriptions.append(
+                    f"Searching codebase for '{fc.args.get('query')}'"
+                )
             elif fc.name in ("code_execution", "run_programming_task"):
                 tool_descriptions.append("Running python code")
             else:
@@ -479,7 +491,9 @@ class SDKLLMService(BaseLLMService):
         joined_descriptions = ", ".join(tool_descriptions)
         # STRICT JSON ENCODING prevents newlines from breaking SSE
         tool_status_msg = f"{joined_descriptions}..."
-        await task_state.broadcast(f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n")
+        await task_state.broadcast(
+            f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n"
+        )
 
         # Parallel Execution
         tool_results = await asyncio.gather(*[_execute_tool(fc) for fc in tool_calls])
@@ -487,15 +501,14 @@ class SDKLLMService(BaseLLMService):
         response_parts = []
         for fc, result in zip(tool_calls, tool_results):
             response_parts.append(
-                types.Part.from_function_response(name=fc.name, response={"result": result})
+                types.Part.from_function_response(
+                    name=fc.name, response={"result": result}
+                )
             )
         return response_parts
 
-
-
-
-    async def _run_loop(self,
-        chat_session, current_msg, task_state: Any
+    async def _run_loop(
+        self, chat_session, current_msg, task_state: Any
     ) -> tuple[defaultdict, list[str], str]:
         """
         Runs the main agent loop.
@@ -547,12 +560,12 @@ class SDKLLMService(BaseLLMService):
         return tool_usage_counts, reasoning_trace, final_answer
 
 
-
-
 class CLILLMService(BaseLLMService):
     """Implementation of the LLM service using the Gemini CLI."""
 
-    async def execute_turn(self, chat_session: Any, current_msg: str, task_state: Any) -> tuple[defaultdict, list[str], str]:
+    async def execute_turn(
+        self, chat_session: Any, current_msg: str, task_state: Any
+    ) -> tuple[defaultdict, list[str], str]:
         import asyncio
         import json
 
@@ -561,23 +574,30 @@ class CLILLMService(BaseLLMService):
         final_answer = ""
 
         proc = await asyncio.create_subprocess_exec(
-            "gemini", "-p", current_msg, "--output-format", "stream-json", "--acp",
+            "gemini",
+            "-p",
+            current_msg,
+            "--output-format",
+            "stream-json",
+            "--acp",
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
         )
 
         while True:
             line = await proc.stdout.readline()
             if not line:
                 break
-            line_str = line.decode('utf-8').strip()
+            line_str = line.decode("utf-8").strip()
             if line_str:
                 try:
                     data = json.loads(line_str)
                     if "text" in data:
                         text_chunk = data["text"]
                         final_answer += text_chunk
-                        await task_state.broadcast(f"event: message\ndata: {json.dumps(text_chunk)}\n\n")
+                        await task_state.broadcast(
+                            f"event: message\ndata: {json.dumps(text_chunk)}\n\n"
+                        )
                 except json.JSONDecodeError:
                     pass
 
@@ -588,8 +608,10 @@ class CLILLMService(BaseLLMService):
 
         return tool_usage_counts, reasoning_trace, final_answer
 
+
 def get_llm_service() -> BaseLLMService:
     from app.config import LLM_ENGINE
+
     if LLM_ENGINE == "cli":
         return CLILLMService()
     return SDKLLMService()
