@@ -23,6 +23,12 @@ HISTORY_LIMIT = 50
 DEFAULT_MODEL = "gemini-3-pro-preview"
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "5000"))
+LLM_ENGINE = os.environ.get("LLM_ENGINE", "sdk").lower()
+
+if LLM_ENGINE not in ("sdk", "cli"):
+    logger.warning("Invalid LLM_ENGINE '%s', defaulting to 'sdk'.", LLM_ENGINE)
+    LLM_ENGINE = "sdk"
+
 
 if not GOOGLE_API_KEY:
     logger.warning("Warning: GOOGLE_API_KEY environment variable not set.")

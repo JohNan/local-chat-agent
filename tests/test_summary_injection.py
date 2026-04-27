@@ -15,6 +15,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # pylint: disable=wrong-import-position
 from app import agent_engine
+from app.services import llm_service
 
 
 @pytest.mark.asyncio
@@ -46,8 +47,8 @@ async def test_summary_injection():
     chat_session.send_message_stream.return_value = mock_stream()
 
     # Mock tool execution
-    original_tool_map = agent_engine.TOOL_MAP
-    agent_engine.TOOL_MAP = {"list_files": lambda **kwargs: ["file1.txt", "file2.txt"]}
+    original_tool_map = llm_service.TOOL_MAP
+    llm_service.TOOL_MAP = {"list_files": lambda **kwargs: ["file1.txt", "file2.txt"]}
 
     try:
         # Run agent task (limit turns to avoid infinite loop if logic is broken)
@@ -114,4 +115,4 @@ async def test_summary_injection():
         assert summary_found, "Summary message not found in queue output"
 
     finally:
-        agent_engine.TOOL_MAP = original_tool_map
+        llm_service.TOOL_MAP = original_tool_map
