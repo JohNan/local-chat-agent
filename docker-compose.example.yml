@@ -8,6 +8,8 @@ services:
     volumes:
       - ./:/codebase
       - ./config:/config
+      - ~/.config/gemini:/root/.config/gemini
+      - ~/.config/gcloud:/root/.config/gcloud
       - ${SSH_AUTH_SOCK}:/ssh-agent
     environment:
       - GOOGLE_API_KEY

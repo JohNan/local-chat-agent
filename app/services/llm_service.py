@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Protocol, Any
 
 from google.genai import types
+from acp import spawn_agent_process, text_block
+from acp.interfaces import Client
 
 from app.services import code_executor, git_ops, rag_manager, web_ops
 from app.config import LLM_ENGINE
@@ -563,52 +565,71 @@ class SDKLLMService(BaseLLMService):
         return tool_usage_counts, reasoning_trace, final_answer
 
 
+class ACPClientHandler(Client):
+    """ACP Client to handle streaming updates from Gemini CLI."""
+
+    def __init__(self, task_state):
+        super().__init__()
+        self.task_state = task_state
+        self.final_answer = ""
+        self.tool_usage_counts = defaultdict(int)
+        self.reasoning_trace = []
+
+    async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
+        # Check if it's an AgentMessageChunk and extract text
+        if hasattr(update, "type") and update.type == "agentMessageChunk":
+            if hasattr(update, "text"):
+                chunk = update.text
+                self.final_answer += chunk
+                await self.task_state.broadcast(
+                    f"event: message\ndata: {json.dumps(chunk)}\n\n"
+                )
+
+    async def request_permission(
+        self, options: Any, session_id: str, tool_call: Any, **kwargs: Any
+    ) -> Any:
+        return {"outcome": "approved"}
+
+
 # pylint: disable=too-few-public-methods
 class CLILLMService(BaseLLMService):
-    """Implementation of the LLM service using the Gemini CLI."""
+    """Implementation of the LLM service using the Gemini CLI via ACP."""
 
     async def execute_turn(
         self, chat_session: Any, current_msg: str, task_state: Any
     ) -> tuple[defaultdict, list[str], str]:
 
-        tool_usage_counts = defaultdict(int)
-        reasoning_trace = []
-        final_answer = ""
+        client = ACPClientHandler(task_state)
 
-        proc = await asyncio.create_subprocess_exec(
-            "gemini",
-            "-p",
-            current_msg,
-            "--output-format",
-            "stream-json",
-            "--acp",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        try:
+            async with spawn_agent_process(
+                client, "gemini", "--acp", "--output-format", "stream-json"
+            ) as (conn, _proc):
+                await conn.initialize(protocol_version=1)
+                session = await conn.new_session(cwd=".", mcp_servers=[])
+                await conn.prompt(
+                    session_id=session.session_id,
+                    prompt=[text_block(current_msg)],
+                )
 
-        while True:
-            line = await proc.stdout.readline()
-            if not line:
-                break
-            line_str = line.decode("utf-8").strip()
-            if line_str:
-                try:
-                    data = json.loads(line_str)
-                    if "text" in data:
-                        text_chunk = data["text"]
-                        final_answer += text_chunk
-                        await task_state.broadcast(
-                            f"event: message\ndata: {json.dumps(text_chunk)}\n\n"
-                        )
-                except json.JSONDecodeError:
-                    pass
+        except Exception as e:
+            error_str = str(e).lower()
+            if (
+                "missing or not configured" in error_str
+                or "authentication" in error_str
+                or "credentials" in error_str
+            ):
+                # pylint: disable=line-too-long
+                err_msg = "Authentication failed for Gemini CLI. If you are running in Docker, please run `gemini auth` on your host machine and mount your ~/.config/gemini and ~/.config/gcloud directories into the container as shown in docker-compose.example.yml."
+                # pylint: enable=line-too-long
+                await task_state.broadcast(f'event: error\ndata: "{err_msg}"\n\n')
+                return client.tool_usage_counts, client.reasoning_trace, err_msg
+            raise e
 
-        await proc.wait()
+        if client.final_answer:
+            client.reasoning_trace.append(client.final_answer)
 
-        if final_answer:
-            reasoning_trace.append(final_answer)
-
-        return tool_usage_counts, reasoning_trace, final_answer
+        return client.tool_usage_counts, client.reasoning_trace, client.final_answer
 
 
 def get_llm_service() -> BaseLLMService:
