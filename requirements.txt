@@ -14,3 +14,4 @@ pytest-asyncio>=0.25.0
 pathspec>=0.11.0
 chromadb
 mcp
+agent-client-protocol>=0.9.0
