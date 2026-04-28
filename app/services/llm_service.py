@@ -218,9 +218,7 @@ def get_cached_content_config(  # pylint: disable=too-many-locals
             try:
                 docs_content += f"\n\n--- {doc_file.name} ---\n"
                 docs_content += doc_file.read_text(encoding="utf-8")
-            except (
-                Exception
-            ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.warning("Failed to read %s: %s", doc_file, e)
 
     if docs_content:
@@ -272,9 +270,7 @@ def get_cached_content_config(  # pylint: disable=too-many-locals
 
         return cache.name, []
 
-    except (
-        Exception
-    ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.warning("Failed to create context cache: %s", e)
         # Clear state if creation failed to avoid stale state issues?
         # Maybe not necessary, but safer.
@@ -296,9 +292,7 @@ async def stream_generator(queue: asyncio.Queue):
         logger.warning(
             "Client disconnected from stream. Worker continues in background."
         )
-    except (
-        Exception
-    ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Stream generator error: %s", e)
 
 
@@ -333,9 +327,7 @@ async def _execute_tool(fc):
             # Tools are synchronous and blocking (e.g. file I/O).
             # Run them in a thread.
             return await asyncio.to_thread(tool_func, **fc.args)
-        except (
-            Exception
-        ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error executing {fc.name}: {e}"
 
     # Check MCP tools
@@ -358,9 +350,7 @@ async def _execute_tool(fc):
 
             return "\n".join(output_text)
 
-        except (
-            Exception
-        ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error executing MCP tool {fc.name}: {e}"
 
     logger.warning("Unknown tool call: %s", fc.name)
@@ -388,9 +378,7 @@ class SDKLLMService(BaseLLMService):
         for attempt in range(max_retries + 1):
             try:
                 return await chat_session.send_message_stream(current_msg)
-            except (
-                Exception
-            ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 error_str = str(e)
                 is_retryable = (
                     "503" in error_str
@@ -456,9 +444,7 @@ class SDKLLMService(BaseLLMService):
                     await task_state.broadcast(
                         f"event: message\ndata: {json.dumps(chunk_text)}\n\n"
                     )
-            except (
-                Exception
-            ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("[TURN %d] Error processing chunk text: %s", turn, e)
 
             # Tool call processing
@@ -471,9 +457,7 @@ class SDKLLMService(BaseLLMService):
                     for part in chunk.parts:
                         if part.function_call:
                             tool_calls.append(part.function_call)
-            except (
-                Exception
-            ) as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-exception-caught
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("[TURN %d] Error processing chunk tool calls: %s", turn, e)
 
         full_turn_text = "".join(turn_text_parts)
