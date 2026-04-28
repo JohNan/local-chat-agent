@@ -630,7 +630,9 @@ class CLILLMService(BaseLLMService):
                         terminal=True,
                     ),
                 )
-                session = await conn.new_session(cwd=git_ops.CODEBASE_ROOT, mcp_servers=[])
+                session = await conn.new_session(
+                    cwd=git_ops.CODEBASE_ROOT, mcp_servers=[]
+                )
                 await conn.prompt(
                     session_id=session.session_id,
                     prompt=[text_block(current_msg)],
