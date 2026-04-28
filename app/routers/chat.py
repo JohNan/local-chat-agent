@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from google.genai import types
 
 from app import agent_engine
-from app.config import CLIENT, ENABLE_GOOGLE_SEARCH, HISTORY_LIMIT
+from app.config import CLIENT, ENABLE_GOOGLE_SEARCH, HISTORY_LIMIT, LLM_ENGINE
 from app.services import chat_manager, prompt_router
 from app.services.llm_service import (
     prepare_messages,
@@ -114,7 +114,7 @@ async def chat(request: ChatRequest):
         await asyncio.to_thread(prompt_router.save_active_persona, active_persona)
         logger.info("Classified intent as: %s", active_persona)
 
-    system_instruction = prompt_router.get_system_instruction(active_persona)
+    system_instruction = prompt_router.get_system_instruction(active_persona, for_cli=(LLM_ENGINE == "cli"))
     if enable_search:
         system_instruction += (
             "\n\nYou also have access to Google Search to "
@@ -125,6 +125,8 @@ async def chat(request: ChatRequest):
     cache_name, history_arg = get_cached_content_config(
         CLIENT, formatted_history, system_instruction, request.model
     )
+
+    is_new_context = len(formatted_history) == 0
 
     if cache_name:
         logger.info("Using context cache: %s", cache_name)
@@ -161,7 +163,7 @@ async def chat(request: ChatRequest):
     queue = asyncio.Queue()
     asyncio.create_task(
         agent_engine.run_agent_task(
-            queue, chat_session, gemini_msg if request.media else user_msg
+            queue, chat_session, gemini_msg if request.media else user_msg, system_instruction, is_new_context
         )
     )
 
@@ -186,7 +188,9 @@ async def chat_get(message: str = Query(...)):
     tool = get_tool_config(CLIENT, ENABLE_GOOGLE_SEARCH)  # Use default search config
 
     active_persona = await asyncio.to_thread(prompt_router.load_active_persona)
-    system_instruction = prompt_router.get_system_instruction(active_persona)
+    system_instruction = prompt_router.get_system_instruction(active_persona, for_cli=(LLM_ENGINE == "cli"))
+
+    is_new_context = True
 
     chat_session = CLIENT.aio.chats.create(
         model="gemini-3-pro-preview",
@@ -204,7 +208,7 @@ async def chat_get(message: str = Query(...)):
     )
 
     queue = asyncio.Queue()
-    asyncio.create_task(agent_engine.run_agent_task(queue, chat_session, message))
+    asyncio.create_task(agent_engine.run_agent_task(queue, chat_session, message, system_instruction, is_new_context))
 
     return StreamingResponse(
         stream_generator(queue),

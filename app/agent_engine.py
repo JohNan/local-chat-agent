@@ -130,7 +130,7 @@ def cancel_current_task() -> bool:
     return False
 
 
-async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: str):
+async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: str, system_instruction: str = "", is_new_context: bool = False):
     """
     Background worker that runs the agent loop and pushes events to the queue.
     Decoupled from the HTTP response to ensure completion even if client disconnects.
@@ -144,7 +144,7 @@ async def run_agent_task(initial_queue: asyncio.Queue, chat_session, user_msg: s
     try:
         service = llm_service.get_llm_service()
         tool_usage_counts, reasoning_trace, final_answer = await service.execute_turn(
-            chat_session, user_msg, task_state
+            chat_session, user_msg, task_state, system_instruction, is_new_context
         )
         await _finalize_task(
             tool_usage_counts, reasoning_trace, final_answer, task_state

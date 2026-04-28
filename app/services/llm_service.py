@@ -30,7 +30,7 @@ class BaseLLMService(Protocol):
     """Protocol defining the interface for an LLM Service."""
 
     async def execute_turn(
-        self, chat_session: Any, current_msg: str, task_state: Any
+        self, chat_session: Any, current_msg: str, task_state: Any, system_instruction: str = "", is_new_context: bool = False
     ) -> tuple[defaultdict, list[str], str]:
         """Executes a single turn of the agent loop."""
 
@@ -47,8 +47,18 @@ MCP_TOOL_TO_SESSION_MAP = {}
 
 
 def clear_cache():
-    """Clears the global cache state."""
+    """Clears the global cache state and resets CLI session history."""
     CACHE_STATE.clear()
+    try:
+        import shutil
+        import os
+        # Delete only the current application's CLI history folder to prevent memory bleeding across contexts.
+        # Inside Docker, the working directory is /app, so the history is stored under 'app' by default.
+        history_dir = os.path.expanduser("~/.gemini/history/app")
+        if os.path.exists(history_dir):
+            shutil.rmtree(history_dir)
+    except Exception as e:
+        logger.warning("Failed to clear CLI history: %s", e)
 
 
 def get_tool_config(client, enable_search):
@@ -359,7 +369,7 @@ class SDKLLMService(BaseLLMService):
     """Implementation of the LLM service using the Google GenAI SDK."""
 
     async def execute_turn(
-        self, chat_session: Any, current_msg: str, task_state: Any
+        self, chat_session: Any, current_msg: str, task_state: Any, system_instruction: str = "", is_new_context: bool = False
     ) -> tuple[defaultdict, list[str], str]:
         return await self._run_loop(chat_session, current_msg, task_state)
 
@@ -602,7 +612,7 @@ class CLILLMService(BaseLLMService):
     """Implementation of the LLM service using the Gemini CLI via ACP."""
 
     async def execute_turn(
-        self, chat_session: Any, current_msg: str, task_state: Any
+        self, chat_session: Any, current_msg: str, task_state: Any, system_instruction: str = "", is_new_context: bool = False
     ) -> tuple[defaultdict, list[str], str]:
 
         client = ACPClientHandler(task_state)
@@ -631,9 +641,14 @@ class CLILLMService(BaseLLMService):
                     ),
                 )
                 session = await conn.new_session(cwd=".", mcp_servers=[])
+
+                prompt_msg = current_msg
+                if is_new_context and system_instruction:
+                    prompt_msg = f"{system_instruction}\n\n{current_msg}"
+
                 await conn.prompt(
                     session_id=session.session_id,
-                    prompt=[text_block(current_msg)],
+                    prompt=[text_block(prompt_msg)],
                 )
 
         except Exception as e:
