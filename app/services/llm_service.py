@@ -14,7 +14,7 @@ from typing import Protocol, Any
 from google.genai import types
 from acp import spawn_agent_process, text_block
 from acp.interfaces import Client
-from acp.schema import ClientCapabilities, FileSystemCapabilities
+from acp.schema import ClientCapabilities, FileSystemCapabilities, AgentMessageChunk, TextContentBlock
 
 from app.services import chat_manager, code_executor, git_ops, rag_manager, web_ops
 from app.config import LLM_ENGINE
@@ -578,9 +578,9 @@ class ACPClientHandler(Client):
 
     async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
         # Check if it's an AgentMessageChunk and extract text
-        if hasattr(update, "type") and update.type == "agentMessageChunk":
-            if hasattr(update, "text"):
-                chunk = update.text
+        if isinstance(update, AgentMessageChunk):
+            if isinstance(update.content, TextContentBlock):
+                chunk = update.content.text
                 self.final_answer += chunk
                 await self.task_state.broadcast(
                     f"event: message\ndata: {json.dumps(chunk)}\n\n"
