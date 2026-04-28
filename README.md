@@ -83,6 +83,20 @@ docker-compose up --build
 
 The current directory is mounted to `/codebase` in the containers.
 
+### OAuth Authentication with Gemini CLI Engine
+
+If you are using `LLM_ENGINE=cli` and want to authenticate using your Google Account (OAuth) instead of setting a `GEMINI_API_KEY`:
+
+1.  Run the application using Docker Compose.
+2.  Open a new terminal and attach interactively to the agent container:
+    ```bash
+    docker exec -it <project_name>-gemini-agent-1 gemini --skip-trust
+    ```
+    *(Note: The exact container name might differ depending on your folder name.)*
+3.  Select **"Sign in with Google"** and follow the prompts. The CLI will provide a URL to visit and ask you to paste back an authorization code.
+4.  Once completed, the OAuth credentials will be saved in `/root/.gemini/` inside the container.
+5.  Alternatively, you can authenticate on your host machine and mount your local `~/.gemini/` directory to the container (see `docker-compose.example.yml`).
+
 ## Usage
 
 1.  Open `http://localhost:5000`.

@@ -11,6 +11,8 @@ services:
       - ~/.config/gemini:/root/.config/gemini
       - ~/.config/gcloud:/root/.config/gcloud
       - ${SSH_AUTH_SOCK}:/ssh-agent
+      # Uncomment the next line to share Gemini CLI OAuth credentials from your host machine
+      # - ~/.gemini:/root/.gemini
     environment:
       - GOOGLE_API_KEY
       # - CHAT_HISTORY_FILE=/config/chat_history.json
