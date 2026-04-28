@@ -14,7 +14,12 @@ from typing import Protocol, Any
 from google.genai import types
 from acp import spawn_agent_process, text_block
 from acp.interfaces import Client
-from acp.schema import ClientCapabilities, FileSystemCapabilities, AgentMessageChunk, TextContentBlock
+from acp.schema import (
+    ClientCapabilities,
+    FileSystemCapabilities,
+    AgentMessageChunk,
+    TextContentBlock,
+)
 
 from app.services import chat_manager, code_executor, git_ops, rag_manager, web_ops
 from app.config import LLM_ENGINE
