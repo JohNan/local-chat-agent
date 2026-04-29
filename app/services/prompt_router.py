@@ -63,6 +63,7 @@ def load_cli_core_instruction() -> str:
     logger.error("CLI System core instruction not found in any location.")
     return "Error: CLI System core instruction not found."
 
+
 CLI_CORE_INSTRUCTION = load_cli_core_instruction()
 
 ARCHITECT_RULES = (
