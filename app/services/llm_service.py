@@ -608,10 +608,18 @@ class ACPClientHandler(Client):
         if isinstance(update, AgentMessageChunk):
             if isinstance(update.content, TextContentBlock):
                 chunk = update.content.text
-                self.final_answer += chunk
-                await self.task_state.broadcast(
-                    f"event: message\ndata: {json.dumps(chunk)}\n\n"
-                )
+                if chunk.startswith(self.final_answer):
+                    new_text = chunk[len(self.final_answer) :]
+                    self.final_answer = chunk
+                    if new_text:
+                        await self.task_state.broadcast(
+                            f"event: message\ndata: {json.dumps(new_text)}\n\n"
+                        )
+                else:
+                    self.final_answer += chunk
+                    await self.task_state.broadcast(
+                        f"event: message\ndata: {json.dumps(chunk)}\n\n"
+                    )
 
     async def request_permission(
         self, options: Any, session_id: str, tool_call: Any, **kwargs: Any
