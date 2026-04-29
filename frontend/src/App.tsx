@@ -46,6 +46,10 @@ function App() {
         const saved = localStorage.getItem("webSearchEnabled");
         return saved !== null ? JSON.parse(saved) : false;
     });
+    const [embeddingsEnabled, setEmbeddingsEnabled] = useState(() => {
+        const saved = localStorage.getItem("embeddingsEnabled");
+        return saved !== null ? JSON.parse(saved) : true;
+    });
     const [currentToolStatus, setCurrentToolStatus] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isTasksOpen, setIsTasksOpen] = useState(false);
@@ -283,6 +287,7 @@ function App() {
                     message: text,
                     model,
                     include_web_search: webSearchEnabled,
+                    include_embeddings: embeddingsEnabled,
                     media: media
                 }),
                 signal: controller.signal
@@ -360,6 +365,11 @@ function App() {
         localStorage.setItem("webSearchEnabled", JSON.stringify(webSearchEnabled));
     }, [webSearchEnabled]);
 
+    // Persist embeddings preference
+    useEffect(() => {
+        localStorage.setItem("embeddingsEnabled", JSON.stringify(embeddingsEnabled));
+    }, [embeddingsEnabled]);
+
     const filteredMessages = useMemo(() => {
         return messages.filter((m, index) => {
             // Hide function outputs
@@ -382,6 +392,8 @@ function App() {
                 setModel={handleModelChange}
                 webSearchEnabled={webSearchEnabled}
                 setWebSearchEnabled={setWebSearchEnabled}
+                embeddingsEnabled={embeddingsEnabled}
+                setEmbeddingsEnabled={setEmbeddingsEnabled}
                 onToggleTasks={() => setIsTasksOpen(!isTasksOpen)}
                 isGenerating={isGenerating}
             />
