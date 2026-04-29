@@ -42,6 +42,29 @@ def load_core_instruction() -> str:
 
 CORE_INSTRUCTION = load_core_instruction()
 
+
+def load_cli_core_instruction() -> str:
+    """
+    Loads the system core instruction for the CLI.
+    Prioritizes /config/system_core_cli.md (Docker volume) over app/prompts/system_core_cli.md.
+    """
+    search_paths = [
+        Path("/config/system_core_cli.md"),
+        Path("app/prompts/system_core_cli.md"),
+    ]
+
+    for path in search_paths:
+        if path.exists():
+            try:
+                return path.read_text(encoding="utf-8")
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error("Failed to read CLI system core from %s: %s", path, e)
+
+    logger.error("CLI System core instruction not found in any location.")
+    return "Error: CLI System core instruction not found."
+
+CLI_CORE_INSTRUCTION = load_cli_core_instruction()
+
 ARCHITECT_RULES = (
     "You are a Distinguished Architect, not a developer. "
     "You MUST NOT write executable application code. "
@@ -168,16 +191,9 @@ def get_system_instruction(persona_key: str, for_cli: bool = False) -> str:
     extra_instruction = PERSONA_PROMPTS.get(persona_key, "")
 
     if for_cli:
-        core_cli_instruction = (
-            "You are a Distinguished Architect, not a developer. "
-            "You MUST NOT write executable application code. "
-            "Every Final Prompt generated must include a Markdown ADR "
-            "(Architecture Decision Record) "
-            "and a Mermaid.js diagram specific to your domain."
-        )
         if extra_instruction:
-            return f"{date_context}\n\n{core_cli_instruction}\n\n{extra_instruction}"
-        return f"{date_context}\n\n{core_cli_instruction}"
+            return f"{date_context}\n\n{CLI_CORE_INSTRUCTION}\n\n{extra_instruction}"
+        return f"{date_context}\n\n{CLI_CORE_INSTRUCTION}"
 
     if extra_instruction:
         return f"{date_context}\n\n{CORE_INSTRUCTION}\n\n{extra_instruction}"

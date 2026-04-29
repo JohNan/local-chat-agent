@@ -162,3 +162,84 @@ def test_classify_intent_exception():
 
         result = classify_intent("Unknown request")
         assert result == "GENERAL"
+
+def test_load_cli_core_instruction_priority():
+    """Test that /config/system_core_cli.md is prioritized."""
+    from app.services.prompt_router import load_cli_core_instruction
+    with patch("app.services.prompt_router.Path") as mock_path:
+        # Create mocks for the two paths
+        config_path = MagicMock()
+        app_path = MagicMock()
+
+        # Configure side_effect to return specific mocks for specific paths
+        def side_effect(path_str):
+            if str(path_str) == "/config/system_core_cli.md":
+                return config_path
+            elif str(path_str) == "app/prompts/system_core_cli.md":
+                return app_path
+            return MagicMock()
+
+        mock_path.side_effect = side_effect
+
+        # Case 1: Config file exists
+        config_path.exists.return_value = True
+        config_path.read_text.return_value = "CLI Config Content"
+        assert load_cli_core_instruction() == "CLI Config Content"
+
+        # Case 2: Config file missing, App file exists
+        config_path.exists.return_value = False
+        app_path.exists.return_value = True
+        app_path.read_text.return_value = "CLI App Content"
+        assert load_cli_core_instruction() == "CLI App Content"
+
+        # Case 3: Both missing
+        config_path.exists.return_value = False
+        app_path.exists.return_value = False
+        assert "Error" in load_cli_core_instruction()
+
+
+def test_load_cli_core_instruction_read_error():
+    """Test fallback when reading CLI core instruction fails."""
+    from app.services.prompt_router import load_cli_core_instruction
+    with patch("app.services.prompt_router.Path") as mock_path:
+        config_path = MagicMock()
+        app_path = MagicMock()
+
+        def side_effect(path_str):
+            if str(path_str) == "/config/system_core_cli.md":
+                return config_path
+            elif str(path_str) == "app/prompts/system_core_cli.md":
+                return app_path
+            return MagicMock()
+
+        mock_path.side_effect = side_effect
+
+        # Config exists but read fails
+        config_path.exists.return_value = True
+        config_path.read_text.side_effect = Exception("Read error")
+
+        app_path.exists.return_value = True
+        app_path.read_text.return_value = "CLI App Content"
+
+        assert load_cli_core_instruction() == "CLI App Content"
+
+def test_get_system_instruction_for_cli():
+    """Test that get_system_instruction includes the CLI core instruction when for_cli=True."""
+    fixed_date = datetime(2023, 10, 27)
+    with patch("app.services.prompt_router.datetime") as mock_datetime:
+        mock_datetime.now.return_value = fixed_date
+
+        # Test default CLI prompt without extra instruction
+        with patch("app.services.prompt_router.CLI_CORE_INSTRUCTION", "MOCK_CLI_CORE_INSTRUCTION"):
+            with patch.dict("app.services.prompt_router.PERSONA_PROMPTS", {"TEST_PERSONA": ""}):
+                instruction = get_system_instruction("TEST_PERSONA", for_cli=True)
+                assert "MOCK_CLI_CORE_INSTRUCTION" in instruction
+                assert "Today's date is 2023-10-27" in instruction
+
+        # Test CLI prompt with extra instruction
+        with patch("app.services.prompt_router.CLI_CORE_INSTRUCTION", "MOCK_CLI_CORE_INSTRUCTION"):
+            with patch.dict("app.services.prompt_router.PERSONA_PROMPTS", {"TEST_PERSONA": "MOCK_EXTRA_INSTRUCTION"}):
+                instruction = get_system_instruction("TEST_PERSONA", for_cli=True)
+                assert "MOCK_CLI_CORE_INSTRUCTION" in instruction
+                assert "MOCK_EXTRA_INSTRUCTION" in instruction
+                assert "Today's date is 2023-10-27" in instruction
