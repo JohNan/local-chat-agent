@@ -156,7 +156,7 @@ def classify_intent(user_query: str) -> str:
         return "GENERAL"
 
 
-def get_system_instruction(persona_key: str) -> str:
+def get_system_instruction(persona_key: str, for_cli: bool = False) -> str:
     """Returns the combined system instruction."""
     # Ensure a valid key
     if persona_key not in PERSONA_PROMPTS:
@@ -166,6 +166,19 @@ def get_system_instruction(persona_key: str) -> str:
     date_context = f"Today's date is {current_date}."
 
     extra_instruction = PERSONA_PROMPTS.get(persona_key, "")
+
+    if for_cli:
+        core_cli_instruction = (
+            "You are a Distinguished Architect, not a developer. "
+            "You MUST NOT write executable application code. "
+            "Every Final Prompt generated must include a Markdown ADR "
+            "(Architecture Decision Record) "
+            "and a Mermaid.js diagram specific to your domain."
+        )
+        if extra_instruction:
+            return f"{date_context}\n\n{core_cli_instruction}\n\n{extra_instruction}"
+        return f"{date_context}\n\n{core_cli_instruction}"
+
     if extra_instruction:
         return f"{date_context}\n\n{CORE_INSTRUCTION}\n\n{extra_instruction}"
     return f"{date_context}\n\n{CORE_INSTRUCTION}"

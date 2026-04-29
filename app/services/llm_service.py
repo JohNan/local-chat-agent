@@ -8,6 +8,7 @@ import json
 import logging
 import traceback
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, Any
 
@@ -26,11 +27,24 @@ from app.config import LLM_ENGINE
 
 
 # pylint: disable=too-few-public-methods
+@dataclass(slots=True)
+class TurnContext:
+    """Context for a single LLM turn."""
+
+    system_instruction: str = ""
+    is_new_context: bool = False
+
+
+# pylint: disable=too-few-public-methods
 class BaseLLMService(Protocol):
     """Protocol defining the interface for an LLM Service."""
 
     async def execute_turn(
-        self, chat_session: Any, current_msg: str, task_state: Any
+        self,
+        chat_session: Any,
+        current_msg: str,
+        task_state: Any,
+        turn_context: TurnContext | None = None,
     ) -> tuple[defaultdict, list[str], str]:
         """Executes a single turn of the agent loop."""
 
@@ -362,8 +376,13 @@ class SDKLLMService(BaseLLMService):
     """Implementation of the LLM service using the Google GenAI SDK."""
 
     async def execute_turn(
-        self, chat_session: Any, current_msg: str, task_state: Any
+        self,
+        chat_session: Any,
+        current_msg: str,
+        task_state: Any,
+        turn_context: TurnContext | None = None,
     ) -> tuple[defaultdict, list[str], str]:
+        del turn_context
         return await self._run_loop(chat_session, current_msg, task_state)
 
     async def _stream_with_retry(
@@ -605,9 +624,13 @@ class CLILLMService(BaseLLMService):
     """Implementation of the LLM service using the Gemini CLI via ACP."""
 
     async def execute_turn(
-        self, chat_session: Any, current_msg: str, task_state: Any
+        self,
+        chat_session: Any,
+        current_msg: str,
+        task_state: Any,
+        turn_context: TurnContext | None = None,
     ) -> tuple[defaultdict, list[str], str]:
-
+        turn_context = turn_context or TurnContext()
         client = ACPClientHandler(task_state)
 
         try:
@@ -634,6 +657,10 @@ class CLILLMService(BaseLLMService):
                     ),
                 )
 
+                prompt_msg = current_msg
+                if turn_context.is_new_context and turn_context.system_instruction:
+                    prompt_msg = f"{turn_context.system_instruction}\n\n{current_msg}"
+
                 global ACP_CLI_SESSION_ID  # pylint: disable=global-statement
                 session = None
                 if ACP_CLI_SESSION_ID:
@@ -657,7 +684,7 @@ class CLILLMService(BaseLLMService):
 
                 await conn.prompt(
                     session_id=session.session_id,
-                    prompt=[text_block(current_msg)],
+                    prompt=[text_block(prompt_msg)],
                 )
 
         except Exception as e:  # pylint: disable=broad-exception-caught
