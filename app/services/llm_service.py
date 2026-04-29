@@ -662,28 +662,30 @@ class CLILLMService(BaseLLMService):
                     prompt_msg = f"{turn_context.system_instruction}\n\n{current_msg}"
 
                 global ACP_CLI_SESSION_ID  # pylint: disable=global-statement
-                session = None
+                current_session_id = None
                 if ACP_CLI_SESSION_ID:
                     try:
-                        session = await conn.load_session(
+                        await conn.load_session(
                             cwd=git_ops.CODEBASE_ROOT,
                             session_id=ACP_CLI_SESSION_ID,
                             mcp_servers=[],
                         )
+                        current_session_id = ACP_CLI_SESSION_ID
                     except Exception as e:  # pylint: disable=broad-exception-caught
                         logger.warning(
                             "Failed to load session %s: %s", ACP_CLI_SESSION_ID, e
                         )
-                        session = None
+                        current_session_id = None
 
-                if not session:
+                if not current_session_id:
                     session = await conn.new_session(
                         cwd=git_ops.CODEBASE_ROOT, mcp_servers=[]
                     )
-                    ACP_CLI_SESSION_ID = session.session_id
+                    current_session_id = session.session_id
+                    ACP_CLI_SESSION_ID = current_session_id
 
                 await conn.prompt(
-                    session_id=session.session_id,
+                    session_id=current_session_id,
                     prompt=[text_block(prompt_msg)],
                 )
 
