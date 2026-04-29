@@ -40,6 +40,7 @@ class TurnContext:
 class BaseLLMService(Protocol):
     """Protocol defining the interface for an LLM Service."""
 
+    # pylint: disable=too-many-locals
     async def execute_turn(
         self,
         chat_session: Any,
@@ -376,6 +377,7 @@ async def _execute_tool(fc):
 class SDKLLMService(BaseLLMService):
     """Implementation of the LLM service using the Google GenAI SDK."""
 
+    # pylint: disable=too-many-locals
     async def execute_turn(
         self,
         chat_session: Any,
@@ -649,6 +651,7 @@ class ACPClientHandler(Client):
 class CLILLMService(BaseLLMService):
     """Implementation of the LLM service using the Gemini CLI via ACP."""
 
+    # pylint: disable=too-many-locals
     async def execute_turn(
         self,
         chat_session: Any,
@@ -688,7 +691,7 @@ class CLILLMService(BaseLLMService):
                 if turn_context.is_new_context and turn_context.system_instruction:
                     prompt_msg = f"{turn_context.system_instruction}\n\n{current_msg}"
 
-                # Append the unique marker to the prompt so we can identify where the new response begins
+                # Append the unique marker to identify where the new response begins
                 prompt_msg = f"{prompt_msg}\n\n{turn_marker}\n\n"
 
                 global ACP_CLI_SESSION_ID  # pylint: disable=global-statement
