@@ -5,6 +5,7 @@ Service for LLM interactions and helper functions.
 import base64
 import asyncio
 import json
+import uuid
 import logging
 import traceback
 from collections import defaultdict
@@ -596,10 +597,13 @@ class SDKLLMService(BaseLLMService):
 class ACPClientHandler(Client):
     """ACP Client to handle streaming updates from Gemini CLI."""
 
-    def __init__(self, task_state):
+    def __init__(self, task_state, turn_marker: str):
         super().__init__()
         self.task_state = task_state
+        self.turn_marker = turn_marker
         self.final_answer = ""
+        self.raw_final_answer = ""
+        self.marker_found = False
         self.tool_usage_counts = defaultdict(int)
         self.reasoning_trace = []
 
@@ -608,18 +612,32 @@ class ACPClientHandler(Client):
         if isinstance(update, AgentMessageChunk):
             if isinstance(update.content, TextContentBlock):
                 chunk = update.content.text
-                if chunk.startswith(self.final_answer):
-                    new_text = chunk[len(self.final_answer) :]
-                    self.final_answer = chunk
-                    if new_text:
-                        await self.task_state.broadcast(
-                            f"event: message\ndata: {json.dumps(new_text)}\n\n"
-                        )
+
+                if chunk.startswith(self.raw_final_answer):
+                    new_raw_text = chunk[len(self.raw_final_answer) :]
+                    self.raw_final_answer = chunk
                 else:
-                    self.final_answer += chunk
-                    await self.task_state.broadcast(
-                        f"event: message\ndata: {json.dumps(chunk)}\n\n"
-                    )
+                    new_raw_text = chunk
+                    self.raw_final_answer += chunk
+
+                if not self.marker_found:
+                    idx = self.raw_final_answer.find(self.turn_marker)
+                    if idx != -1:
+                        self.marker_found = True
+                        new_text = self.raw_final_answer[
+                            idx + len(self.turn_marker) :
+                        ].lstrip("\n")
+                        self.final_answer = new_text
+                        if new_text:
+                            await self.task_state.broadcast(
+                                f"event: message\ndata: {json.dumps(new_text)}\n\n"
+                            )
+                else:
+                    if new_raw_text:
+                        self.final_answer += new_raw_text
+                        await self.task_state.broadcast(
+                            f"event: message\ndata: {json.dumps(new_raw_text)}\n\n"
+                        )
 
     async def request_permission(
         self, options: Any, session_id: str, tool_call: Any, **kwargs: Any
@@ -639,7 +657,8 @@ class CLILLMService(BaseLLMService):
         turn_context: TurnContext | None = None,
     ) -> tuple[defaultdict, list[str], str]:
         turn_context = turn_context or TurnContext()
-        client = ACPClientHandler(task_state)
+        turn_marker = f"<JULES_TURN_MARKER_{uuid.uuid4().hex}>"
+        client = ACPClientHandler(task_state, turn_marker)
 
         try:
             model = await asyncio.to_thread(chat_manager.get_setting, "default_model")
@@ -668,6 +687,9 @@ class CLILLMService(BaseLLMService):
                 prompt_msg = current_msg
                 if turn_context.is_new_context and turn_context.system_instruction:
                     prompt_msg = f"{turn_context.system_instruction}\n\n{current_msg}"
+
+                # Append the unique marker to the prompt so we can identify where the new response begins
+                prompt_msg = f"{prompt_msg}\n\n{turn_marker}\n\n"
 
                 global ACP_CLI_SESSION_ID  # pylint: disable=global-statement
                 current_session_id = None
