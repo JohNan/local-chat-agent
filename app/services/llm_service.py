@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 # Global cache state
 CACHE_STATE = {}
+ACP_CLI_SESSION_ID = None
 
 # Global MCP State
 MCP_SESSIONS = {}
@@ -47,18 +48,10 @@ MCP_TOOL_TO_SESSION_MAP = {}
 
 
 def clear_cache():
-    """Clears the global cache state and resets CLI session history."""
+    """Clears the global cache state."""
+    global ACP_CLI_SESSION_ID  # pylint: disable=global-statement
     CACHE_STATE.clear()
-    try:
-        import shutil
-        import os
-        # Delete only the current application's CLI history folder to prevent memory bleeding across contexts.
-        # Inside Docker, the working directory is /app, so the history is stored under 'app' by default.
-        history_dir = os.path.expanduser("~/.gemini/history/app")
-        if os.path.exists(history_dir):
-            shutil.rmtree(history_dir)
-    except Exception as e:
-        logger.warning("Failed to clear CLI history: %s", e)
+    ACP_CLI_SESSION_ID = None
 
 
 def get_tool_config(client, enable_search):
@@ -640,18 +633,38 @@ class CLILLMService(BaseLLMService):
                         terminal=True,
                     ),
                 )
-                session = await conn.new_session(cwd=".", mcp_servers=[])
-
+                
                 prompt_msg = current_msg
                 if is_new_context and system_instruction:
                     prompt_msg = f"{system_instruction}\n\n{current_msg}"
+
+                global ACP_CLI_SESSION_ID  # pylint: disable=global-statement
+                session = None
+                if ACP_CLI_SESSION_ID:
+                    try:
+                        session = await conn.load_session(
+                            cwd=git_ops.CODEBASE_ROOT,
+                            session_id=ACP_CLI_SESSION_ID,
+                            mcp_servers=[],
+                        )
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        logger.warning(
+                            "Failed to load session %s: %s", ACP_CLI_SESSION_ID, e
+                        )
+                        session = None
+
+                if not session:
+                    session = await conn.new_session(
+                        cwd=git_ops.CODEBASE_ROOT, mcp_servers=[]
+                    )
+                    ACP_CLI_SESSION_ID = session.session_id
 
                 await conn.prompt(
                     session_id=session.session_id,
                     prompt=[text_block(prompt_msg)],
                 )
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             error_str = str(e).lower()
             if (
                 "missing or not configured" in error_str
