@@ -70,7 +70,7 @@ def clear_cache():
     ACP_CLI_SESSION_ID = None
 
 
-def get_tool_config(client, enable_search):
+def get_tool_config(client, enable_search, enable_embeddings=True):
     """Configures tools for the agent."""
     function_declarations = [
         types.FunctionDeclaration.from_callable(
@@ -98,15 +98,19 @@ def get_tool_config(client, enable_search):
             client=client, callable=git_ops.get_definition
         ),
         types.FunctionDeclaration.from_callable(
-            client=client, callable=rag_manager.search_codebase_semantic
-        ),
-        types.FunctionDeclaration.from_callable(
             client=client, callable=web_ops.fetch_url
         ),
         types.FunctionDeclaration.from_callable(
             client=client, callable=git_ops.write_to_docs
         ),
     ]
+
+    if enable_embeddings:
+        function_declarations.append(
+            types.FunctionDeclaration.from_callable(
+                client=client, callable=rag_manager.search_codebase_semantic
+            )
+        )
 
     # Append MCP tools
     function_declarations.extend(MCP_TOOL_DEFINITIONS)

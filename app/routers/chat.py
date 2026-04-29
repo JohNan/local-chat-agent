@@ -34,6 +34,7 @@ class ChatRequest(BaseModel):
     message: str
     model: str = "gemini-3-pro-preview"
     include_web_search: bool | None = None
+    include_embeddings: bool | None = None
     media: list[dict] | None = None
 
 
@@ -52,8 +53,18 @@ def _search_enabled(include_web_search: bool | None) -> bool:
     return ENABLE_GOOGLE_SEARCH
 
 
+def _embeddings_enabled(include_embeddings: bool | None) -> bool:
+    """Determines whether embeddings should be enabled."""
+    if include_embeddings is not None:
+        return include_embeddings
+    return True
+
+
 async def _get_system_instruction(
-    user_msg: str, enable_search: bool, classify_if_missing: bool = False
+    user_msg: str,
+    enable_search: bool,
+    _enable_embeddings: bool,  # Kept for signature compatibility if extended later
+    classify_if_missing: bool = False,
 ) -> str:
     """Builds the system instruction for a request."""
     active_persona = await asyncio.to_thread(prompt_router.load_active_persona)
@@ -105,10 +116,11 @@ async def _create_post_chat_session(
     model: str,
     formatted_history: list[dict],
     enable_search: bool,
+    enable_embeddings: bool,
 ) -> ChatSessionSetup:
     """Creates the chat session and turn context for POST requests."""
     system_instruction = await _get_system_instruction(
-        user_msg, enable_search, classify_if_missing=True
+        user_msg, enable_search, enable_embeddings, classify_if_missing=True
     )
     cache_name, history_arg = get_cached_content_config(
         CLIENT, formatted_history, system_instruction, model
@@ -120,7 +132,7 @@ async def _create_post_chat_session(
     chat_session = CLIENT.aio.chats.create(
         model=model,
         config=_build_generation_config(
-            get_tool_config(CLIENT, enable_search),
+            get_tool_config(CLIENT, enable_search, enable_embeddings),
             system_instruction,
             cache_name,
         ),
@@ -192,6 +204,7 @@ async def chat(request: ChatRequest):
         request.model,
         formatted_history,
         _search_enabled(request.include_web_search),
+        _embeddings_enabled(request.include_embeddings),
     )
 
     queue = asyncio.Queue()
@@ -221,7 +234,9 @@ async def chat_get(message: str = Query(...)):
     await asyncio.to_thread(chat_manager.save_message, "user", message)
     full_history = await asyncio.to_thread(chat_manager.load_chat_history)
     formatted_history = await asyncio.to_thread(format_history, full_history)
-    system_instruction = await _get_system_instruction(message, ENABLE_GOOGLE_SEARCH)
+    system_instruction = await _get_system_instruction(
+        message, ENABLE_GOOGLE_SEARCH, True
+    )
     turn_context = TurnContext(
         system_instruction=system_instruction,
         is_new_context=True,
@@ -230,7 +245,7 @@ async def chat_get(message: str = Query(...)):
     chat_session = CLIENT.aio.chats.create(
         model="gemini-3-pro-preview",
         config=_build_generation_config(
-            get_tool_config(CLIENT, ENABLE_GOOGLE_SEARCH),
+            get_tool_config(CLIENT, ENABLE_GOOGLE_SEARCH, True),
             system_instruction,
             None,
         ),

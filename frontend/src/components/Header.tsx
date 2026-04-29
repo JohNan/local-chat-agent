@@ -7,6 +7,8 @@ interface HeaderProps {
     setModel: (model: string) => void;
     webSearchEnabled: boolean;
     setWebSearchEnabled: (enabled: boolean) => void;
+    embeddingsEnabled: boolean;
+    setEmbeddingsEnabled: (enabled: boolean) => void;
     onToggleTasks: () => void;
     isGenerating: boolean;
 }
@@ -16,6 +18,8 @@ export const Header: React.FC<HeaderProps> = ({
     setModel,
     webSearchEnabled,
     setWebSearchEnabled,
+    embeddingsEnabled,
+    setEmbeddingsEnabled,
     onToggleTasks,
     isGenerating,
 }) => {
@@ -313,6 +317,19 @@ export const Header: React.FC<HeaderProps> = ({
                                 />
                                 <label htmlFor="web-search-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
                                     Enable Web Search
+                                </label>
+                            </div>
+
+                            <div className="setting-item" style={{ flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    id="embeddings-checkbox"
+                                    checked={embeddingsEnabled}
+                                    onChange={(e) => setEmbeddingsEnabled(e.target.checked)}
+                                    style={{ width: 'auto' }}
+                                />
+                                <label htmlFor="embeddings-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
+                                    Enable Embeddings & RAG
                                 </label>
                             </div>
 
