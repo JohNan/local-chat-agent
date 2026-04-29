@@ -4,6 +4,7 @@ Router for chat related endpoints.
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
@@ -19,6 +20,7 @@ from app.services.llm_service import (
     get_tool_config,
     get_cached_content_config,
     stream_generator,
+    TurnContext,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,6 +35,98 @@ class ChatRequest(BaseModel):
     model: str = "gemini-3-pro-preview"
     include_web_search: bool | None = None
     media: list[dict] | None = None
+
+
+@dataclass(slots=True)
+class ChatSessionSetup:
+    """Holds chat session setup data for a request."""
+
+    chat_session: object
+    turn_context: TurnContext
+
+
+def _search_enabled(include_web_search: bool | None) -> bool:
+    """Determines whether web search should be enabled."""
+    if include_web_search is not None:
+        return include_web_search
+    return ENABLE_GOOGLE_SEARCH
+
+
+async def _get_system_instruction(
+    user_msg: str, enable_search: bool, classify_if_missing: bool = False
+) -> str:
+    """Builds the system instruction for a request."""
+    active_persona = await asyncio.to_thread(prompt_router.load_active_persona)
+    if not active_persona and classify_if_missing:
+        active_persona = await asyncio.to_thread(
+            prompt_router.classify_intent, user_msg
+        )
+        await asyncio.to_thread(prompt_router.save_active_persona, active_persona)
+        logger.info("Classified intent as: %s", active_persona)
+
+    system_instruction = prompt_router.get_system_instruction(
+        active_persona, for_cli=(LLM_ENGINE == "cli")
+    )
+    if enable_search:
+        system_instruction += (
+            "\n\nYou also have access to Google Search to "
+            "find real-time documentation and solutions."
+        )
+    return system_instruction
+
+
+def _build_generation_config(
+    tool: types.Tool, system_instruction: str, cache_name: str | None
+) -> types.GenerateContentConfig:
+    """Builds the Gemini generation config."""
+    base_config = {
+        "tools": [tool],
+        "automatic_function_calling": types.AutomaticFunctionCallingConfig(
+            disable=True
+        ),
+        "thinking_config": types.ThinkingConfig(
+            thinking_level=types.ThinkingLevel.HIGH
+        ),
+    }
+    if cache_name:
+        logger.info("Using context cache: %s", cache_name)
+        return types.GenerateContentConfig(
+            cached_content=cache_name,
+            **base_config,
+        )
+    return types.GenerateContentConfig(
+        system_instruction=system_instruction,
+        **base_config,
+    )
+
+
+async def _create_post_chat_session(
+    user_msg: str,
+    model: str,
+    formatted_history: list[dict],
+    enable_search: bool,
+) -> ChatSessionSetup:
+    """Creates the chat session and turn context for POST requests."""
+    system_instruction = await _get_system_instruction(
+        user_msg, enable_search, classify_if_missing=True
+    )
+    cache_name, history_arg = get_cached_content_config(
+        CLIENT, formatted_history, system_instruction, model
+    )
+    turn_context = TurnContext(
+        system_instruction=system_instruction,
+        is_new_context=len(formatted_history) == 0,
+    )
+    chat_session = CLIENT.aio.chats.create(
+        model=model,
+        config=_build_generation_config(
+            get_tool_config(CLIENT, enable_search),
+            system_instruction,
+            cache_name,
+        ),
+        history=history_arg,
+    )
+    return ChatSessionSetup(chat_session=chat_session, turn_context=turn_context)
 
 
 @router.post("/api/stop")
@@ -77,14 +171,12 @@ async def chat(request: ChatRequest):
             status_code=500, content={"error": "Gemini client not initialized"}
         )
 
-    user_msg = request.message
-
     # Construct parts with media if present
-    storage_parts, gemini_msg = prepare_messages(user_msg, request.media)
+    storage_parts, gemini_msg = prepare_messages(request.message, request.media)
 
     # Save user message first
     await asyncio.to_thread(
-        chat_manager.save_message, "user", user_msg, parts=storage_parts
+        chat_manager.save_message, "user", request.message, parts=storage_parts
     )
 
     # Save model preference
@@ -95,75 +187,20 @@ async def chat(request: ChatRequest):
         chat_manager.load_chat_history, limit=HISTORY_LIMIT
     )
     formatted_history = await asyncio.to_thread(format_history, full_history)
-
-    # Determine if search is enabled
-    if request.include_web_search is not None:
-        enable_search = request.include_web_search
-    else:
-        enable_search = ENABLE_GOOGLE_SEARCH
-
-    # Configure tools
-    tool = get_tool_config(CLIENT, enable_search)
-
-    # Configure system instruction
-    active_persona = await asyncio.to_thread(prompt_router.load_active_persona)
-    if not active_persona:
-        active_persona = await asyncio.to_thread(
-            prompt_router.classify_intent, user_msg
-        )
-        await asyncio.to_thread(prompt_router.save_active_persona, active_persona)
-        logger.info("Classified intent as: %s", active_persona)
-
-    system_instruction = prompt_router.get_system_instruction(active_persona, for_cli=(LLM_ENGINE == "cli"))
-    if enable_search:
-        system_instruction += (
-            "\n\nYou also have access to Google Search to "
-            "find real-time documentation and solutions."
-        )
-
-    # Context Caching Logic
-    cache_name, history_arg = get_cached_content_config(
-        CLIENT, formatted_history, system_instruction, request.model
-    )
-
-    is_new_context = len(formatted_history) == 0
-
-    if cache_name:
-        logger.info("Using context cache: %s", cache_name)
-        config = types.GenerateContentConfig(
-            tools=[tool],
-            cached_content=cache_name,
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(
-                disable=True
-            ),
-            thinking_config=types.ThinkingConfig(
-                thinking_level=types.ThinkingLevel.HIGH
-            ),
-        )
-    else:
-        # history_arg is full history in this case
-        config = types.GenerateContentConfig(
-            tools=[tool],
-            system_instruction=system_instruction,
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(
-                disable=True
-            ),
-            thinking_config=types.ThinkingConfig(
-                thinking_level=types.ThinkingLevel.HIGH
-            ),
-        )
-
-    # Use native async client
-    chat_session = CLIENT.aio.chats.create(
-        model=request.model,
-        config=config,
-        history=history_arg,
+    session_setup = await _create_post_chat_session(
+        request.message,
+        request.model,
+        formatted_history,
+        _search_enabled(request.include_web_search),
     )
 
     queue = asyncio.Queue()
     asyncio.create_task(
         agent_engine.run_agent_task(
-            queue, chat_session, gemini_msg if request.media else user_msg, system_instruction, is_new_context
+            queue,
+            session_setup.chat_session,
+            gemini_msg if request.media else request.message,
+            session_setup.turn_context,
         )
     )
 
@@ -184,31 +221,26 @@ async def chat_get(message: str = Query(...)):
     await asyncio.to_thread(chat_manager.save_message, "user", message)
     full_history = await asyncio.to_thread(chat_manager.load_chat_history)
     formatted_history = await asyncio.to_thread(format_history, full_history)
-
-    tool = get_tool_config(CLIENT, ENABLE_GOOGLE_SEARCH)  # Use default search config
-
-    active_persona = await asyncio.to_thread(prompt_router.load_active_persona)
-    system_instruction = prompt_router.get_system_instruction(active_persona, for_cli=(LLM_ENGINE == "cli"))
-
-    is_new_context = True
+    system_instruction = await _get_system_instruction(message, ENABLE_GOOGLE_SEARCH)
+    turn_context = TurnContext(
+        system_instruction=system_instruction,
+        is_new_context=True,
+    )
 
     chat_session = CLIENT.aio.chats.create(
         model="gemini-3-pro-preview",
-        config=types.GenerateContentConfig(
-            tools=[tool],
-            system_instruction=system_instruction,
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(
-                disable=True
-            ),
-            thinking_config=types.ThinkingConfig(
-                thinking_level=types.ThinkingLevel.HIGH
-            ),
+        config=_build_generation_config(
+            get_tool_config(CLIENT, ENABLE_GOOGLE_SEARCH),
+            system_instruction,
+            None,
         ),
         history=formatted_history,
     )
 
     queue = asyncio.Queue()
-    asyncio.create_task(agent_engine.run_agent_task(queue, chat_session, message, system_instruction, is_new_context))
+    asyncio.create_task(
+        agent_engine.run_agent_task(queue, chat_session, message, turn_context)
+    )
 
     return StreamingResponse(
         stream_generator(queue),

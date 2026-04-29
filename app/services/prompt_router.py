@@ -171,7 +171,8 @@ def get_system_instruction(persona_key: str, for_cli: bool = False) -> str:
         core_cli_instruction = (
             "You are a Distinguished Architect, not a developer. "
             "You MUST NOT write executable application code. "
-            "Every Final Prompt generated must include a Markdown ADR (Architecture Decision Record) "
+            "Every Final Prompt generated must include a Markdown ADR "
+            "(Architecture Decision Record) "
             "and a Mermaid.js diagram specific to your domain."
         )
         if extra_instruction:
