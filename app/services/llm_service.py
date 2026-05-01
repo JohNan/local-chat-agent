@@ -24,7 +24,6 @@ from acp.schema import (
     UserMessageChunk,
     ToolCallStart,
     ToolCallProgress,
-    TextContentBlock,
 )
 
 from app.services import chat_manager, code_executor, git_ops, rag_manager, web_ops
@@ -604,6 +603,7 @@ class SDKLLMService(BaseLLMService):
         return tool_usage_counts, reasoning_trace, final_answer
 
 
+# pylint: disable=too-many-instance-attributes
 class ACPClientHandler(Client):
     """ACP Client to handle streaming updates from Gemini CLI."""
 
@@ -627,6 +627,7 @@ class ACPClientHandler(Client):
             return content.text
         return ""
 
+    # pylint: disable=too-many-branches
     async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
         if isinstance(update, (ToolCallStart, ToolCallProgress)):
             title = (
