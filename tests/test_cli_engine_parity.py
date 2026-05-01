@@ -141,6 +141,7 @@ async def test_execute_turn_parity(mock_get_setting, mock_spawn):
     assert isinstance(reasoning, list)
     assert isinstance(final_answer, str)
 
+
 @pytest.mark.asyncio
 async def test_acp_client_handler_no_echo_fallback():
     mock_task_state = AsyncMock()

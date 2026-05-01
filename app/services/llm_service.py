@@ -631,7 +631,10 @@ class ACPClientHandler(Client):
         # Explicit check for TextContentBlock-like objects which may not pass simple isinstance
         if hasattr(content, "text") and getattr(content, "text", None) is not None:
             return str(getattr(content, "text"))
-        if hasattr(content, "thought") and getattr(content, "thought", None) is not None:
+        if (
+            hasattr(content, "thought")
+            and getattr(content, "thought", None) is not None
+        ):
             return str(getattr(content, "thought"))
 
         return ""
@@ -693,9 +696,16 @@ class ACPClientHandler(Client):
                 )
                 if new_text and not is_user_msg:
                     await self._process_new_text(new_text)
-            elif isinstance(update, (AgentMessageChunk, AgentThoughtChunk)) and not self.user_msg_seen:
+            elif (
+                isinstance(update, (AgentMessageChunk, AgentThoughtChunk))
+                and not self.user_msg_seen
+            ):
                 # Fallback: Assume history echo is disabled
-                logger.warning("[ACP] Agent message received before user message. Assuming history echo is disabled.")
+                # pylint: disable=line-too-long
+                logger.warning(
+                    "[ACP] Agent message received before user message. Assuming history echo is disabled."
+                )
+                # pylint: enable=line-too-long
                 self.marker_found = True
                 if new_raw_text and not is_user_msg:
                     await self._process_new_text(new_raw_text)
