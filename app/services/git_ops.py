@@ -659,17 +659,18 @@ def get_file_outline(filepath: str) -> str:
 def _is_entry_point(activity, ns):
     """Helper to check if an activity is a main entry point."""
     ns_uri = ns["android"]
+    name_key = f"{{{ns_uri}}}name"
     for intent_filter in activity.findall("intent-filter"):
         has_main = False
         has_launcher = False
         for action in intent_filter.findall("action"):
-            name = action.get(f"{{{ns_uri}}}name")
+            name = action.get(name_key)
             if not name:
                 name = action.get("android:name")
             if name == "android.intent.action.MAIN":
                 has_main = True
         for category in intent_filter.findall("category"):
-            name = category.get(f"{{{ns_uri}}}name")
+            name = category.get(name_key)
             if not name:
                 name = category.get("android:name")
             if name == "android.intent.category.LAUNCHER":
@@ -704,20 +705,21 @@ def read_android_manifest(manifest_path: str = None) -> str:
         # Handle XML namespaces
         # (android:name usually maps to http://schemas.android.com/apk/res/android)
         ns = {"android": "http://schemas.android.com/apk/res/android"}
+        android_name_key = f"{{{ns['android']}}}name"
 
         package = root.get("package", "Unknown")
 
         permissions = []
         for elem in root.findall("uses-permission"):
             # Try with namespace first, then without
-            name = elem.get(f"{{{ns['android']}}}name") or elem.get("android:name")
+            name = elem.get(android_name_key) or elem.get("android:name")
             if name:
                 permissions.append(name)
 
         activities = []
         for app_elem in root.findall("application"):
             for activity in app_elem.findall("activity"):
-                name = activity.get(f"{{{ns['android']}}}name")
+                name = activity.get(android_name_key)
                 if not name:
                     name = activity.get("android:name")
                 is_entry = _is_entry_point(activity, ns)
