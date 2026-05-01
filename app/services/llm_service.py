@@ -5,7 +5,6 @@ Service for LLM interactions and helper functions.
 import base64
 import asyncio
 import json
-import uuid
 import logging
 import traceback
 from collections import defaultdict
@@ -56,6 +55,7 @@ logger = logging.getLogger(__name__)
 # Global cache state
 CACHE_STATE = {}
 ACP_CLI_SESSION_ID = None
+ACP_CLI_HISTORY_LEN = 0
 
 # Global MCP State
 MCP_SESSIONS = {}
@@ -66,8 +66,10 @@ MCP_TOOL_TO_SESSION_MAP = {}
 def clear_cache():
     """Clears the global cache state."""
     global ACP_CLI_SESSION_ID  # pylint: disable=global-statement
+    global ACP_CLI_HISTORY_LEN  # pylint: disable=global-statement
     CACHE_STATE.clear()
     ACP_CLI_SESSION_ID = None
+    ACP_CLI_HISTORY_LEN = 0
 
 
 def get_tool_config(client, enable_search, enable_embeddings=True):
@@ -603,13 +605,13 @@ class SDKLLMService(BaseLLMService):
 class ACPClientHandler(Client):
     """ACP Client to handle streaming updates from Gemini CLI."""
 
-    def __init__(self, task_state, turn_marker: str):
+    def __init__(self, task_state, previous_history_len: int):
         super().__init__()
         self.task_state = task_state
-        self.turn_marker = turn_marker
+        self.previous_history_len = previous_history_len
+        self.raw_stream = ""
+        self.broadcasted_len = previous_history_len
         self.final_answer = ""
-        self.raw_final_answer = ""
-        self.marker_found = False
         self.tool_usage_counts = defaultdict(int)
         self.reasoning_trace = []
 
@@ -619,30 +621,20 @@ class ACPClientHandler(Client):
             if isinstance(update.content, TextContentBlock):
                 chunk = update.content.text
 
-                if chunk.startswith(self.raw_final_answer):
-                    new_raw_text = chunk[len(self.raw_final_answer) :]
-                    self.raw_final_answer = chunk
+                # Accumulate the raw stream
+                if chunk.startswith(self.raw_stream):
+                    self.raw_stream = chunk
                 else:
-                    new_raw_text = chunk
-                    self.raw_final_answer += chunk
+                    self.raw_stream += chunk
 
-                if not self.marker_found:
-                    idx = self.raw_final_answer.find(self.turn_marker)
-                    if idx != -1:
-                        self.marker_found = True
-                        new_text = self.raw_final_answer[
-                            idx + len(self.turn_marker) :
-                        ].lstrip("\n")
-                        self.final_answer = new_text
-                        if new_text:
-                            await self.task_state.broadcast(
-                                f"event: message\ndata: {json.dumps(new_text)}\n\n"
-                            )
-                else:
-                    if new_raw_text:
-                        self.final_answer += new_raw_text
+                if len(self.raw_stream) > self.broadcasted_len:
+                    new_text = self.raw_stream[self.broadcasted_len :]
+                    self.broadcasted_len = len(self.raw_stream)
+                    self.final_answer += new_text
+
+                    if new_text:
                         await self.task_state.broadcast(
-                            f"event: message\ndata: {json.dumps(new_raw_text)}\n\n"
+                            f"event: message\ndata: {json.dumps(new_text)}\n\n"
                         )
 
     async def request_permission(
@@ -664,8 +656,8 @@ class CLILLMService(BaseLLMService):
         turn_context: TurnContext | None = None,
     ) -> tuple[defaultdict, list[str], str]:
         turn_context = turn_context or TurnContext()
-        turn_marker = f"<JULES_TURN_MARKER_{uuid.uuid4().hex}>"
-        client = ACPClientHandler(task_state, turn_marker)
+        global ACP_CLI_HISTORY_LEN  # pylint: disable=global-statement
+        client = ACPClientHandler(task_state, ACP_CLI_HISTORY_LEN)
 
         try:
             model = await asyncio.to_thread(chat_manager.get_setting, "default_model")
@@ -694,9 +686,6 @@ class CLILLMService(BaseLLMService):
                 prompt_msg = current_msg
                 if turn_context.is_new_context and turn_context.system_instruction:
                     prompt_msg = f"{turn_context.system_instruction}\n\n{current_msg}"
-
-                # Append the unique marker to identify where the new response begins
-                prompt_msg = f"{prompt_msg}\n\n{turn_marker}\n\n"
 
                 global ACP_CLI_SESSION_ID  # pylint: disable=global-statement
                 current_session_id = None
@@ -742,6 +731,7 @@ class CLILLMService(BaseLLMService):
 
         if client.final_answer:
             client.reasoning_trace.append(client.final_answer)
+            ACP_CLI_HISTORY_LEN += len(client.final_answer)
 
         return client.tool_usage_counts, client.reasoning_trace, client.final_answer
 
