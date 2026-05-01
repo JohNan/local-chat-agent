@@ -617,6 +617,7 @@ class ACPClientHandler(Client):
         self.tool_usage_counts = defaultdict(int)
         self.reasoning_trace = []
         self.current_text_segment = ""
+        self.user_msg_seen = False
 
     def _extract_text(self, content: Any) -> str:
         """Robustly extracts text from dictionaries, lists, or Pydantic models."""
@@ -626,10 +627,13 @@ class ACPClientHandler(Client):
             return "".join(self._extract_text(item) for item in content)
         if isinstance(content, dict):
             return content.get("text", content.get("thought", ""))
-        if hasattr(content, "text") and isinstance(content.text, str):
-            return content.text
-        if hasattr(content, "thought") and isinstance(content.thought, str):
-            return content.thought
+
+        # Explicit check for TextContentBlock-like objects which may not pass simple isinstance
+        if hasattr(content, "text") and getattr(content, "text", None) is not None:
+            return str(getattr(content, "text"))
+        if hasattr(content, "thought") and getattr(content, "thought", None) is not None:
+            return str(getattr(content, "thought"))
+
         return ""
 
     # pylint: disable=too-many-branches
@@ -669,6 +673,9 @@ class ACPClientHandler(Client):
         if not chunk:
             return
 
+        if is_user_msg:
+            self.user_msg_seen = True
+
         if chunk.startswith(self.raw_final_answer):
             new_raw_text = chunk[len(self.raw_final_answer) :]
             self.raw_final_answer = chunk
@@ -679,12 +686,19 @@ class ACPClientHandler(Client):
         if not self.marker_found:
             idx = self.raw_final_answer.find(self.turn_marker)
             if idx != -1:
+                logger.info("[ACP] Turn marker found at index %d", idx)
                 self.marker_found = True
                 new_text = self.raw_final_answer[idx + len(self.turn_marker) :].lstrip(
                     "\n"
                 )
                 if new_text and not is_user_msg:
                     await self._process_new_text(new_text)
+            elif isinstance(update, (AgentMessageChunk, AgentThoughtChunk)) and not self.user_msg_seen:
+                # Fallback: Assume history echo is disabled
+                logger.warning("[ACP] Agent message received before user message. Assuming history echo is disabled.")
+                self.marker_found = True
+                if new_raw_text and not is_user_msg:
+                    await self._process_new_text(new_raw_text)
         else:
             if new_raw_text and not is_user_msg:
                 await self._process_new_text(new_raw_text)
