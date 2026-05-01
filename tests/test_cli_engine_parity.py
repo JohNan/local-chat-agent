@@ -15,49 +15,73 @@ from app.services.llm_service import CLILLMService, TurnContext, ACPClientHandle
 
 
 @pytest.mark.asyncio
-async def test_acp_client_handler_session_update():
+async def test_acp_client_handler_multi_turn_simulation():
     mock_task_state = AsyncMock()
-    turn_marker = f"<JULES_TURN_MARKER_TEST>"
+    turn_marker = "==JULES_TURN_12345678=="
     handler = ACPClientHandler(mock_task_state, turn_marker)
 
-    # Simulate Tool Call
-    tool_call_start = ToolCallStart(
-        type="toolCallStart",
-        toolCallId="test",
-        title="my_tool",
-        tool_call=MagicMock(),
-        sessionUpdate="tool_call",
+    # 1. Simulate history re-emission (before marker)
+    await handler.session_update(
+        "sess",
+        AgentMessageChunk(
+            type="agentMessageChunk",
+            content=TextContentBlock(type="text", text="Old history here."),
+            sessionUpdate="agent_message_chunk",
+        ),
     )
-    await handler.session_update("sess", tool_call_start)
-    assert handler.tool_usage_counts["my_tool"] == 1
-    mock_task_state.broadcast.assert_called_with('event: tool\ndata: "my_tool..."\n\n')
+    assert handler.marker_found is False
+    assert handler.current_text_segment == ""
+    assert len(handler.reasoning_trace) == 0
 
-    # Simulate History re-emission (UserMessageChunk with marker)
-    history_user_msg = UserMessageChunk(
-        type="userMessageChunk",
-        content=TextContentBlock(type="text", text=f"Old Message\n\n{turn_marker}\n\n"),
-        sessionUpdate="user_message_chunk",
+    # 2. Simulate UserMessageChunk containing the marker
+    await handler.session_update(
+        "sess",
+        UserMessageChunk(
+            type="userMessageChunk",
+            content=TextContentBlock(type="text", text=f"My prompt\n\n{turn_marker}\n\n"),
+            sessionUpdate="user_message_chunk",
+        ),
     )
-    await handler.session_update("sess", history_user_msg)
     assert handler.marker_found is True
+    assert handler.current_text_segment == ""
 
-    # Simulate New Text (AgentMessageChunk)
-    new_msg = AgentMessageChunk(
-        type="agentMessageChunk",
-        content=TextContentBlock(type="text", text="Hello world!"),
-        sessionUpdate="agent_message_chunk",
+    # 3. Simulate first new thought chunk (AgentThoughtChunk)
+    await handler.session_update(
+        "sess",
+        AgentThoughtChunk(
+            type="agentThoughtChunk",
+            content=TextContentBlock(type="text", text="I need to use a tool."),
+            sessionUpdate="agent_thought_chunk",
+        ),
     )
-    await handler.session_update("sess", new_msg)
-    assert handler.final_answer == "Hello world!"
+    assert handler.current_text_segment == "I need to use a tool."
 
-    # Simulate Thought (AgentThoughtChunk)
-    thought_msg = AgentThoughtChunk(
-        type="agentThoughtChunk",
-        content=TextContentBlock(type="text", text="I am thinking..."),
-        sessionUpdate="agent_thought_chunk",
+    # 4. Simulate a ToolCallStart, which should move the current text to reasoning_trace
+    await handler.session_update(
+        "sess",
+        ToolCallStart(
+            type="toolCallStart",
+            toolCallId="call_1",
+            title="read_file",
+            tool_call=MagicMock(),
+            sessionUpdate="tool_call",
+        ),
     )
-    await handler.session_update("sess", thought_msg)
-    assert handler.reasoning_trace[0] == "I am thinking..."
+    assert handler.tool_usage_counts["read_file"] == 1
+    assert handler.current_text_segment == ""
+    assert len(handler.reasoning_trace) == 1
+    assert handler.reasoning_trace[0] == "I need to use a tool."
+
+    # 5. Simulate final answer message chunk
+    await handler.session_update(
+        "sess",
+        AgentMessageChunk(
+            type="agentMessageChunk",
+            content=TextContentBlock(type="text", text="The file contains..."),
+            sessionUpdate="agent_message_chunk",
+        ),
+    )
+    assert handler.current_text_segment == "The file contains..."
 
 
 @pytest.mark.asyncio
