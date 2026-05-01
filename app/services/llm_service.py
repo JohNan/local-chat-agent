@@ -617,18 +617,26 @@ class ACPClientHandler(Client):
         self.tool_usage_counts = defaultdict(int)
         self.reasoning_trace = []
         self.current_text_segment = ""
-        self.text_segments = []
 
     def _extract_text(self, content: Any) -> str:
-        """Robustly extracts text from dictionaries or Pydantic models."""
+        """Robustly extracts text from dictionaries, lists, or Pydantic models."""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return "".join(self._extract_text(item) for item in content)
         if isinstance(content, dict):
-            return content.get("text", "")
+            return content.get("text", content.get("thought", ""))
         if hasattr(content, "text") and isinstance(content.text, str):
             return content.text
+        if hasattr(content, "thought") and isinstance(content.thought, str):
+            return content.thought
         return ""
 
     # pylint: disable=too-many-branches
     async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
+        update_type = type(update).__name__
+        logger.debug("[ACP] session_update: %s - %s", update_type, str(update)[:100])
+
         if isinstance(update, (ToolCallStart, ToolCallProgress)):
             title = (
                 getattr(update, "title", None)
@@ -638,7 +646,7 @@ class ACPClientHandler(Client):
             if isinstance(update, ToolCallStart) and getattr(update, "title", None):
                 self.tool_usage_counts[update.title] += 1
                 if self.current_text_segment:
-                    self.text_segments.append(self.current_text_segment)
+                    self.reasoning_trace.append(self.current_text_segment)
                     self.current_text_segment = ""
             # STRICT JSON ENCODING prevents newlines from breaking SSE
             tool_status_msg = f"{title}..."
@@ -648,14 +656,12 @@ class ACPClientHandler(Client):
             return
 
         chunk = ""
-        is_thought = False
         is_user_msg = False
 
         if isinstance(update, AgentMessageChunk):
             chunk = self._extract_text(update.content)
         elif isinstance(update, AgentThoughtChunk):
             chunk = self._extract_text(update.content)
-            is_thought = True
         elif isinstance(update, UserMessageChunk):
             chunk = self._extract_text(update.content)
             is_user_msg = True
@@ -678,21 +684,13 @@ class ACPClientHandler(Client):
                     "\n"
                 )
                 if new_text and not is_user_msg:
-                    await self._process_new_text(new_text, is_thought)
+                    await self._process_new_text(new_text)
         else:
             if new_raw_text and not is_user_msg:
-                await self._process_new_text(new_raw_text, is_thought)
+                await self._process_new_text(new_raw_text)
 
-    async def _process_new_text(self, text: str, is_thought: bool):
-        if is_thought:
-            if len(self.reasoning_trace) == 0:
-                self.reasoning_trace.append(text)
-            else:
-                self.reasoning_trace[0] += text
-        else:
-            self.final_answer += text
-            self.current_text_segment += text
-
+    async def _process_new_text(self, text: str):
+        self.current_text_segment += text
         await self.task_state.broadcast(f"event: message\ndata: {json.dumps(text)}\n\n")
 
     async def request_permission(
@@ -714,7 +712,7 @@ class CLILLMService(BaseLLMService):
         turn_context: TurnContext | None = None,
     ) -> tuple[defaultdict, list[str], str]:
         turn_context = turn_context or TurnContext()
-        turn_marker = f"<JULES_TURN_MARKER_{uuid.uuid4().hex}>"
+        turn_marker = f"==JULES_TURN_{uuid.uuid4().hex[:8]}=="
         client = ACPClientHandler(task_state, turn_marker)
 
         try:
@@ -791,13 +789,10 @@ class CLILLMService(BaseLLMService):
             raise e
 
         if client.current_text_segment:
-            client.text_segments.append(client.current_text_segment)
+            client.reasoning_trace.append(client.current_text_segment)
 
-        if client.tool_usage_counts:
-            if client.text_segments:
-                client.final_answer = client.text_segments[-1]
-        elif client.final_answer:
-            client.reasoning_trace.append(client.final_answer)
+        if client.reasoning_trace:
+            client.final_answer = client.reasoning_trace[-1]
 
         return client.tool_usage_counts, client.reasoning_trace, client.final_answer
 
