@@ -1,6 +1,7 @@
-import pytest
-import asyncio
+"""Test suite for the CLI Engine stream delta extraction."""
+
 from unittest.mock import AsyncMock
+import pytest
 
 from acp.schema import AgentMessageChunk, TextContentBlock
 from app.services.llm_service import ACPClientHandler
@@ -16,17 +17,13 @@ async def test_acp_client_handler_stream():
     client = ACPClientHandler(mock_task_state, previous_history_len=5)
 
     # Turn 2 outputs previous "Hello" + new answer "\nWorld!"
-    stream_chunks = [
-        "H",
-        "Hel",
-        "Hello",
-        "Hello\n",
-        "Hello\nWorld!"
-    ]
+    stream_chunks = ["H", "Hel", "Hello", "Hello\n", "Hello\nWorld!"]
 
     for chunk in stream_chunks:
         content = TextContentBlock(text=chunk, type="text")
-        update = AgentMessageChunk(content=content, session_update="agent_message_chunk")
+        update = AgentMessageChunk(
+            content=content, session_update="agent_message_chunk"
+        )
         await client.session_update("session_1", update)
 
     assert client.final_answer == "\nWorld!"
@@ -39,6 +36,7 @@ async def test_acp_client_handler_stream():
     assert '"\\n"' in calls[0][0][0]
     assert '"World!"' in calls[1][0][0]
 
+
 @pytest.mark.asyncio
 async def test_acp_client_handler_exact_concat():
     """Test what happens if the CLI Engine concatenates exact delta (though usually absolute)."""
@@ -47,14 +45,13 @@ async def test_acp_client_handler_exact_concat():
 
     client = ACPClientHandler(mock_task_state, previous_history_len=0)
 
-    stream_chunks = [
-        "Hello",
-        "World!"
-    ]
+    stream_chunks = ["Hello", "World!"]
 
     for chunk in stream_chunks:
         content = TextContentBlock(text=chunk, type="text")
-        update = AgentMessageChunk(content=content, session_update="agent_message_chunk")
+        update = AgentMessageChunk(
+            content=content, session_update="agent_message_chunk"
+        )
         await client.session_update("session_1", update)
 
     assert client.final_answer == "HelloWorld!"
