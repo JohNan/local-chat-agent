@@ -20,7 +20,15 @@ async def test_acp_client_handler_multi_turn_simulation():
     turn_marker = "==JULES_TURN_12345678=="
     handler = ACPClientHandler(mock_task_state, turn_marker)
 
-    # 1. Simulate history re-emission (before marker)
+    # 1. Simulate history re-emission (before marker) by sending a UserMessageChunk first so that it knows history is there
+    await handler.session_update(
+        "sess",
+        UserMessageChunk(
+            type="userMessageChunk",
+            content=TextContentBlock(type="text", text="Old prompt"),
+            sessionUpdate="user_message_chunk",
+        ),
+    )
     await handler.session_update(
         "sess",
         AgentMessageChunk(
@@ -132,3 +140,25 @@ async def test_execute_turn_parity(mock_get_setting, mock_spawn):
     assert isinstance(tool_counts, defaultdict)
     assert isinstance(reasoning, list)
     assert isinstance(final_answer, str)
+
+
+@pytest.mark.asyncio
+async def test_acp_client_handler_no_echo_fallback():
+    mock_task_state = AsyncMock()
+    turn_marker = "==JULES_TURN_NO_ECHO=="
+    handler = ACPClientHandler(mock_task_state, turn_marker)
+
+    # 1. Simulate agent message arriving without any user message prior
+    await handler.session_update(
+        "sess",
+        AgentMessageChunk(
+            type="agentMessageChunk",
+            content=TextContentBlock(type="text", text="Hello world!"),
+            sessionUpdate="agent_message_chunk",
+        ),
+    )
+
+    # 2. Check that fallback activated
+    assert handler.user_msg_seen is False
+    assert handler.marker_found is True
+    assert handler.current_text_segment == "Hello world!"
