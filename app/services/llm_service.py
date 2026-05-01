@@ -629,7 +629,11 @@ class ACPClientHandler(Client):
 
     async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
         if isinstance(update, (ToolCallStart, ToolCallProgress)):
-            title = getattr(update, "title", None) or getattr(update, "status", None) or "Tool operation"
+            title = (
+                getattr(update, "title", None)
+                or getattr(update, "status", None)
+                or "Tool operation"
+            )
             if isinstance(update, ToolCallStart) and getattr(update, "title", None):
                 self.tool_usage_counts[update.title] += 1
                 if self.current_text_segment:
@@ -669,7 +673,9 @@ class ACPClientHandler(Client):
             idx = self.raw_final_answer.find(self.turn_marker)
             if idx != -1:
                 self.marker_found = True
-                new_text = self.raw_final_answer[idx + len(self.turn_marker) :].lstrip("\n")
+                new_text = self.raw_final_answer[idx + len(self.turn_marker) :].lstrip(
+                    "\n"
+                )
                 if new_text and not is_user_msg:
                     await self._process_new_text(new_text, is_thought)
         else:
