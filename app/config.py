@@ -30,6 +30,17 @@ if LLM_ENGINE not in ("sdk", "cli"):
     LLM_ENGINE = "sdk"
 
 
+# CORS settings
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "").split(",")
+CORS_ALLOWED_ORIGINS = [
+    origin.strip() for origin in ALLOWED_ORIGINS if origin.strip()
+] or [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+]
+
 if not GOOGLE_API_KEY:
     logger.warning("Warning: GOOGLE_API_KEY environment variable not set.")
 
