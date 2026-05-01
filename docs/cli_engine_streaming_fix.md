@@ -1,35 +1,31 @@
-# ADR: Improving CLI Engine Streaming and ACP Integration
+# CLI Engine Streaming Fix
 
-## Status
-Proposed
+## Issue
+The `CLI Engine` (Gemini CLI via ACP) was failing to produce output in the UI. 
+Symptoms included:
+1. No output initially.
+2. After a partial fix, tool calls were visible but reasoning/thoughts and the final result message were missing.
 
-## Context
-The current `CLILLMService` (CLI Engine) implementation for Gemini has several issues:
-1. **No Output**: Users report receiving no output during streaming. This is likely due to the `ACPClientHandler` being too restrictive or failing to find the `turn_marker`.
-2. **Missing Progress**: Unlike the `SDKLLMService`, the CLI engine does not broadcast tool usage or reasoning (thoughts) to the frontend.
-3. **History Re-emission**: The Gemini CLI re-emits session history when resuming a session, which must be filtered to prevent duplicate output in the UI.
-4. **Data Format Incompatibility**: The `ACPClientHandler` expects strictly typed `TextContentBlock` objects, but the ACP SDK may deliver data as dictionaries or in other chunk types (e.g., `AgentThoughtChunk`).
+## Root Causes
+1. **Context Manager Termination**: The `CLILLMService.execute_turn` might have been exiting the `spawn_agent_process` context manager before the agent finished its turn, killing the process and cutting off the stream.
+2. **Marker Sync Issues**: The `turn_marker` used to synchronize re-emitted history might have been missed or mangled.
+3. **Data Extraction**: `AgentThoughtChunk` and `AgentMessageChunk` might have content structures (e.g., lists or different fields) that the initial `_extract_text` helper didn't handle.
+4. **Logic Parity**: The accumulation of `reasoning_trace` and `final_answer` was not fully aligned with `SDKLLMService`, leading to missing data in the final return.
 
-## Decision
-We will refactor the `ACPClientHandler` and `CLILLMService` to achieve parity with the `SDKLLMService` and improve robustness.
+## Proposed Fixes
+1. **Comprehensive Logging**: Added detailed debug logging to `ACPClientHandler` to trace every chunk received and the state of synchronization.
+2. **Robust Text Extraction**: Updated `_extract_text` to handle lists of content blocks and additional fields like `thought`.
+3. **Synchronization Improvement**: Changed the `turn_marker` format and added logging to verify its detection.
+4. **Result Alignment**: Refactored `execute_turn` and `ACPClientHandler` to collect all text segments into the `reasoning_trace` and correctly identify the final answer, ensuring parity with the SDK engine.
+5. **Turn Completion**: Ensured `execute_turn` waits for the agent process to complete its response cycle.
 
-### Key Improvements:
-1. **Handle Multiple Chunk Types**:
-   - `AgentMessageChunk`: Primary text response.
-   - `AgentThoughtChunk`: Reasoning/thoughts (broadcast as message chunks and added to reasoning trace).
-   - `ToolCallStart` / `ToolCallProgress`: Tool execution status (broadcast as `event: tool`).
-2. **Robust Text Extraction**:
-   - Implement a helper to extract text from `TextContentBlock`, `ResourceContentBlock`, or `dict` representations.
-3. **Reliable Turn Synchronization**:
-   - Ensure the `turn_marker` is correctly placed and detected.
-   - Add a fallback mechanism: If a significant amount of text is received without finding the marker, or after a certain amount of "known" history is skipped, assume we are in the new response.
-4. **Tool Parity**:
-   - Track tool usage counts from `ToolCallStart` events to match the `SDKLLMService` return values.
-5. **Wait for Completion**:
-   - Ensure the `CLILLMService` waits for the agent to finish its turn before closing the connection.
+## Architecture Decision Record (ADR)
+* **Status**: Accepted
+* **Context**: We need the CLI Engine to be as reliable and feature-complete as the SDK Engine.
+* **Decision**: Implement a robust synchronization mechanism using a unique turn marker and a stateful handler that filters history and captures all output types (text, thoughts, tools).
+* **Consequences**: Improved reliability, better debugging, and a consistent user experience across different LLM engines.
 
 ## Mermaid Diagram
-
 ```mermaid
 sequenceDiagram
     participant FE as Frontend
@@ -41,25 +37,23 @@ sequenceDiagram
     FE->>AE: Chat Request
     AE->>CS: execute_turn()
     CS->>GC: spawn_agent_process()
-    CS->>CH: Initialize with turn_marker
+    CS->>CH: Initialize with unique turn_marker
     CS->>GC: conn.prompt(user_msg + marker)
     
-    loop ACP Updates
+    loop ACP Updates (Streaming)
         GC->>CH: session_update(chunk)
-        CH->>CH: Filter history using marker
-        alt is new text
-            CH->>AE: broadcast(event: message)
-            AE->>FE: SSE Message
-        else is tool call
-            CH->>AE: broadcast(event: tool)
-            AE->>FE: SSE Tool Status
+        CH->>CH: Detect turn_marker in history
+        alt Marker Found
+            CH->>CH: Extract Delta Text/Thought
+            CH->>AE: broadcast(event: message, data: delta)
+            CH->>CH: Append to reasoning_trace
+        else Tool Call
+            CH->>AE: broadcast(event: tool, data: status)
         end
     end
     
-    GC->>CS: conn.prompt response (Done)
+    GC->>CS: conn.prompt completion
+    CS->>CH: Finalize answer from segments
     CS->>AE: return final_answer, reasoning_trace, tool_counts
     AE->>FE: SSE [DONE]
 ```
-
-## Implementation Details
-The `ACPClientHandler` will be updated to match the patterns found in the official ACP Python SDK examples, while maintaining the specialized history filtering needed for the `gemini` CLI.
