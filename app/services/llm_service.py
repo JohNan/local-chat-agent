@@ -20,7 +20,10 @@ from acp.schema import (
     ClientCapabilities,
     FileSystemCapabilities,
     AgentMessageChunk,
-    TextContentBlock,
+    AgentThoughtChunk,
+    UserMessageChunk,
+    ToolCallStart,
+    ToolCallProgress,
 )
 
 from app.services import chat_manager, code_executor, git_ops, rag_manager, web_ops
@@ -600,6 +603,7 @@ class SDKLLMService(BaseLLMService):
         return tool_usage_counts, reasoning_trace, final_answer
 
 
+# pylint: disable=too-many-instance-attributes
 class ACPClientHandler(Client):
     """ACP Client to handle streaming updates from Gemini CLI."""
 
@@ -612,38 +616,84 @@ class ACPClientHandler(Client):
         self.marker_found = False
         self.tool_usage_counts = defaultdict(int)
         self.reasoning_trace = []
+        self.current_text_segment = ""
+        self.text_segments = []
 
+    def _extract_text(self, content: Any) -> str:
+        """Robustly extracts text from dictionaries or Pydantic models."""
+        if isinstance(content, dict):
+            return content.get("text", "")
+        if hasattr(content, "text") and isinstance(content.text, str):
+            return content.text
+        return ""
+
+    # pylint: disable=too-many-branches
     async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
-        # Check if it's an AgentMessageChunk and extract text
+        if isinstance(update, (ToolCallStart, ToolCallProgress)):
+            title = (
+                getattr(update, "title", None)
+                or getattr(update, "status", None)
+                or "Tool operation"
+            )
+            if isinstance(update, ToolCallStart) and getattr(update, "title", None):
+                self.tool_usage_counts[update.title] += 1
+                if self.current_text_segment:
+                    self.text_segments.append(self.current_text_segment)
+                    self.current_text_segment = ""
+            # STRICT JSON ENCODING prevents newlines from breaking SSE
+            tool_status_msg = f"{title}..."
+            await self.task_state.broadcast(
+                f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n"
+            )
+            return
+
+        chunk = ""
+        is_thought = False
+        is_user_msg = False
+
         if isinstance(update, AgentMessageChunk):
-            if isinstance(update.content, TextContentBlock):
-                chunk = update.content.text
+            chunk = self._extract_text(update.content)
+        elif isinstance(update, AgentThoughtChunk):
+            chunk = self._extract_text(update.content)
+            is_thought = True
+        elif isinstance(update, UserMessageChunk):
+            chunk = self._extract_text(update.content)
+            is_user_msg = True
 
-                if chunk.startswith(self.raw_final_answer):
-                    new_raw_text = chunk[len(self.raw_final_answer) :]
-                    self.raw_final_answer = chunk
-                else:
-                    new_raw_text = chunk
-                    self.raw_final_answer += chunk
+        if not chunk:
+            return
 
-                if not self.marker_found:
-                    idx = self.raw_final_answer.find(self.turn_marker)
-                    if idx != -1:
-                        self.marker_found = True
-                        new_text = self.raw_final_answer[
-                            idx + len(self.turn_marker) :
-                        ].lstrip("\n")
-                        self.final_answer = new_text
-                        if new_text:
-                            await self.task_state.broadcast(
-                                f"event: message\ndata: {json.dumps(new_text)}\n\n"
-                            )
-                else:
-                    if new_raw_text:
-                        self.final_answer += new_raw_text
-                        await self.task_state.broadcast(
-                            f"event: message\ndata: {json.dumps(new_raw_text)}\n\n"
-                        )
+        if chunk.startswith(self.raw_final_answer):
+            new_raw_text = chunk[len(self.raw_final_answer) :]
+            self.raw_final_answer = chunk
+        else:
+            new_raw_text = chunk
+            self.raw_final_answer += chunk
+
+        if not self.marker_found:
+            idx = self.raw_final_answer.find(self.turn_marker)
+            if idx != -1:
+                self.marker_found = True
+                new_text = self.raw_final_answer[idx + len(self.turn_marker) :].lstrip(
+                    "\n"
+                )
+                if new_text and not is_user_msg:
+                    await self._process_new_text(new_text, is_thought)
+        else:
+            if new_raw_text and not is_user_msg:
+                await self._process_new_text(new_raw_text, is_thought)
+
+    async def _process_new_text(self, text: str, is_thought: bool):
+        if is_thought:
+            if len(self.reasoning_trace) == 0:
+                self.reasoning_trace.append(text)
+            else:
+                self.reasoning_trace[0] += text
+        else:
+            self.final_answer += text
+            self.current_text_segment += text
+
+        await self.task_state.broadcast(f"event: message\ndata: {json.dumps(text)}\n\n")
 
     async def request_permission(
         self, options: Any, session_id: str, tool_call: Any, **kwargs: Any
@@ -740,7 +790,13 @@ class CLILLMService(BaseLLMService):
                 return client.tool_usage_counts, client.reasoning_trace, err_msg
             raise e
 
-        if client.final_answer:
+        if client.current_text_segment:
+            client.text_segments.append(client.current_text_segment)
+
+        if client.tool_usage_counts:
+            if client.text_segments:
+                client.final_answer = client.text_segments[-1]
+        elif client.final_answer:
             client.reasoning_trace.append(client.final_answer)
 
         return client.tool_usage_counts, client.reasoning_trace, client.final_answer
