@@ -38,7 +38,9 @@ async def test_acp_client_handler_multi_turn_simulation():
         "sess",
         UserMessageChunk(
             type="userMessageChunk",
-            content=TextContentBlock(type="text", text=f"My prompt\n\n{turn_marker}\n\n"),
+            content=TextContentBlock(
+                type="text", text=f"My prompt\n\n{turn_marker}\n\n"
+            ),
             sessionUpdate="user_message_chunk",
         ),
     )
