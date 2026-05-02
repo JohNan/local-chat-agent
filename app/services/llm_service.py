@@ -611,6 +611,9 @@ class ACPClientHandler(Client):
         super().__init__()
         self.task_state = task_state
         self.turn_marker = turn_marker
+        logger.info(
+            "[ACP] ACPClientHandler started. Waiting for turn_marker: %s", turn_marker
+        )
         self.final_answer = ""
         self.raw_final_answer = ""
         self.marker_found = False
@@ -620,6 +623,7 @@ class ACPClientHandler(Client):
         self.user_msg_seen = False
         self.last_agent_text = ""
         self.last_thought_text = ""
+        self.last_user_text = ""
 
     def _extract_text(self, content: Any) -> str:
         """Robustly extracts text from dictionaries, lists, or Pydantic models."""
@@ -707,10 +711,9 @@ class ACPClientHandler(Client):
                 new_raw_text = chunk
             self.last_thought_text = chunk
         elif is_user_msg:
-            # We don't broadcast user messages, but we add them to raw_final_answer to find the marker
-            if hasattr(self, "last_user_text") and chunk.startswith(
-                self.last_user_text
-            ):
+            # We don't broadcast user messages, but we add them to
+            # raw_final_answer to find the marker
+            if chunk.startswith(self.last_user_text):
                 new_raw_text = chunk[len(self.last_user_text) :]
             else:
                 new_raw_text = chunk
@@ -732,11 +735,14 @@ class ACPClientHandler(Client):
                 if new_text_after_marker and not is_user_msg:
                     await self._process_new_text(new_text_after_marker)
             elif is_agent or is_thought:
-                # Fallbacks if marker isn't found yet but we are receiving agent content
+                # Fallbacks if marker isn't found yet but we are receiving agent
+                # content
                 if not self.user_msg_seen:
+                    # pylint: disable=line-too-long
                     logger.warning(
                         "[ACP] Agent message received before user message. Assuming history echo is disabled."
                     )
+                    # pylint: enable=line-too-long
                     self.marker_found = True
                     if new_raw_text and not is_user_msg:
                         await self._process_new_text(new_raw_text)
@@ -745,8 +751,9 @@ class ACPClientHandler(Client):
                         "[ACP] Fallback triggered by significant agent content without marker"
                     )
                     self.marker_found = True
-                    # If we fallback due to significant content, it's safer to broadcast the accumulated text
-                    # (this might be slightly duplicated with what was already buffered in current_text_segment, but we didn't broadcast it yet)
+                    # If we fallback due to significant content, it's safer to broadcast the
+                    # accumulated text (this might be slightly duplicated with what was already
+                    # buffered in current_text_segment, but we didn't broadcast it yet)
                     await self._process_new_text(
                         self.last_thought_text + self.last_agent_text
                     )
