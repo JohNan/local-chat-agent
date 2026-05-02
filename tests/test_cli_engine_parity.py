@@ -163,6 +163,7 @@ async def test_acp_client_handler_no_echo_fallback():
     assert handler.marker_found is True
     assert handler.current_text_segment == "Hello world!"
 
+
 @pytest.mark.asyncio
 async def test_acp_sync_with_history_echo():
     mock_task_state = AsyncMock()
@@ -190,7 +191,7 @@ async def test_acp_sync_with_history_echo():
             sessionUpdate="agent_message_chunk",
         ),
     )
-    assert handler.marker_found is False # Marker not found yet
+    assert handler.marker_found is False  # Marker not found yet
 
     # 3. Simulate new user message chunk containing the marker
     await handler.session_update(
@@ -204,7 +205,7 @@ async def test_acp_sync_with_history_echo():
         ),
     )
     assert handler.marker_found is True
-    assert handler.current_text_segment == "" # We don't process user msg as new text
+    assert handler.current_text_segment == ""  # We don't process user msg as new text
 
     # 4. Simulate a new Agent message chunk
     await handler.session_update(
@@ -216,6 +217,7 @@ async def test_acp_sync_with_history_echo():
         ),
     )
     assert handler.current_text_segment == "New turn agent response"
+
 
 @pytest.mark.asyncio
 async def test_acp_sync_fallback_tool_call():
@@ -232,7 +234,9 @@ async def test_acp_sync_fallback_tool_call():
             sessionUpdate="agent_thought_chunk",
         ),
     )
-    assert handler.marker_found is True # Because of "Agent message received before user message" fallback
+    assert (
+        handler.marker_found is True
+    )  # Because of "Agent message received before user message" fallback
 
     # Let's reset the state to simulate the case where history *was* sent (user_msg_seen = True),
     # but the prompt with the marker hasn't arrived yet, and we suddenly get a ToolCallStart.

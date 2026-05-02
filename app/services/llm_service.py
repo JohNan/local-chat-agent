@@ -696,20 +696,22 @@ class ACPClientHandler(Client):
         new_raw_text = ""
         if is_agent:
             if chunk.startswith(self.last_agent_text):
-                new_raw_text = chunk[len(self.last_agent_text):]
+                new_raw_text = chunk[len(self.last_agent_text) :]
             else:
                 new_raw_text = chunk
             self.last_agent_text = chunk
         elif is_thought:
             if chunk.startswith(self.last_thought_text):
-                new_raw_text = chunk[len(self.last_thought_text):]
+                new_raw_text = chunk[len(self.last_thought_text) :]
             else:
                 new_raw_text = chunk
             self.last_thought_text = chunk
         elif is_user_msg:
             # We don't broadcast user messages, but we add them to raw_final_answer to find the marker
-            if hasattr(self, "last_user_text") and chunk.startswith(self.last_user_text):
-                new_raw_text = chunk[len(self.last_user_text):]
+            if hasattr(self, "last_user_text") and chunk.startswith(
+                self.last_user_text
+            ):
+                new_raw_text = chunk[len(self.last_user_text) :]
             else:
                 new_raw_text = chunk
             self.last_user_text = chunk
@@ -724,22 +726,30 @@ class ACPClientHandler(Client):
                 self.marker_found = True
 
                 # We found the marker. Extract text *after* the marker
-                new_text_after_marker = self.raw_final_answer[idx + len(self.turn_marker) :].lstrip("\n")
+                new_text_after_marker = self.raw_final_answer[
+                    idx + len(self.turn_marker) :
+                ].lstrip("\n")
                 if new_text_after_marker and not is_user_msg:
                     await self._process_new_text(new_text_after_marker)
-            elif (is_agent or is_thought):
+            elif is_agent or is_thought:
                 # Fallbacks if marker isn't found yet but we are receiving agent content
                 if not self.user_msg_seen:
-                    logger.warning("[ACP] Agent message received before user message. Assuming history echo is disabled.")
+                    logger.warning(
+                        "[ACP] Agent message received before user message. Assuming history echo is disabled."
+                    )
                     self.marker_found = True
                     if new_raw_text and not is_user_msg:
                         await self._process_new_text(new_raw_text)
                 elif len(self.last_agent_text) + len(self.last_thought_text) > 50:
-                    logger.warning("[ACP] Fallback triggered by significant agent content without marker")
+                    logger.warning(
+                        "[ACP] Fallback triggered by significant agent content without marker"
+                    )
                     self.marker_found = True
                     # If we fallback due to significant content, it's safer to broadcast the accumulated text
                     # (this might be slightly duplicated with what was already buffered in current_text_segment, but we didn't broadcast it yet)
-                    await self._process_new_text(self.last_thought_text + self.last_agent_text)
+                    await self._process_new_text(
+                        self.last_thought_text + self.last_agent_text
+                    )
         else:
             if new_raw_text and not is_user_msg:
                 await self._process_new_text(new_raw_text)
@@ -844,7 +854,11 @@ class CLILLMService(BaseLLMService):
             raise e
 
         if not client.marker_found:
-            fallback_text = client.last_agent_text or client.last_thought_text or client.raw_final_answer[-500:]
+            fallback_text = (
+                client.last_agent_text
+                or client.last_thought_text
+                or client.raw_final_answer[-500:]
+            )
             if fallback_text and fallback_text not in client.current_text_segment:
                 client.current_text_segment += fallback_text
 
