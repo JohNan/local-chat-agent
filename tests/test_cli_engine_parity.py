@@ -162,3 +162,120 @@ async def test_acp_client_handler_no_echo_fallback():
     assert handler.user_msg_seen is False
     assert handler.marker_found is True
     assert handler.current_text_segment == "Hello world!"
+
+
+@pytest.mark.asyncio
+async def test_acp_sync_with_history_echo():
+    mock_task_state = AsyncMock()
+    turn_marker = "==JULES_TURN_HISTORY_ECHO=="
+    handler = ACPClientHandler(mock_task_state, turn_marker)
+
+    # 1. Simulate a multi-turn scenario where an old user prompt is echoed without the marker
+    await handler.session_update(
+        "sess",
+        UserMessageChunk(
+            type="userMessageChunk",
+            content=TextContentBlock(type="text", text="Previous turn user prompt"),
+            sessionUpdate="user_message_chunk",
+        ),
+    )
+    assert handler.user_msg_seen is True
+    assert handler.marker_found is False
+
+    # 2. Simulate agent response from the previous turn
+    await handler.session_update(
+        "sess",
+        AgentMessageChunk(
+            type="agentMessageChunk",
+            content=TextContentBlock(type="text", text="Previous turn agent response"),
+            sessionUpdate="agent_message_chunk",
+        ),
+    )
+    assert handler.marker_found is False  # Marker not found yet
+
+    # 3. Simulate new user message chunk containing the marker
+    await handler.session_update(
+        "sess",
+        UserMessageChunk(
+            type="userMessageChunk",
+            content=TextContentBlock(
+                type="text", text=f"New prompt\\n\\n{turn_marker}\\n\\n"
+            ),
+            sessionUpdate="user_message_chunk",
+        ),
+    )
+    assert handler.marker_found is True
+    assert handler.current_text_segment == ""  # We don't process user msg as new text
+
+    # 4. Simulate a new Agent message chunk
+    await handler.session_update(
+        "sess",
+        AgentMessageChunk(
+            type="agentMessageChunk",
+            content=TextContentBlock(type="text", text="New turn agent response"),
+            sessionUpdate="agent_message_chunk",
+        ),
+    )
+    assert handler.current_text_segment == "New turn agent response"
+
+
+@pytest.mark.asyncio
+async def test_acp_sync_fallback_tool_call():
+    mock_task_state = AsyncMock()
+    turn_marker = "==JULES_TURN_TOOL_FALLBACK=="
+    handler = ACPClientHandler(mock_task_state, turn_marker)
+
+    # Simulate agent generating thought before marker or any user message arrives
+    await handler.session_update(
+        "sess",
+        AgentThoughtChunk(
+            type="agentThoughtChunk",
+            content=TextContentBlock(type="text", text="Thinking about using a tool"),
+            sessionUpdate="agent_thought_chunk",
+        ),
+    )
+    assert (
+        handler.marker_found is True
+    )  # Because of "Agent message received before user message" fallback
+
+    # Let's reset the state to simulate the case where history *was* sent (user_msg_seen = True),
+    # but the prompt with the marker hasn't arrived yet, and we suddenly get a ToolCallStart.
+    handler = ACPClientHandler(mock_task_state, turn_marker)
+
+    await handler.session_update(
+        "sess",
+        UserMessageChunk(
+            type="userMessageChunk",
+            content=TextContentBlock(type="text", text="Old history prompt"),
+            sessionUpdate="user_message_chunk",
+        ),
+    )
+    assert handler.user_msg_seen is True
+    assert handler.marker_found is False
+
+    await handler.session_update(
+        "sess",
+        AgentThoughtChunk(
+            type="agentThoughtChunk",
+            content=TextContentBlock(type="text", text="Still old history..."),
+            sessionUpdate="agent_thought_chunk",
+        ),
+    )
+    assert handler.marker_found is False
+
+    # Simulate a sudden ToolCallStart without seeing the turn_marker
+    await handler.session_update(
+        "sess",
+        ToolCallStart(
+            type="toolCallStart",
+            toolCallId="call_1",
+            title="test_tool",
+            tool_call=MagicMock(),
+            sessionUpdate="tool_call",
+        ),
+    )
+
+    assert handler.marker_found is True
+    assert handler.current_text_segment == ""
+    assert len(handler.reasoning_trace) == 1
+    assert handler.reasoning_trace[0] == "Still old history..."
