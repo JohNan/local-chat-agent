@@ -618,6 +618,8 @@ class ACPClientHandler(Client):
         self.reasoning_trace = []
         self.current_text_segment = ""
         self.user_msg_seen = False
+        self.last_agent_text = ""
+        self.last_thought_text = ""
 
     def _extract_text(self, content: Any) -> str:
         """Robustly extracts text from dictionaries, lists, or Pydantic models."""
@@ -639,12 +641,20 @@ class ACPClientHandler(Client):
 
         return ""
 
-    # pylint: disable=too-many-branches
+    # pylint: disable=too-many-branches,too-many-statements
     async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
         update_type = type(update).__name__
         logger.debug("[ACP] session_update: %s - %s", update_type, str(update)[:100])
 
         if isinstance(update, (ToolCallStart, ToolCallProgress)):
+            if not self.marker_found:
+                logger.warning("[ACP] Fallback triggered by ToolCallStart")
+                self.marker_found = True
+                # Flush existing buffer
+                combined = self.last_agent_text + self.last_thought_text
+                if combined:
+                    await self._process_new_text(combined)
+
             title = (
                 getattr(update, "title", None)
                 or getattr(update, "status", None)
@@ -664,11 +674,15 @@ class ACPClientHandler(Client):
 
         chunk = ""
         is_user_msg = False
+        is_thought = False
+        is_agent = False
 
         if isinstance(update, AgentMessageChunk):
             chunk = self._extract_text(update.content)
+            is_agent = True
         elif isinstance(update, AgentThoughtChunk):
             chunk = self._extract_text(update.content)
+            is_thought = True
         elif isinstance(update, UserMessageChunk):
             chunk = self._extract_text(update.content)
             is_user_msg = True
@@ -679,36 +693,53 @@ class ACPClientHandler(Client):
         if is_user_msg:
             self.user_msg_seen = True
 
-        if chunk.startswith(self.raw_final_answer):
-            new_raw_text = chunk[len(self.raw_final_answer) :]
-            self.raw_final_answer = chunk
-        else:
-            new_raw_text = chunk
-            self.raw_final_answer += chunk
+        new_raw_text = ""
+        if is_agent:
+            if chunk.startswith(self.last_agent_text):
+                new_raw_text = chunk[len(self.last_agent_text):]
+            else:
+                new_raw_text = chunk
+            self.last_agent_text = chunk
+        elif is_thought:
+            if chunk.startswith(self.last_thought_text):
+                new_raw_text = chunk[len(self.last_thought_text):]
+            else:
+                new_raw_text = chunk
+            self.last_thought_text = chunk
+        elif is_user_msg:
+            # We don't broadcast user messages, but we add them to raw_final_answer to find the marker
+            if hasattr(self, "last_user_text") and chunk.startswith(self.last_user_text):
+                new_raw_text = chunk[len(self.last_user_text):]
+            else:
+                new_raw_text = chunk
+            self.last_user_text = chunk
 
+        self.raw_final_answer += new_raw_text
+
+        # Always check for the marker in raw_final_answer if we haven't found it yet
         if not self.marker_found:
             idx = self.raw_final_answer.find(self.turn_marker)
             if idx != -1:
                 logger.info("[ACP] Turn marker found at index %d", idx)
                 self.marker_found = True
-                new_text = self.raw_final_answer[idx + len(self.turn_marker) :].lstrip(
-                    "\n"
-                )
-                if new_text and not is_user_msg:
-                    await self._process_new_text(new_text)
-            elif (
-                isinstance(update, (AgentMessageChunk, AgentThoughtChunk))
-                and not self.user_msg_seen
-            ):
-                # Fallback: Assume history echo is disabled
-                # pylint: disable=line-too-long
-                logger.warning(
-                    "[ACP] Agent message received before user message. Assuming history echo is disabled."
-                )
-                # pylint: enable=line-too-long
-                self.marker_found = True
-                if new_raw_text and not is_user_msg:
-                    await self._process_new_text(new_raw_text)
+
+                # We found the marker. Extract text *after* the marker
+                new_text_after_marker = self.raw_final_answer[idx + len(self.turn_marker) :].lstrip("\n")
+                if new_text_after_marker and not is_user_msg:
+                    await self._process_new_text(new_text_after_marker)
+            elif (is_agent or is_thought):
+                # Fallbacks if marker isn't found yet but we are receiving agent content
+                if not self.user_msg_seen:
+                    logger.warning("[ACP] Agent message received before user message. Assuming history echo is disabled.")
+                    self.marker_found = True
+                    if new_raw_text and not is_user_msg:
+                        await self._process_new_text(new_raw_text)
+                elif len(self.last_agent_text) + len(self.last_thought_text) > 50:
+                    logger.warning("[ACP] Fallback triggered by significant agent content without marker")
+                    self.marker_found = True
+                    # If we fallback due to significant content, it's safer to broadcast the accumulated text
+                    # (this might be slightly duplicated with what was already buffered in current_text_segment, but we didn't broadcast it yet)
+                    await self._process_new_text(self.last_thought_text + self.last_agent_text)
         else:
             if new_raw_text and not is_user_msg:
                 await self._process_new_text(new_raw_text)
@@ -811,6 +842,11 @@ class CLILLMService(BaseLLMService):
                 await task_state.broadcast(f'event: error\ndata: "{err_msg}"\n\n')
                 return client.tool_usage_counts, client.reasoning_trace, err_msg
             raise e
+
+        if not client.marker_found:
+            fallback_text = client.last_agent_text or client.last_thought_text or client.raw_final_answer[-500:]
+            if fallback_text and fallback_text not in client.current_text_segment:
+                client.current_text_segment += fallback_text
 
         if client.current_text_segment:
             client.reasoning_trace.append(client.current_text_segment)
