@@ -84,10 +84,10 @@ def _get_remote_url():
                 stderr=subprocess.DEVNULL,
             )
             remote_url = remote_url_bytes.decode("utf-8").strip()
-        except subprocess.CalledProcessError:
-            pass
+        except subprocess.CalledProcessError as e:
+            logger.debug("git remote get-url origin failed: %s", e)
         except FileNotFoundError:
-            pass
+            logger.debug("git command not found while getting remote URL")
 
     return remote_url
 
@@ -102,10 +102,10 @@ def _get_current_branch():
             stderr=subprocess.DEVNULL,
         )
         branch = branch_bytes.decode("utf-8").strip()
-    except subprocess.CalledProcessError:
-        pass
+    except subprocess.CalledProcessError as e:
+        logger.debug("git rev-parse HEAD failed: %s", e)
     except FileNotFoundError:
-        pass
+        logger.debug("git command not found while getting current branch")
     return branch
 
 
@@ -201,7 +201,8 @@ def perform_git_push(
             )
             branch_exists = True
         except subprocess.CalledProcessError:
-            pass
+            # This is expected if the branch does not exist locally
+            logger.debug("Branch %s does not exist locally", branch_name)
 
         if branch_exists:
             # Checkout existing branch
