@@ -127,6 +127,7 @@ class DatabaseManager:
 
             logger.info("Migrating %d tasks from %s...", len(tasks), tasks_file)
 
+            task_data = []
             for task in tasks:
                 task_id = task.get("id", str(uuid.uuid4()))
                 session_name = task.get("session_name")
@@ -147,12 +148,7 @@ class DatabaseManager:
                         "updated_at",
                     ]
                 }
-
-                cursor.execute(
-                    """
-                    INSERT INTO tasks (id, session_name, status, created_at, updated_at, data)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """,
+                task_data.append(
                     (
                         task_id,
                         session_name,
@@ -160,7 +156,16 @@ class DatabaseManager:
                         created_at,
                         updated_at,
                         json.dumps(data),
-                    ),
+                    )
+                )
+
+            if task_data:
+                cursor.executemany(
+                    """
+                    INSERT INTO tasks (id, session_name, status, created_at, updated_at, data)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                    task_data,
                 )
 
             # Rename legacy file
@@ -204,6 +209,7 @@ class DatabaseManager:
                         "Removed orphaned function response during migration."
                     )
 
+            message_data = []
             for msg in history:
                 msg_id = msg.get("id", str(uuid.uuid4()))
                 role = msg.get("role")
@@ -214,12 +220,17 @@ class DatabaseManager:
 
                 created_at = datetime.now(timezone.utc).isoformat()
 
-                cursor.execute(
+                message_data.append(
+                    (msg_id, role, content, json.dumps(parts), created_at)
+                )
+
+            if message_data:
+                cursor.executemany(
                     """
                     INSERT INTO messages (id, role, content, parts, created_at)
                     VALUES (?, ?, ?, ?, ?)
                 """,
-                    (msg_id, role, content, json.dumps(parts), created_at),
+                    message_data,
                 )
 
             # Rename legacy file
