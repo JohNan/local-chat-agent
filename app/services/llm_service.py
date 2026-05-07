@@ -823,10 +823,13 @@ class CLILLMService(BaseLLMService):
                 global ACP_CLI_SESSION_ID  # pylint: disable=global-statement
                 current_session_id = None
 
+                # pylint: disable=import-outside-toplevel
                 import os
                 import sys
 
-                app_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+                app_root = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), "..", "..")
+                )
                 mcp_server_script = os.path.join(app_root, "mcp_server.py")
 
                 env_vars = [
