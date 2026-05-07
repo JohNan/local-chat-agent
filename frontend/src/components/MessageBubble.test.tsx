@@ -219,4 +219,46 @@ describe('MessageBubble', () => {
 
         expect(alertMock).toHaveBeenCalledWith('Error deploying: Deployment failed');
     });
+
+
+    it('uses the last occurrence of ## Jules Prompt if multiple are present', async () => {
+        const message: Message = {
+            id: '8',
+            role: 'model',
+            text: `First try
+## Jules Prompt
+Wrong task
+Oh wait, here is the real one
+## Jules Prompt
+Correct task`,
+            parts: [{ text: `First try
+## Jules Prompt
+Wrong task
+Oh wait, here is the real one
+## Jules Prompt
+Correct task` }]
+        };
+
+        const mockResponse = {
+            success: true,
+            result: { name: 'session-125' }
+        };
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (globalThis.fetch as any).mockResolvedValue({
+            json: () => Promise.resolve(mockResponse),
+        });
+
+        render(<MessageBubble message={message} />);
+
+        const deployButton = screen.getByText('Start Jules Task');
+        fireEvent.click(deployButton);
+
+        await waitFor(() => {
+            expect(globalThis.fetch).toHaveBeenCalledWith('/api/deploy_to_jules', expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ prompt: 'Correct task' })
+            }));
+        });
+    });
 });
