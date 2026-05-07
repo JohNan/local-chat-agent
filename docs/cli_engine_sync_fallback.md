@@ -1,35 +1,26 @@
-# ADR: CLI Engine Synchronization Fallback
+# ADR: CLI Engine Synchronization Fallback (Updated)
 
 ## Status
-Proposed
+Accepted
 
 ## Context
-The `CLILLMService` uses a unique `turn_marker` appended to the user prompt to identify where the new agent response begins in the ACP stream. This is necessary because some ACP-compatible CLI versions re-emit the entire conversation history.
+The `CLILLMService` uses a unique `turn_marker` appended to the user prompt to identify where the new agent response begins in the ACP stream.
 
-However, if the CLI version or configuration does not re-emit the prompt (history echo disabled), the `ACPClientHandler` never finds the marker. Consequently, it suppresses all `AgentMessageChunk` and `AgentThoughtChunk` events, leading to a UI where only tool calls are visible, and final answers are missing.
+In multi-turn conversations, calling `load_session` often causes the CLI to echo previous turn history. If the current prompt echo is missing or arrives late, the agent may start responding while the handler is still waiting for the marker. If history was echoed, the `user_msg_seen` flag is set, blocking the fallback and causing the new response to be ignored.
+
+Additionally, streaming updates from different CLI versions may be cumulative or incremental. The handler must correctly extract deltas without being confused by the prompt prefix in the buffer.
 
 ## Decision
-We will implement a "Smart Synchronization" fallback in `ACPClientHandler`:
-1. **Marker-First**: Continue to search for the `turn_marker` in all chunks.
-2. **History Echo Detection**: Track if any `UserMessageChunk` has been received.
-3. **Fallback**: If an `AgentMessageChunk` or `AgentThoughtChunk` is received *before* any `UserMessageChunk`, assume history echo is disabled and immediately enable output synchronization.
-4. **Logging**: Add explicit debug logging for marker detection and synchronization state changes.
+We will implement "Smart Synchronization" in `ACPClientHandler`:
+1. **Marker-First**: Search `raw_final_answer` for `turn_marker`.
+2. **Signal-Based Fallback**: Trigger fallback if `marker_found` is False and we see:
+   - Agent content with no previous user message.
+   - OR a `ToolCallStart` (strong turn indicator).
+   - OR significant agent content after a user message that lacked the marker.
+3. **Robust Delta Extraction**: Track `last_text_by_type` to handle cumulative vs incremental chunks independently of the prompt buffer.
+4. **Safe Return**: `execute_turn` will ensure a final answer is returned even if the marker was never found.
 
 ## Consequences
-- **Robustness**: The CLI engine will work correctly across different CLI versions and configurations (both history-echoing and non-echoing).
-- **Correctness**: Preserves the ability to filter history when it is indeed re-emitted.
-
-## Mermaid Diagram
-```mermaid
-graph TD
-    A[Start Turn] --> B{Update Received}
-    B -- Tool Call --> C[Broadcast Tool Status]
-    B -- User Msg --> D[Check for Marker]
-    D -- Marker Found --> E[Sync Enabled]
-    B -- Agent Msg/Thought --> F{Sync Enabled?}
-    F -- Yes --> G[Broadcast Content]
-    F -- No --> H{User Msg Seen?}
-    H -- No --> I[Assume No Echo - Enable Sync]
-    I --> G
-    H -- Yes --> J[Skip - Waiting for Marker]
-```
+- **High Compatibility**: Works with all Gemini CLI versions regardless of echo settings.
+- **Clean UI**: Prevents "A AB ABC" cumulative text jumps.
+- **Reliable History**: Multi-turn conversations will correctly show reasoning and final messages.
