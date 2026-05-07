@@ -1,48 +1,24 @@
-# Agent Instructions for Gemini Local Agent
+# Agent Rules & Architecture
 
-## Project Overview
-This is a lightweight, self-hosted web interface acting as a "Prompt Architect" for another AI agent.
-It runs on **Python 3.11+** using **FastAPI** and **Google Gemini API**.
+## Core Principles
+1.  **Prompt Architect**: This system is primarily a "Prompt Architect." It analyzes context to generate instructions for a coding agent.
+2.  **Jules Integration**: It can deploy prompts to "Jules" via an external API.
+3.  **Active CLI Mode**: (New) If enabled, the local CLI Engine (Gemini) can act as an autonomous implementation agent, performing file edits and running tests directly.
+4.  **Read-Only by Default**: The backend is read-only unless "Active CLI Mode" or specific Jules deployment flows are triggered.
 
-## Architecture
-- **Backend:** `app/` package (FastAPI). Entry point is `app/main.py`.
-  - Routes: Defined in `app/main.py`.
-  - Services: Business logic in `app/services/`.
-    - `chat_manager.py`: Handles chat history persistence and pagination.
-    - `database.py`: Manages SQLite database (`app.db`) for tasks, history, and settings.
-    - `git_ops.py`: Git operations and file system tools.
-    - `jules_api.py`: Manages integration with Jules API.
-    - `lsp_manager.py` & `lsp_registry.py`: Manages Language Server Protocol (LSP) processes for code intelligence. Supports both local subprocess and TCP connections (e.g. for the isolated Kotlin LSP container).
-    - `prompt_router.py`: Handles sticky persona logic and intent classification.
-    - `rag_manager.py`: Handles RAG system and codebase indexing (uses ChromaDB).
-    - `task_manager.py`: Handles task persistence (via SQLite).
-  - **MCP Integration:** The system supports Model Context Protocol (MCP) for dynamic tool extension. Configuration is loaded from `mcp_servers.json`.
-- **Frontend:** React + Vite (TypeScript). Build artifacts are served by FastAPI at `app/static/dist`.
-- **Container:** Dockerized via `Dockerfile`.
+## Directory Structure
+- `app/`: Python backend (FastAPI).
+- `frontend/`: React frontend (Vite + TypeScript).
+- `docs/`: Architecture Decision Records (ADRs) and documentation.
+- `app/services/`: Core logic (LSP, Git, LLM, RAG).
+- `app/routers/`: API endpoints.
 
-## Development Rules
-1. **Model:** Always ensure `gemini-3-pro-preview` is used.
-2. **Formatting & Testing:** Run `black .`, `pylint app/`, and `pytest` before committing.
-3. **RAG & Persistence:** The system uses ChromaDB for the RAG system (persisted locally). Task state and chat history are saved in SQLite (`app.db`), replacing legacy JSON files. Ensure `rag_manager.index_codebase_task` is called on startup and after git pulls.
-4. **Rate Limiting:** Embedding calls are rate-limited to 1,000 TPM and 3,000 RPM. See `docs/rag_limitations.md` for details.
-5. **Security:** Never hardcode API keys. Use `os.environ.get("GOOGLE_API_KEY")` or `os.environ.get("JULES_API_KEY")`.
-6. **Frontend State:** Complex scroll logic (lazy loading) is handled in `ChatInterface.tsx` using `useLayoutEffect`. Maintain this pattern to prevent scroll jumping.
+## Coding Standards
+- Use `asyncio` for I/O bound tasks.
+- Keep the `CLILLMService` modular to support different modes (Chat, Edit, Implementation).
+- Frontend components should be functional and use Hooks.
 
-## Testing
-
-### Backend Tests & Linting
-Run these commands to verify the backend:
-1. `pytest`
-2. `black --check .`
-3. `PYTHONPATH=. pylint app/`
-
-### Frontend Checks
-Run these commands inside the `frontend/` directory:
-1. `npm run lint`
-2. `npm run build`
-
-### Running the Server
-To run the server locally for manual testing:
-1. `source venv/bin/activate` (if applicable)
-2. `export GOOGLE_API_KEY="test_key"` (or use real key from env)
-3. `uvicorn app.main:app --reload`
+## Active CLI Mode Rules
+- Must use a specialized system prompt for implementation tasks.
+- Must provide clear feedback to the user via SSE or status endpoints.
+- Should ideally work on a temporary git branch for safety.
