@@ -184,7 +184,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
         setIsError(false);
         setDeploying(true);
         const marker = "## Jules Prompt";
-        const markerIndex = text.indexOf(marker);
+        const markerIndex = text.lastIndexOf(marker);
         let promptText = text;
         if (markerIndex !== -1) {
             // Extract text AFTER the marker
