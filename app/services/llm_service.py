@@ -20,6 +20,8 @@ from acp.schema import (
     ClientCapabilities,
     FileSystemCapabilities,
     AgentMessageChunk,
+    McpServerStdio,
+    EnvVariable,
     AgentThoughtChunk,
     UserMessageChunk,
     ToolCallStart,
@@ -820,12 +822,37 @@ class CLILLMService(BaseLLMService):
 
                 global ACP_CLI_SESSION_ID  # pylint: disable=global-statement
                 current_session_id = None
+
+                import os
+                import sys
+
+                app_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+                mcp_server_script = os.path.join(app_root, "mcp_server.py")
+
+                env_vars = [
+                    EnvVariable(name="PYTHONPATH", value=app_root),
+                    EnvVariable(name="CODEBASE_ROOT", value=git_ops.CODEBASE_ROOT),
+                ]
+                if "GOOGLE_API_KEY" in os.environ:
+                    env_vars.append(
+                        EnvVariable(
+                            name="GOOGLE_API_KEY", value=os.environ["GOOGLE_API_KEY"]
+                        )
+                    )
+
+                mcp_server_config = McpServerStdio(
+                    name="JulesAppServer",
+                    command=sys.executable,
+                    args=[mcp_server_script],
+                    env=env_vars,
+                )
+
                 if ACP_CLI_SESSION_ID:
                     try:
                         await conn.load_session(
                             cwd=git_ops.CODEBASE_ROOT,
                             session_id=ACP_CLI_SESSION_ID,
-                            mcp_servers=[],
+                            mcp_servers=[mcp_server_config],
                         )
                         current_session_id = ACP_CLI_SESSION_ID
                     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -836,7 +863,7 @@ class CLILLMService(BaseLLMService):
 
                 if not current_session_id:
                     session = await conn.new_session(
-                        cwd=git_ops.CODEBASE_ROOT, mcp_servers=[]
+                        cwd=git_ops.CODEBASE_ROOT, mcp_servers=[mcp_server_config]
                     )
                     current_session_id = session.session_id
                     ACP_CLI_SESSION_ID = current_session_id
