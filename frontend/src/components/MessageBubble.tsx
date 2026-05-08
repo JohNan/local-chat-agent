@@ -3,7 +3,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js';
 import mermaid from 'mermaid';
-import { Bot, Loader2, Rocket, Check, X, User, GitPullRequestArrow, RefreshCw, Copy, FileText, Search } from 'lucide-react';
+import { Bot, Loader2, Rocket, Check, X, User, GitPullRequestArrow, RefreshCw, Copy, FileText, Search, Terminal } from 'lucide-react';
 import type { Message } from '../types';
 
 mermaid.initialize({ startOnLoad: false });
@@ -37,9 +37,10 @@ interface MessageBubbleProps {
     toolStatus?: string | null;
     deployedSessionId?: string | null;
     onSendMessage?: (text: string) => void;
+    cliEditEnabled?: boolean;
 }
 
-const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolStatus, deployedSessionId, onSendMessage }) => {
+const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolStatus, deployedSessionId, onSendMessage, cliEditEnabled }) => {
     const [deploying, setDeploying] = useState(false);
     const [deployResult, setDeployResult] = useState<string | null>(
         deployedSessionId ? `Started! (${deployedSessionId})` : null
@@ -178,6 +179,48 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
     };
 
     const hasJulesPrompt = text.includes("## Jules Prompt");
+
+    const applyWithCli = async () => {
+        setDeployResult(null);
+        setIsError(false);
+        setDeploying(true);
+        const marker = "## Jules Prompt";
+        const markerIndex = text.lastIndexOf(marker);
+        let promptText = text;
+        if (markerIndex !== -1) {
+            // Extract text AFTER the marker
+            promptText = text.substring(markerIndex + marker.length).trim();
+            // Remove thought blocks if any
+            promptText = promptText.replace(/<details>[\s\S]*?<\/details>/g, '');
+        }
+
+        try {
+            const response = await fetch('/api/cli/apply', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ prompt: promptText }),
+            });
+
+            if (response.ok) {
+                setDeployResult("Started CLI Implementation");
+                setIsError(false);
+            } else {
+                const data = await response.json();
+                setDeployResult(data.error || "Error applying with CLI");
+                setIsError(true);
+            }
+        } catch (e) {
+            console.error(e);
+            setDeployResult("Error applying with CLI");
+            setIsError(true);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            alert("Error: " + (e as any).message);
+        } finally {
+            setDeploying(false);
+        }
+    };
 
     const deploy = async () => {
         setDeployResult(null);
@@ -414,23 +457,40 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                     </div>
                  )}
                  {isAi && hasJulesPrompt && (
-                     <div className="jules-controls" style={{ marginTop: '8px' }}>
+                     <div className="jules-controls" style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
                          {!deployResult ? (
-                             <button className="deploy-btn" onClick={deploy} disabled={deploying}>
-                                 {deploying ? (
-                                     <>
-                                        <Loader2 size={16} className="animate-spin" />
-                                        Sending...
-                                     </>
-                                 ) : (
-                                     <>
-                                        <Rocket size={16} />
-                                        Start Jules Task
-                                     </>
+                             <>
+                                 <button className="deploy-btn" onClick={deploy} disabled={deploying} style={{ flex: 1 }}>
+                                     {deploying ? (
+                                         <>
+                                            <Loader2 size={16} className="animate-spin" />
+                                            Sending...
+                                         </>
+                                     ) : (
+                                         <>
+                                            <Rocket size={16} />
+                                            Start Jules Task
+                                         </>
+                                     )}
+                                 </button>
+                                 {cliEditEnabled && (
+                                     <button className="deploy-btn" onClick={applyWithCli} disabled={deploying} style={{ flex: 1, backgroundColor: '#2da44e', borderColor: '#2da44e' }}>
+                                         {deploying ? (
+                                             <>
+                                                <Loader2 size={16} className="animate-spin" />
+                                                Applying...
+                                             </>
+                                         ) : (
+                                             <>
+                                                <Terminal size={16} />
+                                                Apply with CLI
+                                             </>
+                                         )}
+                                     </button>
                                  )}
-                             </button>
+                             </>
                          ) : (
-                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                                  <button className="deploy-btn" disabled>
                                      {isError ? <X size={16} /> : <Check size={16} />}
                                      {deployResult}
