@@ -9,6 +9,7 @@ import { QuotaErrorModal } from './components/QuotaErrorModal';
 import { useChatHistory } from './hooks/useChatHistory';
 import { generateId } from './utils';
 import type { Message, MediaItem, HistoryResponse } from './types';
+import { CLITerminal } from './components/CLITerminal';
 
 function App() {
     const {
@@ -54,6 +55,10 @@ function App() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [isTasksOpen, setIsTasksOpen] = useState(false);
     const [quotaErrorData, setQuotaErrorData] = useState<{ text: string, media?: MediaItem[], error: string } | null>(null);
+    const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
+    const [terminalOpen, setTerminalOpen] = useState(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [pendingAction, setPendingAction] = useState<any | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const hasCheckedStream = useRef(false);
 
@@ -203,6 +208,14 @@ function App() {
                         console.warn("Tool status parse error:", e);
                         setCurrentToolStatus("Executing tools...");
                     }
+                } else if (eventType === 'action_required') {
+                    try {
+                        const action = JSON.parse(dataStr);
+                        setPendingAction(action);
+                        setTerminalOpen(true);
+                    } catch (e) {
+                        console.error("Action parse error:", e);
+                    }
                 } else if (eventType === 'done' || eventType === 'error') {
                     if (eventType === 'error') {
                         console.error("Stream error:", dataStr);
@@ -276,6 +289,7 @@ function App() {
         addMessage(aiMsg);
 
         setIsGenerating(true);
+        setTerminalLogs([]); // Clear logs on new generation
         const controller = new AbortController();
         abortControllerRef.current = controller;
 
@@ -338,6 +352,7 @@ function App() {
                     const res = await fetch('/api/stream/active');
                     if (res.ok) {
                         setIsGenerating(true);
+                setTerminalOpen(true); // Auto-open terminal on reconnect
                         // Add placeholder for AI message
                         const aiMsg: Message = { id: generateId(), role: 'model', text: "", parts: [{text: ""}] };
                         addMessage(aiMsg);
@@ -369,6 +384,25 @@ function App() {
     useEffect(() => {
         localStorage.setItem("embeddingsEnabled", JSON.stringify(embeddingsEnabled));
     }, [embeddingsEnabled]);
+
+    // Override the `addMessage`/`updateLastMessage` inside readStream slightly if needed,
+    // but the simplest way is to intercept event: message or just show tool/action status.
+    // For now we'll rely on the existing readStream logic and only show special events in terminal.
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleResolveAction = async (action_id: string, decision: 'approve' | 'reject' | 'edit', editedArgs?: any) => {
+        setPendingAction(null);
+        try {
+            await fetch('/api/chat/action/resolve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action_id, decision, edited_arguments: editedArgs })
+            });
+        } catch (e) {
+            console.error("Error resolving action", e);
+        }
+    };
+
 
     const filteredMessages = useMemo(() => {
         return messages.filter((m, index) => {
@@ -410,6 +444,15 @@ function App() {
                 isGenerating={isGenerating}
                 onStop={handleStop}
             />
+
+            <CLITerminal
+                isOpen={terminalOpen}
+                onClose={() => setTerminalOpen(false)}
+                logs={terminalLogs}
+                pendingAction={pendingAction}
+                onResolveAction={handleResolveAction}
+            />
+
             {quotaErrorData && (
                 <QuotaErrorModal
                     currentModel={model}
