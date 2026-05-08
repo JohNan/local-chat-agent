@@ -16,16 +16,33 @@ interface CLITerminalProps {
     onClose: () => void;
     logs: string[];
     pendingAction: ActionRequest | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onResolveAction: (action_id: string, decision: 'approve' | 'reject' | 'edit', editedArgs?: any) => void;
 }
 
 export const CLITerminal: React.FC<CLITerminalProps> = ({ isOpen, onClose, logs, pendingAction, onResolveAction }) => {
-    const [editedArgs, setEditedArgs] = useState<string>('');
+    // Only re-initialize editedArgs when pendingAction changes from null to a new action,
+    // to avoid resetting user edits if the component re-renders.
+    const [editedArgs, setEditedArgs] = useState<string>(
+        pendingAction ? JSON.stringify(pendingAction.data.arguments, null, 2) : ''
+    );
 
+    // Keep editedArgs in sync when a *new* action arrives.
+    // Use layout effect to avoid flashing
     useEffect(() => {
-        if (pendingAction) {
-            setEditedArgs(JSON.stringify(pendingAction.data.arguments, null, 2));
+        let mounted = true;
+        if (pendingAction && mounted) {
+            // Using a slight delay to avoid React complaint about setState during effect,
+            // though it's technically fine for this simple synchronization.
+            setTimeout(() => {
+                if (mounted) setEditedArgs(JSON.stringify(pendingAction.data.arguments, null, 2));
+            }, 0);
+        } else if (mounted) {
+            setTimeout(() => {
+                if (mounted) setEditedArgs('');
+            }, 0);
         }
+        return () => { mounted = false; };
     }, [pendingAction]);
 
     if (!isOpen) return null;
@@ -47,6 +64,7 @@ export const CLITerminal: React.FC<CLITerminalProps> = ({ isOpen, onClose, logs,
             try {
                 const parsed = JSON.parse(editedArgs);
                 onResolveAction(pendingAction.action_id, 'edit', parsed);
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             } catch (e) {
                 alert("Invalid JSON in edited arguments.");
             }

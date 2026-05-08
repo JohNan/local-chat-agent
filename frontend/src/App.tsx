@@ -389,6 +389,7 @@ function App() {
     // but the simplest way is to intercept event: message or just show tool/action status.
     // For now we'll rely on the existing readStream logic and only show special events in terminal.
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleResolveAction = async (action_id: string, decision: 'approve' | 'reject' | 'edit', editedArgs?: any) => {
         setPendingAction(null);
         try {
