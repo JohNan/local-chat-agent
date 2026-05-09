@@ -119,21 +119,30 @@ async def clear_and_reindex_rag():
 
 class SettingsRequest(BaseModel):
     """Request model for updating settings."""
-
     model: str
+    cli_edit_enabled: bool | None = None
+    cli_setup_script: str | None = None
 
 
 @router.get("/api/settings")
 def api_settings():
     """Returns system settings."""
+    from app.config import CLI_EDIT_ENABLED, CLI_SETUP_SCRIPT
     model = chat_manager.get_setting("default_model", DEFAULT_MODEL)
-    return {"model": model}
+    cli_edit_enabled_str = chat_manager.get_setting("cli_edit_enabled", str(CLI_EDIT_ENABLED))
+    cli_edit_enabled = cli_edit_enabled_str.lower() == "true"
+    cli_setup_script = chat_manager.get_setting("cli_setup_script", CLI_SETUP_SCRIPT)
+    return {"model": model, "cli_edit_enabled": cli_edit_enabled, "cli_setup_script": cli_setup_script}
 
 
 @router.post("/api/settings")
 def save_settings(request: SettingsRequest):
     """Saves system settings."""
     chat_manager.save_setting("default_model", request.model)
+    if request.cli_edit_enabled is not None:
+        chat_manager.save_setting("cli_edit_enabled", str(request.cli_edit_enabled).lower())
+    if request.cli_setup_script is not None:
+        chat_manager.save_setting("cli_setup_script", request.cli_setup_script)
     return {"status": "updated", "model": request.model}
 
 

@@ -52,6 +52,7 @@ class BaseLLMService(Protocol):
         current_msg: str,
         task_state: Any,
         turn_context: TurnContext | None = None,
+        mode: str = "chat",
     ) -> tuple[defaultdict, list[str], str]:
         """Executes a single turn of the agent loop."""
 
@@ -393,8 +394,10 @@ class SDKLLMService(BaseLLMService):
         current_msg: str,
         task_state: Any,
         turn_context: TurnContext | None = None,
+        mode: str = "chat",
     ) -> tuple[defaultdict, list[str], str]:
         del turn_context
+        del mode
         return await self._run_loop(chat_session, current_msg, task_state)
 
     async def _stream_with_retry(
@@ -784,6 +787,7 @@ class CLILLMService(BaseLLMService):
         current_msg: str,
         task_state: Any,
         turn_context: TurnContext | None = None,
+        mode: str = "chat",
     ) -> tuple[defaultdict, list[str], str]:
         turn_context = turn_context or TurnContext()
         turn_marker = f"==JULES_TURN_{uuid.uuid4().hex[:8]}=="
@@ -814,7 +818,10 @@ class CLILLMService(BaseLLMService):
                 )
 
                 prompt_msg = current_msg
-                if turn_context.is_new_context and turn_context.system_instruction:
+                if mode == "implementation":
+                    impl_instruction = "You are an autonomous coding agent. Implement the given instructions, modify files using the provided tools, and execute tests to verify your changes. If tests fail, diagnose and fix the errors. Ensure to use tools autonomously."
+                    prompt_msg = f"{impl_instruction}\n\n{current_msg}"
+                elif turn_context.is_new_context and turn_context.system_instruction:
                     prompt_msg = f"{turn_context.system_instruction}\n\n{current_msg}"
 
                 # Append the unique marker to identify where the new response begins

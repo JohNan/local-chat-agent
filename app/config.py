@@ -25,6 +25,10 @@ HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "5000"))
 LLM_ENGINE = os.environ.get("LLM_ENGINE", "sdk").lower()
 
+CLI_EDIT_ENABLED = False
+CLI_SETUP_SCRIPT = ".jules/setup.sh"
+
+
 if LLM_ENGINE not in ("sdk", "cli"):
     logger.warning("Invalid LLM_ENGINE '%s', defaulting to 'sdk'.", LLM_ENGINE)
     LLM_ENGINE = "sdk"

@@ -21,16 +21,16 @@ function App() {
     } = useChatHistory();
 
     const [model, setModel] = useState("gemini-3-pro-preview");
+    const [cliEditEnabled, setCliEditEnabled] = useState(false);
 
     useEffect(() => {
         // Fetch saved model preference
         fetch('/api/settings')
             .then(res => res.json())
             .then(data => {
-                if (data.model) {
-                    setModel(data.model);
-                }
-            })
+                if (data.model) setModel(data.model);
+                if (data.cli_edit_enabled !== undefined) setCliEditEnabled(data.cli_edit_enabled);
+                            })
             .catch(err => console.error("Failed to fetch settings:", err));
     }, []);
 
@@ -430,6 +430,15 @@ function App() {
                 setEmbeddingsEnabled={setEmbeddingsEnabled}
                 onToggleTasks={() => setIsTasksOpen(!isTasksOpen)}
                 isGenerating={isGenerating}
+                cliEditEnabled={cliEditEnabled}
+                setCliEditEnabled={(val) => {
+                    setCliEditEnabled(val);
+                    fetch('/api/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ cli_edit_enabled: val, model: model })
+                    }).catch(err => console.error("Failed to save CLI edit setting:", err));
+                }}
             />
             <TasksDrawer isOpen={isTasksOpen} onClose={() => setIsTasksOpen(false)} />
             <ChatInterface
@@ -438,6 +447,7 @@ function App() {
                 toolStatus={currentToolStatus}
                 isLoadingHistory={isFetchingNextPage}
                 onSendMessage={sendMessage}
+                cliEditEnabled={cliEditEnabled}
             />
             <InputArea
                 onSendMessage={sendMessage}
