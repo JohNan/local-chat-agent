@@ -45,7 +45,7 @@ class TurnContext:
 class BaseLLMService(Protocol):
     """Protocol defining the interface for an LLM Service."""
 
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals, too-many-arguments, too-many-positional-arguments
     async def execute_turn(
         self,
         chat_session: Any,
@@ -387,7 +387,7 @@ async def _execute_tool(fc):
 class SDKLLMService(BaseLLMService):
     """Implementation of the LLM service using the Google GenAI SDK."""
 
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals, too-many-arguments, too-many-positional-arguments
     async def execute_turn(
         self,
         chat_session: Any,
@@ -780,7 +780,7 @@ class ACPClientHandler(Client):
 class CLILLMService(BaseLLMService):
     """Implementation of the LLM service using the Gemini CLI via ACP."""
 
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals, too-many-arguments, too-many-positional-arguments, too-many-branches, too-many-statements
     async def execute_turn(
         self,
         chat_session: Any,
@@ -819,7 +819,12 @@ class CLILLMService(BaseLLMService):
 
                 prompt_msg = current_msg
                 if mode == "implementation":
-                    impl_instruction = "You are an autonomous coding agent. Implement the given instructions, modify files using the provided tools, and execute tests to verify your changes. If tests fail, diagnose and fix the errors. Ensure to use tools autonomously."
+                    impl_instruction = (
+                        "You are an autonomous coding agent. "
+                        "Implement the given instructions, modify files using the provided tools, "
+                        "and execute tests to verify your changes. If tests fail, "
+                        "diagnose and fix the errors. Ensure to use tools autonomously."
+                    )
                     prompt_msg = f"{impl_instruction}\n\n{current_msg}"
                 elif turn_context.is_new_context and turn_context.system_instruction:
                     prompt_msg = f"{turn_context.system_instruction}\n\n{current_msg}"

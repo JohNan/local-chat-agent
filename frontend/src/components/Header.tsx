@@ -24,6 +24,8 @@ export const Header: React.FC<HeaderProps> = ({
     setEmbeddingsEnabled,
     onToggleTasks,
     isGenerating,
+    cliEditEnabled,
+    setCliEditEnabled
 }) => {
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [loading, setLoading] = useState(false);
