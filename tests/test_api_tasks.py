@@ -88,18 +88,3 @@ def test_sync_task(client, mock_jules_api, mock_task_manager):
 
     mock_jules_api.get_session_status.assert_called_with("sessions/1")
     mock_task_manager.update_task_status.assert_called_with("sessions/1", "SUCCEEDED")
-
-
-def test_api_cli_apply_flow(client, mocker):
-    """Test the autonomous CLI implementation flow."""
-    mock_git = mocker.patch("app.services.git_ops.create_branch", return_value=True)
-    mock_run = mocker.patch("app.routers.chat.agent_engine.run_agent_task")
-
-    response = client.post("/api/cli/apply", json={"prompt": "Fix the bug"})
-
-    assert response.status_code == 200
-    assert response.json()["success"] is True
-    assert "branch" in response.json()
-
-    mock_git.assert_called_once()
-    mock_run.assert_called_once()

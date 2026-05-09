@@ -815,23 +815,6 @@ async def get_definition(file_path: str, line: int, col: int) -> dict:
     return {"file": rel_target_path, "line": start_line, "content": content_snippet}
 
 
-def create_branch(branch_name: str) -> bool:
-    """
-    Creates and checkouts a new git branch.
-    """
-    try:
-        subprocess.run(
-            ["git", "checkout", "-b", branch_name],
-            cwd=CODEBASE_ROOT,
-            check=True,
-            capture_output=True,
-        )
-        return True
-    except subprocess.CalledProcessError as e:
-        logger.error("Failed to create branch %s: %s", branch_name, e.stderr)
-        return False
-
-
 def write_to_docs(filepath: str, content: str) -> str:
     """
     Writes content to a file, restricted strictly to the docs/ directory,
