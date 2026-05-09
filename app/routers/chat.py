@@ -186,27 +186,40 @@ async def api_cli_apply(request: CliApplyRequest):
     """Handles autonomous CLI implementation."""
     # pylint: disable=import-outside-toplevel
     import os
+    import time
     from app.config import CLI_SETUP_SCRIPT
-    from app.services import llm_service
+    from app.services import git_ops
 
     # pylint: enable=import-outside-toplevel
 
+    # 1. Create unique branch
+    timestamp = int(time.time())
+    branch_name = f"jules-implementation-{timestamp}"
+    if not git_ops.create_branch(branch_name):
+        return JSONResponse(status_code=500, content={"error": "Failed to create git branch."})
+
+    # 2. Run setup script
     setup_script = chat_manager.get_setting("cli_setup_script", CLI_SETUP_SCRIPT)
     if os.path.exists(setup_script):
         logger.info("Executing setup script: %s", setup_script)
         process = await asyncio.create_subprocess_shell(setup_script)
         await process.wait()
+        if process.returncode != 0:
+            return JSONResponse(status_code=500, content={"error": "Setup script failed."})
 
-    task_state = agent_engine.TaskState()
-    service = llm_service.CLILLMService()
-    await service.execute_turn(
-        chat_session=None,
-        current_msg=request.prompt,
-        task_state=task_state,
-        turn_context=None,
-        mode="implementation",
+    # 3. Start task in background
+    queue = asyncio.Queue()
+    asyncio.create_task(
+        agent_engine.run_agent_task(
+            initial_queue=queue,
+            chat_session=None,
+            user_msg=request.prompt,
+            turn_context=None,
+            mode="implementation"
+        )
     )
-    return {"success": True}
+
+    return {"success": True, "branch": branch_name}
 
 
 @router.post("/chat")

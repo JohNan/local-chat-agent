@@ -4,7 +4,6 @@ import './index.css';
 import { Header } from './components/Header';
 import { ChatInterface } from './components/ChatInterface';
 import { InputArea } from './components/InputArea';
-import { TasksDrawer } from './components/TasksDrawer';
 import { QuotaErrorModal } from './components/QuotaErrorModal';
 import { useChatHistory } from './hooks/useChatHistory';
 import { generateId } from './utils';
@@ -53,7 +52,6 @@ function App() {
     });
     const [currentToolStatus, setCurrentToolStatus] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [isTasksOpen, setIsTasksOpen] = useState(false);
     const [quotaErrorData, setQuotaErrorData] = useState<{ text: string, media?: MediaItem[], error: string } | null>(null);
     const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
     const [terminalOpen, setTerminalOpen] = useState(false);
@@ -215,6 +213,13 @@ function App() {
                         setTerminalOpen(true);
                     } catch (e) {
                         console.error("Action parse error:", e);
+                    }
+                } else if (eventType === 'log') {
+                    try {
+                        const parsedLog = JSON.parse(dataStr);
+                        setTerminalLogs(prev => [...prev, parsedLog]);
+                    } catch (e) {
+                        console.error("Failed to parse log data:", dataStr, e);
                     }
                 } else if (eventType === 'done' || eventType === 'error') {
                     if (eventType === 'error') {
@@ -428,7 +433,7 @@ function App() {
                 setWebSearchEnabled={setWebSearchEnabled}
                 embeddingsEnabled={embeddingsEnabled}
                 setEmbeddingsEnabled={setEmbeddingsEnabled}
-                onToggleTasks={() => setIsTasksOpen(!isTasksOpen)}
+                onToggleTerminal={() => setTerminalOpen(!terminalOpen)}
                 isGenerating={isGenerating}
                 cliEditEnabled={cliEditEnabled}
                 setCliEditEnabled={(val) => {
@@ -440,7 +445,6 @@ function App() {
                     }).catch(err => console.error("Failed to save CLI edit setting:", err));
                 }}
             />
-            <TasksDrawer isOpen={isTasksOpen} onClose={() => setIsTasksOpen(false)} />
             <ChatInterface
                 messages={filteredMessages}
                 onLoadHistory={fetchNextPage}

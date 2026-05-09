@@ -679,6 +679,9 @@ class ACPClientHandler(Client):
             await self.task_state.broadcast(
                 f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n"
             )
+            await self.task_state.broadcast(
+                f"event: log\ndata: {json.dumps(tool_status_msg)}\n\n"
+            )
             return
 
         chunk = ""
@@ -769,6 +772,7 @@ class ACPClientHandler(Client):
     async def _process_new_text(self, text: str):
         self.current_text_segment += text
         await self.task_state.broadcast(f"event: message\ndata: {json.dumps(text)}\n\n")
+        await self.task_state.broadcast(f"event: log\ndata: {json.dumps(text)}\n\n")
 
     async def request_permission(
         self, options: Any, session_id: str, tool_call: Any, **kwargs: Any
