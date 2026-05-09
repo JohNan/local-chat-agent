@@ -28,6 +28,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+class CliApplyRequest(BaseModel):
+    """Request model for cli apply endpoint."""
+
+    prompt: str
+
+
 class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
 
@@ -173,6 +179,34 @@ def chat_status():
 async def chat_stream_active():
     """Returns the active stream if one exists (chat path)."""
     return await stream_active()
+
+
+@router.post("/api/cli/apply")
+async def api_cli_apply(request: CliApplyRequest):
+    """Handles autonomous CLI implementation."""
+    # pylint: disable=import-outside-toplevel
+    import os
+    from app.config import CLI_SETUP_SCRIPT
+    from app.services import llm_service
+
+    # pylint: enable=import-outside-toplevel
+
+    setup_script = chat_manager.get_setting("cli_setup_script", CLI_SETUP_SCRIPT)
+    if os.path.exists(setup_script):
+        logger.info("Executing setup script: %s", setup_script)
+        process = await asyncio.create_subprocess_shell(setup_script)
+        await process.wait()
+
+    task_state = agent_engine.TaskState()
+    service = llm_service.CLILLMService()
+    await service.execute_turn(
+        chat_session=None,
+        current_msg=request.prompt,
+        task_state=task_state,
+        turn_context=None,
+        mode="implementation",
+    )
+    return {"success": True}
 
 
 @router.post("/chat")

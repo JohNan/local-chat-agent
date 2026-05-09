@@ -11,6 +11,8 @@ interface HeaderProps {
     setEmbeddingsEnabled: (enabled: boolean) => void;
     onToggleTasks: () => void;
     isGenerating: boolean;
+    cliEditEnabled?: boolean;
+    setCliEditEnabled?: (val: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +24,8 @@ export const Header: React.FC<HeaderProps> = ({
     setEmbeddingsEnabled,
     onToggleTasks,
     isGenerating,
+    cliEditEnabled,
+    setCliEditEnabled
 }) => {
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [loading, setLoading] = useState(false);
@@ -333,6 +337,18 @@ export const Header: React.FC<HeaderProps> = ({
                                 </label>
                             </div>
 
+                            <div className="setting-item" style={{ flexDirection: 'row', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+                                <input
+                                    type="checkbox"
+                                    id="cli-edit-checkbox"
+                                    checked={!!cliEditEnabled}
+                                    onChange={(e) => setCliEditEnabled?.(e.target.checked)}
+                                    style={{ width: 'auto' }}
+                                />
+                                <label htmlFor="cli-edit-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
+                                    Enable CLI Edit Mode (Local Auto-Fix)
+                                </label>
+                            </div>
                             <div className="setting-item">
                                 <button
                                     onClick={clearAndRebuildRag}
