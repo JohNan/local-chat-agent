@@ -777,7 +777,18 @@ class ACPClientHandler(Client):
     async def request_permission(
         self, options: Any, session_id: str, tool_call: Any, **kwargs: Any
     ) -> Any:
-        return {"outcome": "approved"}
+        # ACP requires 'outcome' to be an object with 'outcome' and 'optionId' fields
+        selected_option = "approve"
+        if options and len(options) > 0:
+            # Use the first option's ID if available (usually 'allow' or similar)
+            selected_option = options[0].id
+
+        return {
+            "outcome": {
+                "outcome": "selected",
+                "optionId": selected_option
+            }
+        }
 
 
 # pylint: disable=too-few-public-methods
