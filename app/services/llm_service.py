@@ -783,12 +783,7 @@ class ACPClientHandler(Client):
             # Use the first option's ID if available (usually 'allow' or similar)
             selected_option = options[0].id
 
-        return {
-            "outcome": {
-                "outcome": "selected",
-                "optionId": selected_option
-            }
-        }
+        return {"outcome": {"outcome": "selected", "optionId": selected_option}}
 
 
 # pylint: disable=too-few-public-methods

@@ -221,13 +221,6 @@ function App() {
                     } catch (e) {
                         console.error("Action parse error:", e);
                     }
-                } else if (eventType === 'log') {
-                    try {
-                        const parsedLog = JSON.parse(dataStr);
-                        setTerminalLogs(prev => [...prev, parsedLog]);
-                    } catch (e) {
-                        console.error("Failed to parse log data:", dataStr, e);
-                    }
                 } else if (eventType === 'done' || eventType === 'error') {
                     if (eventType === 'error') {
                         console.error("Stream error:", dataStr);
