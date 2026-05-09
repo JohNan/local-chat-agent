@@ -196,7 +196,9 @@ async def api_cli_apply(request: CliApplyRequest):
     timestamp = int(time.time())
     branch_name = f"jules-implementation-{timestamp}"
     if not git_ops.create_branch(branch_name):
-        return JSONResponse(status_code=500, content={"error": "Failed to create git branch."})
+        return JSONResponse(
+            status_code=500, content={"error": "Failed to create git branch."}
+        )
 
     # 2. Run setup script
     setup_script = chat_manager.get_setting("cli_setup_script", CLI_SETUP_SCRIPT)
@@ -205,7 +207,9 @@ async def api_cli_apply(request: CliApplyRequest):
         process = await asyncio.create_subprocess_shell(setup_script)
         await process.wait()
         if process.returncode != 0:
-            return JSONResponse(status_code=500, content={"error": "Setup script failed."})
+            return JSONResponse(
+                status_code=500, content={"error": "Setup script failed."}
+            )
 
     # 3. Start task in background
     queue = asyncio.Queue()
@@ -215,7 +219,7 @@ async def api_cli_apply(request: CliApplyRequest):
             chat_session=None,
             user_msg=request.prompt,
             turn_context=None,
-            mode="implementation"
+            mode="implementation",
         )
     )
 

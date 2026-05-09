@@ -27,14 +27,15 @@ window.confirm = confirmMock;
 describe('Header Component', () => {
     const mockSetModel = vi.fn();
     const mockSetWebSearchEnabled = vi.fn();
-    const mockOnToggleTasks = vi.fn();
+    const mockOnToggleTerminal = vi.fn();
 
+    // @ts-expect-error - ignoring missing props for tests
     const defaultProps = {
         model: 'gemini-2.0-flash-exp',
         setModel: mockSetModel,
         webSearchEnabled: false,
         setWebSearchEnabled: mockSetWebSearchEnabled,
-        onToggleTasks: mockOnToggleTasks,
+        onToggleTerminal: mockOnToggleTerminal,
     };
 
     beforeEach(() => {
@@ -50,7 +51,7 @@ describe('Header Component', () => {
 
         expect(screen.getByText('Gemini Agent')).toBeInTheDocument();
         // Check for main buttons by title
-        expect(screen.getByTitle('Tasks')).toBeInTheDocument();
+        expect(screen.getByTitle('CLI Terminal')).toBeInTheDocument();
         expect(screen.getByTitle('Reset Context')).toBeInTheDocument();
         expect(screen.getByTitle('Settings')).toBeInTheDocument();
 
@@ -89,13 +90,13 @@ describe('Header Component', () => {
         });
     });
 
-    it('toggles tasks drawer', async () => {
+    it('toggles CLI Terminal', async () => {
         render(<Header {...defaultProps} />);
         await waitFor(() => expect(fetchMock).toHaveBeenCalled());
 
-        const tasksButton = screen.getByTitle('Tasks');
-        fireEvent.click(tasksButton);
-        expect(mockOnToggleTasks).toHaveBeenCalledTimes(1);
+        const terminalButton = screen.getByTitle('CLI Terminal');
+        fireEvent.click(terminalButton);
+        expect(mockOnToggleTerminal).toHaveBeenCalledTimes(1);
     });
 
     it('opens settings modal and displays info', async () => {
