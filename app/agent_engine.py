@@ -135,6 +135,7 @@ async def run_agent_task(
     chat_session,
     user_msg: str,
     turn_context: llm_service.TurnContext | None = None,
+    mode: str = "chat",
 ):
     """
     Background worker that runs the agent loop and pushes events to the queue.
@@ -149,7 +150,7 @@ async def run_agent_task(
     try:
         service = llm_service.get_llm_service()
         tool_usage_counts, reasoning_trace, final_answer = await service.execute_turn(
-            chat_session, user_msg, task_state, turn_context
+            chat_session, user_msg, task_state, turn_context, mode=mode
         )
         await _finalize_task(
             tool_usage_counts, reasoning_trace, final_answer, task_state

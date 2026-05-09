@@ -200,6 +200,13 @@ function App() {
                     } catch (e) {
                         console.error("Failed to parse message data:", dataStr, e);
                     }
+                } else if (eventType === 'log') {
+                    try {
+                        const logData = JSON.parse(dataStr);
+                        setTerminalLogs(prev => [...prev, logData]);
+                    } catch (e) {
+                        setTerminalLogs(prev => [...prev, dataStr]);
+                    }
                 } else if (eventType === 'tool') {
                     try {
                         const parsedStatus = JSON.parse(dataStr);

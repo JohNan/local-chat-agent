@@ -699,6 +699,13 @@ class ACPClientHandler(Client):
         if not chunk:
             return
 
+        # Broadcast everything from the tool output / standard agent text as 'log' for the CLI Terminal
+        if is_agent or is_thought:
+            log_msg = f"[{update_type}] {chunk}"
+            await self.task_state.broadcast(
+                f"event: log\ndata: {json.dumps(log_msg)}\n\n"
+            )
+
         if is_user_msg:
             self.user_msg_seen = True
 
