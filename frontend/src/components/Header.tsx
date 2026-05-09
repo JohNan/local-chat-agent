@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, List, LayoutTemplate, Smartphone, Box, Server, MessageSquare, FileText, Upload } from 'lucide-react';
+import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, Terminal, LayoutTemplate, Smartphone, Box, Server, MessageSquare, FileText, Upload } from 'lucide-react';
 import type { RepoStatus } from '../types';
 
 interface HeaderProps {
@@ -9,7 +9,7 @@ interface HeaderProps {
     setWebSearchEnabled: (enabled: boolean) => void;
     embeddingsEnabled: boolean;
     setEmbeddingsEnabled: (enabled: boolean) => void;
-    onToggleTasks: () => void;
+    onToggleTerminal: () => void;
     isGenerating: boolean;
     cliEditEnabled?: boolean;
     setCliEditEnabled?: (val: boolean) => void;
@@ -22,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
     setWebSearchEnabled,
     embeddingsEnabled,
     setEmbeddingsEnabled,
-    onToggleTasks,
+    onToggleTerminal,
     isGenerating,
     cliEditEnabled,
     setCliEditEnabled
@@ -233,8 +233,8 @@ export const Header: React.FC<HeaderProps> = ({
                     )}
                 </div>
                 <div className="header-controls">
-                    <button onClick={onToggleTasks} className="icon-btn" title="Tasks">
-                        <List size={20} />
+                    <button onClick={onToggleTerminal} className="icon-btn" title="CLI Terminal">
+                        <Terminal size={20} />
                     </button>
                     <button onClick={clearContext} className="icon-btn" title="Reset Context">
                         <Eraser size={20} />

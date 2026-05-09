@@ -870,6 +870,33 @@ def write_to_docs(filepath: str, content: str) -> str:
         return f"Error writing file: {str(e)}"
 
 
+def create_branch(branch_name: str) -> bool:
+    """
+    Creates and checks out a new git branch.
+
+    Args:
+        branch_name: The name of the branch to create.
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    try:
+        subprocess.run(
+            ["git", "checkout", "-b", branch_name],
+            cwd=CODEBASE_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.error("Error creating branch %s: %s", branch_name, e.stderr)
+        return False
+    except (subprocess.SubprocessError, OSError) as e:
+        logger.error("Error creating branch %s: %s", branch_name, e)
+        return False
+
+
 def get_pr_diff(pr_number: int) -> str:
     """
     Retrieves the diff for a specific Pull Request.
