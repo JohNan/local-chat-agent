@@ -197,21 +197,21 @@ function App() {
                         const parsedText = JSON.parse(dataStr);
                         currentText += parsedText;
                         hasNewText = true;
-                    } catch (e) {
+                    } catch {
                         console.error("Failed to parse message data:", dataStr, e);
                     }
                 } else if (eventType === 'log') {
                     try {
                         const logData = JSON.parse(dataStr);
                         setTerminalLogs(prev => [...prev, logData]);
-                    } catch (e) {
+                    } catch {
                         setTerminalLogs(prev => [...prev, dataStr]);
                     }
                 } else if (eventType === 'tool') {
                     try {
                         const parsedStatus = JSON.parse(dataStr);
                         setCurrentToolStatus(parsedStatus);
-                    } catch (e) {
+                    } catch {
                         console.warn("Tool status parse error:", e);
                         setCurrentToolStatus("Executing tools...");
                     }
@@ -220,7 +220,7 @@ function App() {
                         const action = JSON.parse(dataStr);
                         setPendingAction(action);
                         setTerminalOpen(true);
-                    } catch (e) {
+                    } catch {
                         console.error("Action parse error:", e);
                     }
                 } else if (eventType === 'done' || eventType === 'error') {
@@ -275,7 +275,7 @@ function App() {
         // Backend abort
         try {
             await fetch('/api/stop', { method: 'POST' });
-        } catch (e) {
+        } catch {
             console.error("Failed to stop backend:", e);
         }
     };
@@ -372,7 +372,7 @@ function App() {
                     } else {
                         setIsGenerating(false);
                     }
-                } catch (e) {
+                } catch {
                     console.error("Failed to check active stream", e);
                     setIsGenerating(false);
                 }
@@ -405,7 +405,7 @@ function App() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action_id, decision, edited_arguments: editedArgs })
             });
-        } catch (e) {
+        } catch {
             console.error("Error resolving action", e);
         }
     };

@@ -188,7 +188,7 @@ async def api_cli_apply(request: CliApplyRequest):
     import os
     import time
     from app.config import CLI_SETUP_SCRIPT
-    from app.services import llm_service, git_ops
+    from app.services import git_ops
 
     # pylint: enable=import-outside-toplevel
 
