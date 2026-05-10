@@ -7,6 +7,7 @@ Exposes Python tools as an MCP server using FastMCP.
 import sys
 import os
 import logging
+import subprocess
 from typing import Optional, Dict
 
 # Ensure we can import from the app package
@@ -81,6 +82,39 @@ def replace_in_file_safe(filepath: str, old_string: str, new_string: str) -> str
 def fetch_url(url: str) -> str:
     """Fetches a URL."""
     return web_ops.fetch_url(url)
+
+
+@mcp.tool()
+def run_shell_command(command: str) -> str:
+    """
+    Runs a shell command and returns the output.
+    Useful as a fallback if the built-in shell tool fails for complex redirections.
+    """
+    try:
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+        output = []
+        if result.stdout:
+            output.append(result.stdout)
+        if result.stderr:
+            output.append(f"STDERR:\n{result.stderr}")
+
+        if not output:
+            # pylint: disable=line-too-long
+            return f"Command '{command}' executed successfully with no output (Exit code: {result.returncode})."
+            # pylint: enable=line-too-long
+
+        return "\n".join(output)
+    except subprocess.TimeoutExpired:
+        return f"Error: Command '{command}' timed out after 120 seconds."
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        return f"Error executing shell command: {e}"
 
 
 # Lazy Initialization for LSPManager
