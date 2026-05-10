@@ -1,6 +1,7 @@
 """
 Service module for Git operations.
 """
+# pylint: disable=too-many-lines
 
 import os
 import re
