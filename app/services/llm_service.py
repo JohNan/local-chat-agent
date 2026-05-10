@@ -26,6 +26,7 @@ from acp.schema import (
     UserMessageChunk,
     ToolCallStart,
     ToolCallProgress,
+    TextContentBlock,
 )
 
 from app.services import chat_manager, code_executor, git_ops, rag_manager, web_ops
@@ -630,8 +631,11 @@ class ACPClientHandler(Client):
         self.last_thought_text = ""
         self.last_user_text = ""
 
+    # pylint: disable=too-many-return-statements
     def _extract_text(self, content: Any) -> str:
         """Robustly extracts text from dictionaries, lists, or Pydantic models."""
+        if content is None:
+            return ""
         if isinstance(content, str):
             return content
         if isinstance(content, list):
@@ -639,7 +643,10 @@ class ACPClientHandler(Client):
         if isinstance(content, dict):
             return content.get("text", content.get("thought", ""))
 
-        # Explicit check for TextContentBlock-like objects which may not pass simple isinstance
+        if isinstance(content, TextContentBlock):
+            return str(content.text)
+
+        # Fallback for dynamic/duck-typed Pydantic objects if isinstance fails
         if hasattr(content, "text") and getattr(content, "text", None) is not None:
             return str(getattr(content, "text"))
         if (
@@ -650,7 +657,7 @@ class ACPClientHandler(Client):
 
         return ""
 
-    # pylint: disable=too-many-branches,too-many-statements
+    # pylint: disable=too-many-branches,too-many-statements,too-many-return-statements
     async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
         update_type = type(update).__name__
         logger.debug("[ACP] session_update: %s - %s", update_type, str(update)[:100])
@@ -664,12 +671,13 @@ class ACPClientHandler(Client):
                 if combined:
                     await self._process_new_text(combined)
 
-            title = (
-                getattr(update, "title", None)
-                or getattr(update, "status", None)
-                or "Tool operation"
-            )
-            if isinstance(update, ToolCallStart) and getattr(update, "title", None):
+            title = "Tool operation"
+            if hasattr(update, "title") and update.title:
+                title = update.title
+            elif hasattr(update, "status") and update.status:
+                title = update.status
+
+            if isinstance(update, ToolCallStart) and hasattr(update, "title") and update.title:
                 self.tool_usage_counts[update.title] += 1
                 if self.current_text_segment:
                     self.reasoning_trace.append(self.current_text_segment)
@@ -778,15 +786,15 @@ class ACPClientHandler(Client):
     async def request_permission(
         self, options: Any, session_id: str, tool_call: Any, **kwargs: Any
     ) -> Any:
-        # pylint: disable=import-outside-toplevel
-        from app.config import CLI_REQUIRE_APPROVAL
+        try:
+            # pylint: disable=import-outside-toplevel
+            from app.config import CLI_REQUIRE_APPROVAL
 
-        selected_option = "approve"
-        if options and len(options) > 0:
-            selected_option = options[0].get("id")
+            selected_option = "approve"
+            if options and len(options) > 0:
+                selected_option = options[0].get("id")
 
-        if CLI_REQUIRE_APPROVAL:
-            try:
+            if CLI_REQUIRE_APPROVAL:
                 tool_name = getattr(tool_call, "name", "unknown_tool")
                 tool_args = getattr(tool_call, "arguments", {})
 
@@ -814,10 +822,10 @@ class ACPClientHandler(Client):
 
                 return {"outcome": {"outcome": "rejected"}}
 
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.error("Error in request_permission: %s", e)
-
-        return {"outcome": {"outcome": "selected", "optionId": selected_option}}
+            return {"outcome": {"outcome": "selected", "optionId": selected_option}}
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error in request_permission: %s", e)
+            return {"outcome": {"outcome": "rejected"}}
 
 
 # pylint: disable=too-few-public-methods
@@ -869,7 +877,9 @@ class CLILLMService(BaseLLMService):
                         "and execute tests to verify your changes. If tests fail, "
                         "diagnose and fix the errors. Ensure to use tools autonomously. "
                         "You must use replace_in_file_safe and write_file_safe "
-                        "for all file modifications to avoid platform bugs."
+                        "for all file modifications to avoid platform bugs. "
+                        "If the built-in shell tool fails for complex redirections, "
+                        "use the MCP-provided run_shell_command tool."
                     )
                     prompt_msg = f"{impl_instruction}\n\n{current_msg}"
                 elif turn_context.is_new_context and turn_context.system_instruction:
