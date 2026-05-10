@@ -774,14 +774,40 @@ class ACPClientHandler(Client):
         await self.task_state.broadcast(f"event: message\ndata: {json.dumps(text)}\n\n")
         await self.task_state.broadcast(f"event: log\ndata: {json.dumps(text)}\n\n")
 
+    # pylint: disable=too-many-locals
     async def request_permission(
         self, options: Any, session_id: str, tool_call: Any, **kwargs: Any
     ) -> Any:
-        # ACP requires 'outcome' to be an object with 'outcome' and 'optionId' fields
+        # pylint: disable=import-outside-toplevel
+        from app.config import CLI_REQUIRE_APPROVAL
+
         selected_option = "approve"
         if options and len(options) > 0:
-            # Use the first option's ID if available (usually 'allow' or similar)
-            selected_option = options[0].id
+            selected_option = options[0].get("id")
+
+        if CLI_REQUIRE_APPROVAL:
+            try:
+                tool_name = getattr(tool_call, "name", "unknown_tool")
+                tool_args = getattr(tool_call, "arguments", {})
+
+                payload = {"name": tool_name, "arguments": tool_args}
+                action_id, future = self.task_state.action_registry.register(payload)
+
+                event_data = {"action_id": action_id, "type": "tool_call", "data": payload}
+                event_str = json.dumps(event_data)
+
+                await self.task_state.broadcast(f"event: action_required\ndata: {event_str}\n\n")
+
+                result = await future
+                decision = result.get("decision")
+
+                if decision in ("approve", "edit"):
+                    return {"outcome": {"outcome": "selected", "optionId": selected_option}}
+
+                return {"outcome": {"outcome": "rejected"}}
+
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error("Error in request_permission: %s", e)
 
         return {"outcome": {"outcome": "selected", "optionId": selected_option}}
 

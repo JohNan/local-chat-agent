@@ -5,6 +5,7 @@ Router for chat related endpoints.
 import asyncio
 import logging
 from dataclasses import dataclass
+from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
@@ -27,6 +28,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+class ActionResolveRequest(BaseModel):
+    """Request model for resolving pending actions."""
+    action_id: str
+    decision: str
+    edited_arguments: Any | None = None
 
 class CliApplyRequest(BaseModel):
     """Request model for cli apply endpoint."""
@@ -146,6 +153,18 @@ async def _create_post_chat_session(
     )
     return ChatSessionSetup(chat_session=chat_session, turn_context=turn_context)
 
+
+
+@router.post("/api/chat/action/resolve")
+async def api_resolve_action(request: ActionResolveRequest):
+    """Resolves a pending action."""
+    if agent_engine.CURRENT_STATE:
+        resolved = agent_engine.CURRENT_STATE.action_registry.resolve(
+            request.action_id, request.decision, request.edited_arguments
+        )
+        if resolved:
+            return {"status": "resolved"}
+    return JSONResponse(status_code=404, content={"error": "Action not found"})
 
 @router.post("/api/stop")
 def api_stop():
