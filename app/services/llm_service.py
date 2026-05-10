@@ -793,16 +793,24 @@ class ACPClientHandler(Client):
                 payload = {"name": tool_name, "arguments": tool_args}
                 action_id, future = self.task_state.action_registry.register(payload)
 
-                event_data = {"action_id": action_id, "type": "tool_call", "data": payload}
+                event_data = {
+                    "action_id": action_id,
+                    "type": "tool_call",
+                    "data": payload,
+                }
                 event_str = json.dumps(event_data)
 
-                await self.task_state.broadcast(f"event: action_required\ndata: {event_str}\n\n")
+                await self.task_state.broadcast(
+                    f"event: action_required\ndata: {event_str}\n\n"
+                )
 
                 result = await future
                 decision = result.get("decision")
 
                 if decision in ("approve", "edit"):
-                    return {"outcome": {"outcome": "selected", "optionId": selected_option}}
+                    return {
+                        "outcome": {"outcome": "selected", "optionId": selected_option}
+                    }
 
                 return {"outcome": {"outcome": "rejected"}}
 

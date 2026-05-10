@@ -31,9 +31,11 @@ router = APIRouter()
 
 class ActionResolveRequest(BaseModel):
     """Request model for resolving pending actions."""
+
     action_id: str
     decision: str
     edited_arguments: Any | None = None
+
 
 class CliApplyRequest(BaseModel):
     """Request model for cli apply endpoint."""
@@ -154,7 +156,6 @@ async def _create_post_chat_session(
     return ChatSessionSetup(chat_session=chat_session, turn_context=turn_context)
 
 
-
 @router.post("/api/chat/action/resolve")
 async def api_resolve_action(request: ActionResolveRequest):
     """Resolves a pending action."""
@@ -165,6 +166,7 @@ async def api_resolve_action(request: ActionResolveRequest):
         if resolved:
             return {"status": "resolved"}
     return JSONResponse(status_code=404, content={"error": "Action not found"})
+
 
 @router.post("/api/stop")
 def api_stop():
