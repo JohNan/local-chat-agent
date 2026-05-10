@@ -55,6 +55,7 @@ function App() {
     const [quotaErrorData, setQuotaErrorData] = useState<{ text: string, media?: MediaItem[], error: string } | null>(null);
     const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
     const [terminalOpen, setTerminalOpen] = useState(false);
+    const [terminalHeight, setTerminalHeight] = useState(300);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [pendingAction, setPendingAction] = useState<any | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -425,7 +426,15 @@ function App() {
     }, [messages]);
 
     return (
-        <>
+        <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            paddingBottom: terminalOpen ? `${terminalHeight}px` : '0',
+            transition: 'padding-bottom 0.3s ease-in-out',
+            overflow: 'hidden',
+            height: '100dvh'
+        }}>
             <Header
                 model={model}
                 setModel={handleModelChange}
@@ -465,6 +474,8 @@ function App() {
                 logs={terminalLogs}
                 pendingAction={pendingAction}
                 onResolveAction={handleResolveAction}
+                height={terminalHeight}
+                onHeightChange={setTerminalHeight}
             />
 
             {quotaErrorData && (
@@ -501,7 +512,7 @@ function App() {
                     }}
                 />
             )}
-        </>
+        </div>
     );
 }
 

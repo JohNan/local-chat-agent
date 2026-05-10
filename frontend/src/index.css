@@ -1,4 +1,5 @@
 :root {
+    --terminal-bg: #0c0c0c;
     --bg-color: #1e1e1e;
     --chat-bg: #252526;
     --user-msg-bg: #0e639c;
@@ -520,4 +521,55 @@ code {
 }
 .refresh-btn:hover {
     text-decoration: underline;
+}
+
+/* Terminal Responsive Bottom Panel */
+.terminal-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    background-color: var(--terminal-bg, #0c0c0c);
+    z-index: 1000;
+    transition: transform 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
+}
+
+.terminal-container.open {
+    transform: translateY(0);
+}
+
+.terminal-container.closed {
+    transform: translateY(105%);
+}
+
+.drag-handle {
+    height: 5px;
+    cursor: row-resize;
+    background: #333;
+    width: 100%;
+    flex-shrink: 0;
+}
+.drag-handle:hover {
+    background: #555;
+}
+
+@media (max-width: 767px) {
+    .terminal-container {
+        height: 80vh !important;
+        border-radius: 12px 12px 0 0;
+    }
+    .drag-handle {
+        display: none;
+    }
+}
+
+@media (min-width: 768px) {
+    .terminal-container {
+        border-top: 1px solid var(--border-color);
+    }
 }
