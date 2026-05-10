@@ -9,11 +9,50 @@ import traceback
 import asyncio
 import re
 from collections import defaultdict
+from dataclasses import dataclass
+import uuid
+from typing import Any, Dict
 
 
 from app.services import chat_manager, llm_service
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PendingAction:
+    """Dataclass representing a pending action requiring user approval."""
+
+    action_id: str
+    payload: Any
+    future: asyncio.Future
+
+
+class ActionRegistry:
+    """Registry for managing pending actions."""
+
+    def __init__(self):
+        self.pending_actions: Dict[str, PendingAction] = {}
+
+    def register(self, payload: Any) -> tuple[str, asyncio.Future]:
+        """Registers a new pending action and returns its ID and a Future."""
+        action_id = str(uuid.uuid4())
+        future = asyncio.Future()
+        self.pending_actions[action_id] = PendingAction(action_id, payload, future)
+        return action_id, future
+
+    def resolve(
+        self, action_id: str, decision: str, edited_arguments: Any = None
+    ) -> bool:
+        """Resolves a pending action."""
+        if action_id in self.pending_actions:
+            action = self.pending_actions.pop(action_id)
+            if not action.future.done():
+                action.future.set_result(
+                    {"decision": decision, "edited_arguments": edited_arguments}
+                )
+            return True
+        return False
 
 
 class TaskState:
@@ -23,6 +62,7 @@ class TaskState:
         self.listeners = []
         self.replay_buffer = []
         self.task_handle = asyncio.current_task()
+        self.action_registry = ActionRegistry()
 
     async def broadcast(self, event: str | None):
         """Broadcasts an event to all listeners and appends to replay buffer."""

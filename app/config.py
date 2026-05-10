@@ -26,6 +26,11 @@ PORT = int(os.environ.get("PORT", "5000"))
 LLM_ENGINE = os.environ.get("LLM_ENGINE", "sdk").lower()
 
 CLI_EDIT_ENABLED = False
+CLI_REQUIRE_APPROVAL = os.environ.get("CLI_REQUIRE_APPROVAL", "false").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 CLI_SETUP_SCRIPT = ".jules/setup.sh"
 
 
