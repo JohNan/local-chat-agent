@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { Terminal, Check, X } from 'lucide-react';
 
 interface ActionRequest {
@@ -18,14 +19,17 @@ interface CLITerminalProps {
     pendingAction: ActionRequest | null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onResolveAction: (action_id: string, decision: 'approve' | 'reject' | 'edit', editedArgs?: any) => void;
+    height: number;
+    onHeightChange: (height: number) => void;
 }
 
-export const CLITerminal: React.FC<CLITerminalProps> = ({ isOpen, onClose, logs, pendingAction, onResolveAction }) => {
+export const CLITerminal: React.FC<CLITerminalProps> = ({ isOpen, onClose, logs, pendingAction, onResolveAction, height, onHeightChange }) => {
     // Only re-initialize editedArgs when pendingAction changes from null to a new action,
     // to avoid resetting user edits if the component re-renders.
     const [editedArgs, setEditedArgs] = useState<string>(
         pendingAction ? JSON.stringify(pendingAction.data.arguments, null, 2) : ''
     );
+    const dragRef = useRef<{ isDragging: boolean; startY: number; startHeight: number }>({ isDragging: false, startY: 0, startHeight: 0 });
 
     // Keep editedArgs in sync when a *new* action arrives.
     // Use layout effect to avoid flashing
@@ -45,7 +49,34 @@ export const CLITerminal: React.FC<CLITerminalProps> = ({ isOpen, onClose, logs,
         return () => { mounted = false; };
     }, [pendingAction]);
 
-    if (!isOpen) return null;
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!dragRef.current.isDragging) return;
+            const deltaY = e.clientY - dragRef.current.startY;
+            const newHeight = Math.max(100, Math.min(window.innerHeight * 0.9, dragRef.current.startHeight - deltaY));
+            onHeightChange(newHeight);
+        };
+
+        const handleMouseUp = () => {
+            dragRef.current.isDragging = false;
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [onHeightChange]);
+
+    const handleMouseDown = (e: ReactMouseEvent) => {
+        dragRef.current = {
+            isDragging: true,
+            startY: e.clientY,
+            startHeight: height
+        };
+        e.preventDefault();
+    };
 
     const handleApprove = () => {
         if (pendingAction) {
@@ -72,21 +103,11 @@ export const CLITerminal: React.FC<CLITerminalProps> = ({ isOpen, onClose, logs,
     };
 
     return (
-        <div style={{
-            position: 'fixed',
-            bottom: '20px',
-            right: '20px',
-            width: '400px',
-            maxHeight: '500px',
-            backgroundColor: 'var(--bg-secondary)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            zIndex: 1000,
-            overflow: 'hidden'
-        }}>
+        <div
+            className={`terminal-container ${isOpen ? 'open' : 'closed'}`}
+            style={{ height: `${height}px` }}
+        >
+            <div className="drag-handle" onMouseDown={handleMouseDown} />
             <div style={{
                 padding: '10px',
                 borderBottom: '1px solid var(--border-color)',
