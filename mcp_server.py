@@ -92,7 +92,12 @@ def run_shell_command(command: str) -> str:
     """
     try:
         result = subprocess.run(
-            command, shell=True, capture_output=True, text=True, timeout=120, check=False
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
         )
         output = []
         if result.stdout:

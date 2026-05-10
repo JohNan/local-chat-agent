@@ -677,7 +677,11 @@ class ACPClientHandler(Client):
             elif hasattr(update, "status") and update.status:
                 title = update.status
 
-            if isinstance(update, ToolCallStart) and hasattr(update, "title") and update.title:
+            if (
+                isinstance(update, ToolCallStart)
+                and hasattr(update, "title")
+                and update.title
+            ):
                 self.tool_usage_counts[update.title] += 1
                 if self.current_text_segment:
                     self.reasoning_trace.append(self.current_text_segment)
