@@ -833,7 +833,9 @@ class CLILLMService(BaseLLMService):
                         "You are an autonomous coding agent. "
                         "Implement the given instructions, modify files using the provided tools, "
                         "and execute tests to verify your changes. If tests fail, "
-                        "diagnose and fix the errors. Ensure to use tools autonomously."
+                        "diagnose and fix the errors. Ensure to use tools autonomously. "
+                        "You must use replace_in_file_safe and write_file_safe "
+                        "for all file modifications to avoid platform bugs."
                     )
                     prompt_msg = f"{impl_instruction}\n\n{current_msg}"
                 elif turn_context.is_new_context and turn_context.system_instruction:

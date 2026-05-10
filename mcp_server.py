@@ -66,6 +66,18 @@ def write_to_docs(filename: str, content: str) -> str:
 
 
 @mcp.tool()
+def write_file_safe(filepath: str, content: str) -> str:
+    """Safely overwrites a file with new content."""
+    return git_ops.write_file_safe(filepath, content)
+
+
+@mcp.tool()
+def replace_in_file_safe(filepath: str, old_string: str, new_string: str) -> str:
+    """Safely replaces the first occurrence of a string in a file."""
+    return git_ops.replace_in_file_safe(filepath, old_string, new_string)
+
+
+@mcp.tool()
 def fetch_url(url: str) -> str:
     """Fetches a URL."""
     return web_ops.fetch_url(url)

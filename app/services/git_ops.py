@@ -2,6 +2,8 @@
 Service module for Git operations.
 """
 
+# pylint: disable=too-many-lines
+
 import os
 import re
 import subprocess
@@ -813,6 +815,69 @@ async def get_definition(file_path: str, line: int, col: int) -> dict:
     content_snippet = read_file(rel_target_path, start_line, start_line + 5)
 
     return {"file": rel_target_path, "line": start_line, "content": content_snippet}
+
+
+def write_file_safe(filepath: str, content: str) -> str:
+    """
+    Overwrites the specified file with new content.
+    Provides a safe fallback when Node.js tools fail.
+
+    Args:
+        filepath: The path of the file to write to.
+        content: The new text content of the file.
+
+    Returns:
+        A success message or an error message.
+    """
+    try:
+        full_path = _validate_path(filepath)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return f"Successfully wrote to {filepath}"
+    except ValueError as e:
+        return f"Error: {str(e)}"
+    except OSError as e:
+        logger.error("Error writing to %s: %s", filepath, e)
+        return f"Error writing file: {str(e)}"
+
+
+def replace_in_file_safe(filepath: str, old_string: str, new_string: str) -> str:
+    """
+    Replaces the first occurrence of old_string with new_string in a file.
+    Provides a safe fallback when Node.js tools fail.
+
+    Args:
+        filepath: The path of the file to modify.
+        old_string: The string to replace.
+        new_string: The replacement string.
+
+    Returns:
+        A success message or an error message.
+    """
+    try:
+        full_path = _validate_path(filepath)
+
+        if not os.path.exists(full_path):
+            return f"Error: File {filepath} not found."
+
+        with open(full_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        if old_string not in content:
+            return f"Error: The string to replace was not found in {filepath}."
+
+        new_content = content.replace(old_string, new_string, 1)
+
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+
+        return f"Successfully replaced content in {filepath}"
+    except ValueError as e:
+        return f"Error: {str(e)}"
+    except OSError as e:
+        logger.error("Error modifying %s: %s", filepath, e)
+        return f"Error modifying file: {str(e)}"
 
 
 def write_to_docs(filepath: str, content: str) -> str:
