@@ -112,7 +112,10 @@ def run_shell_command(command: str) -> str:
         if result.returncode != 0:
             if not output:
                 return f"Command '{command}' failed with exit code {result.returncode}."
-            return f"Command '{command}' failed (Exit code: {result.returncode}):\n" + "\n".join(output)
+            return (
+                f"Command '{command}' failed (Exit code: {result.returncode}):\n"
+                + "\n".join(output)
+            )
 
         if not output:
             # pylint: disable=line-too-long
