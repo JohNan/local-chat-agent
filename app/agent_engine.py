@@ -12,11 +12,26 @@ from collections import defaultdict
 from dataclasses import dataclass
 import uuid
 from typing import Any, Dict
+from pydantic import BaseModel
 
 
 from app.services import chat_manager, llm_service
 
 logger = logging.getLogger(__name__)
+
+
+class ActionRequest(BaseModel):
+    """Pydantic model for an action request payload."""
+
+    action_id: str
+    payload: Any
+
+
+class ActionResponse(BaseModel):
+    """Pydantic model for a resolved action response."""
+
+    decision: str
+    edited_arguments: Any | None = None
 
 
 @dataclass
@@ -41,16 +56,12 @@ class ActionRegistry:
         self.pending_actions[action_id] = PendingAction(action_id, payload, future)
         return action_id, future
 
-    def resolve(
-        self, action_id: str, decision: str, edited_arguments: Any = None
-    ) -> bool:
+    def resolve(self, action_id: str, response: ActionResponse) -> bool:
         """Resolves a pending action."""
         if action_id in self.pending_actions:
             action = self.pending_actions.pop(action_id)
             if not action.future.done():
-                action.future.set_result(
-                    {"decision": decision, "edited_arguments": edited_arguments}
-                )
+                action.future.set_result(response)
             return True
         return False
 
