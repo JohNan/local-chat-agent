@@ -631,23 +631,42 @@ class ACPClientHandler(Client):
         self.last_thought_text = ""
         self.last_user_text = ""
 
-    async def read_text_file(self, session_id: str, filepath: str, **kwargs: Any) -> str:
+    # pylint: disable=arguments-differ,arguments-renamed,unused-argument
+    async def read_text_file(
+        self, session_id: str, filepath: str, **kwargs: Any
+    ) -> str:
+        """Reads a text file from the codebase."""
         return git_ops.read_file(filepath)
 
-    async def write_text_file(self, session_id: str, filepath: str, content: str, **kwargs: Any) -> None:
+    async def write_text_file(
+        self, session_id: str, filepath: str, content: str, **kwargs: Any
+    ) -> None:
+        """Writes a text file to the codebase."""
         git_ops.write_file_safe(filepath, content)
 
     async def delete_file(self, session_id: str, filepath: str, **kwargs: Any) -> None:
+        """Deletes a file from the codebase."""
+        # pylint: disable=import-outside-toplevel
         import os
+
         os.remove(filepath)
 
-    async def list_directory(self, session_id: str, directory: str, **kwargs: Any) -> list:
+    async def list_directory(
+        self, session_id: str, directory: str, **kwargs: Any
+    ) -> list:
+        """Lists files in a directory."""
         return git_ops.list_files(directory)
 
-    async def run_terminal_command(self, session_id: str, command: str, **kwargs: Any) -> str:
+    async def run_terminal_command(
+        self, session_id: str, command: str, **kwargs: Any
+    ) -> str:
+        """Runs a terminal command."""
+        # pylint: disable=import-outside-toplevel
         import mcp_server
-        import asyncio
+
         return await asyncio.to_thread(mcp_server.run_shell_command, command)
+
+    # pylint: enable=arguments-differ,arguments-renamed,unused-argument
 
     # pylint: disable=too-many-return-statements
     def _extract_text(self, content: Any) -> str:
