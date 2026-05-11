@@ -28,7 +28,6 @@ from acp.schema import (
     ToolCallStart,
     ToolCallProgress,
     TextContentBlock,
-    PermissionOption,
     RequestPermissionResponse,
     AllowedOutcome,
     DeniedOutcome,
@@ -672,7 +671,7 @@ class ACPClientHandler(Client):
                 command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=git_ops.CODEBASE_ROOT
+                cwd=git_ops.CODEBASE_ROOT,
             )
             stdout, stderr = await proc.communicate()
 
@@ -879,7 +878,9 @@ class ACPClientHandler(Client):
 
                 if decision in ("approve", "edit"):
                     return RequestPermissionResponse(
-                        outcome=AllowedOutcome(option_id=selected_option, outcome="selected")
+                        outcome=AllowedOutcome(
+                            option_id=selected_option, outcome="selected"
+                        )
                     )
 
                 return RequestPermissionResponse(
@@ -891,9 +892,7 @@ class ACPClientHandler(Client):
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Error in request_permission: %s", e)
-            return RequestPermissionResponse(
-                outcome=DeniedOutcome(outcome="rejected")
-            )
+            return RequestPermissionResponse(outcome=DeniedOutcome(outcome="rejected"))
 
 
 # pylint: disable=too-few-public-methods
