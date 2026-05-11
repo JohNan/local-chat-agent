@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """
 Service for LLM interactions and helper functions.
 """
