@@ -11,11 +11,15 @@ import subprocess
 from typing import Optional, Dict
 
 # Ensure we can import from the app package
-sys.path.insert(0, os.getcwd())
+app_root = os.getcwd()
+sys.path.insert(0, app_root)
 
 # pylint: disable=wrong-import-position
 from mcp.server.fastmcp import FastMCP
 from app.services import git_ops, web_ops, rag_manager
+
+# Change process working directory to codebase root
+os.chdir(git_ops.CODEBASE_ROOT)
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
@@ -105,6 +109,11 @@ def run_shell_command(command: str) -> str:
         if result.stderr:
             output.append(f"STDERR:\n{result.stderr}")
 
+        if result.returncode != 0:
+            if not output:
+                return f"Command '{command}' failed with exit code {result.returncode}."
+            return f"Command '{command}' failed (Exit code: {result.returncode}):\n" + "\n".join(output)
+
         if not output:
             # pylint: disable=line-too-long
             return f"Command '{command}' executed successfully with no output (Exit code: {result.returncode})."
@@ -151,7 +160,7 @@ def get_file_outline(filepath: str) -> str:
 if os.environ.get("GOOGLE_API_KEY"):
 
     @mcp.tool()
-    def search_codebase_semantic(query: str, filters: Optional[Dict] = None):
+    def search_codebase_semantic(query: str, filters: dict = None):
         """Searches the codebase semantically."""
         return rag_manager.search_codebase_semantic(query, filters)
 
