@@ -28,6 +28,9 @@ from acp.schema import (
     ToolCallStart,
     ToolCallProgress,
     TextContentBlock,
+    RequestPermissionResponse,
+    AllowedOutcome,
+    DeniedOutcome,
 )
 
 from app.services import chat_manager, code_executor, git_ops, rag_manager, web_ops
@@ -650,6 +653,7 @@ class ACPClientHandler(Client):
         # pylint: disable=import-outside-toplevel
         import os
 
+        git_ops._validate_path(filepath)  # pylint: disable=protected-access
         os.remove(filepath)
 
     async def list_directory(
@@ -661,11 +665,26 @@ class ACPClientHandler(Client):
     async def run_terminal_command(
         self, session_id: str, command: str, **kwargs: Any
     ) -> str:
-        """Runs a terminal command."""
-        # pylint: disable=import-outside-toplevel
-        import mcp_server
+        """Runs a terminal command robustly."""
+        try:
+            proc = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=git_ops.CODEBASE_ROOT,
+            )
+            stdout, stderr = await proc.communicate()
 
-        return await asyncio.to_thread(mcp_server.run_shell_command, command)
+            output = []
+            if stdout:
+                output.append(stdout.decode().strip())
+            if stderr:
+                output.append(f"STDERR:\n{stderr.decode().strip()}")
+
+            return "\n".join(output) if output else "Command executed with no output"
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error executing terminal command: %s", e)
+            return f"Error executing command: {e}"
 
     # pylint: enable=arguments-differ,arguments-renamed,unused-argument
 
@@ -834,7 +853,7 @@ class ACPClientHandler(Client):
 
             selected_option = "approve"
             if options and len(options) > 0:
-                selected_option = options[0].get("id")
+                selected_option = options[0].option_id
 
             if CLI_REQUIRE_APPROVAL:
                 tool_name = getattr(tool_call, "name", "unknown_tool")
@@ -855,19 +874,25 @@ class ACPClientHandler(Client):
                 )
 
                 result = await future
-                decision = result.get("decision")
+                decision = result.decision
 
                 if decision in ("approve", "edit"):
-                    return {
-                        "outcome": {"outcome": "selected", "optionId": selected_option}
-                    }
+                    return RequestPermissionResponse(
+                        outcome=AllowedOutcome(
+                            option_id=selected_option, outcome="selected"
+                        )
+                    )
 
-                return {"outcome": {"outcome": "rejected"}}
+                return RequestPermissionResponse(
+                    outcome=DeniedOutcome(outcome="rejected")
+                )
 
-            return {"outcome": {"outcome": "selected", "optionId": selected_option}}
+            return RequestPermissionResponse(
+                outcome=AllowedOutcome(option_id=selected_option, outcome="selected")
+            )
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Error in request_permission: %s", e)
-            return {"outcome": {"outcome": "rejected"}}
+            return RequestPermissionResponse(outcome=DeniedOutcome(outcome="rejected"))
 
 
 # pylint: disable=too-few-public-methods

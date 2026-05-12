@@ -160,8 +160,11 @@ async def _create_post_chat_session(
 async def api_resolve_action(request: ActionResolveRequest):
     """Resolves a pending action."""
     if agent_engine.CURRENT_STATE:
+        response = agent_engine.ActionResponse(
+            decision=request.decision, edited_arguments=request.edited_arguments
+        )
         resolved = agent_engine.CURRENT_STATE.action_registry.resolve(
-            request.action_id, request.decision, request.edited_arguments
+            request.action_id, response
         )
         if resolved:
             return {"status": "resolved"}
