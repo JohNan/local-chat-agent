@@ -923,6 +923,8 @@ class CLILLMService(BaseLLMService):
                 "stream-json",
                 "--model",
                 model,
+                "--policy",
+                os.path.join(git_ops.CODEBASE_ROOT, "app/resources/fix_tools_policy.toml"),
                 cwd=git_ops.CODEBASE_ROOT,
             ) as (conn, _proc):
                 await conn.initialize(
@@ -942,8 +944,7 @@ class CLILLMService(BaseLLMService):
                         "Implement the given instructions, modify files using the provided tools, "
                         "and execute tests to verify your changes. If tests fail, "
                         "diagnose and fix the errors. Ensure to use tools autonomously. "
-                        "You must use replace_in_file_safe and write_file_safe "
-                        "for all file modifications to avoid platform bugs. "
+                        "The built-in write_file and replace tools are disabled. You MUST use the provided MCP tools instead."
                         "If the built-in shell tool fails for complex redirections, "
                         "use the MCP-provided run_shell_command tool."
                     )
