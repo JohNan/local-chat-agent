@@ -636,17 +636,15 @@ class ACPClientHandler(Client):
         self.last_user_text = ""
 
     # pylint: disable=arguments-differ,arguments-renamed,unused-argument
-    async def read_text_file(
-        self, session_id: str, filepath: str, **kwargs: Any
-    ) -> str:
+    async def read_text_file(self, session_id: str, path: str, **kwargs: Any) -> str:
         """Reads a text file from the codebase."""
-        return git_ops.read_file(filepath)
+        return git_ops.read_file(path)
 
     async def write_text_file(
-        self, session_id: str, filepath: str, content: str, **kwargs: Any
+        self, session_id: str, path: str, content: str, **kwargs: Any
     ) -> None:
         """Writes a text file to the codebase."""
-        git_ops.write_file_safe(filepath, content)
+        git_ops.write_file_safe(path, content)
 
     async def delete_file(self, session_id: str, filepath: str, **kwargs: Any) -> None:
         """Deletes a file from the codebase."""
