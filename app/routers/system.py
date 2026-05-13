@@ -71,7 +71,31 @@ class GitPushRequest(BaseModel):
 def api_git_status():
     """Returns the git status."""
     status = git_ops.get_git_status()
-    return {"status": status}
+    current_branch = git_ops.get_current_branch()
+    diff = git_ops.get_local_diff()
+
+    suggested_commit_message = "chore: update files"
+    if status and diff and CLIENT:
+        prompt = (
+            "Write a concise, conventional commit message based on the following git diff. "
+            "Output ONLY the commit message (max 1 line), "
+            "without any markdown backticks or explanations.\n\n"
+            f"{diff}"
+        )
+        try:
+            response = CLIENT.models.generate_content(
+                model="gemini-3-flash-preview", contents=prompt
+            )
+            if response and response.text:
+                suggested_commit_message = response.text.strip()
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Failed to generate commit message: %s", e)
+
+    return {
+        "status": status,
+        "branch": current_branch,
+        "suggested_commit_message": suggested_commit_message,
+    }
 
 
 @router.post("/api/git_push")
