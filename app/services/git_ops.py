@@ -17,6 +17,18 @@ from app.services.lsp_manager import LSPManager
 
 logger = logging.getLogger(__name__)
 
+# Pre-compiled regex patterns for performance
+KOTLIN_OUTLINE_PATTERN = re.compile(
+    r"^\s*((@\w+\s*)*\s*(fun|class|data class|interface|object)\s+[\w<>]+)",
+    re.MULTILINE,
+)
+JS_OUTLINE_PATTERN = re.compile(
+    r"^\s*(export\s+)?(default\s+)?(async\s+)?"
+    r"(function|class|const|let|var|interface|type|enum)\s+([\w$]+)",
+    re.MULTILINE,
+)
+WHITESPACE_PATTERN = re.compile(r"\s+")
+
 # Default to /codebase inside Docker, but fallback to current directory for local testing
 CODEBASE_ROOT = os.environ.get("CODEBASE_ROOT", "/codebase")
 MAX_FILES_LIMIT = 500
@@ -599,14 +611,10 @@ def _get_outline_python(content: str) -> list[str]:
 def _get_outline_kotlin(content: str) -> list[str]:
     """Helper to outline Kotlin files."""
     outline = []
-    pattern = re.compile(
-        r"^\s*((@\w+\s*)*\s*(fun|class|data class|interface|object)\s+[\w<>]+)",
-        re.MULTILINE,
-    )
-    for match in pattern.finditer(content):
+    for match in KOTLIN_OUTLINE_PATTERN.finditer(content):
         lineno = content[: match.start()].count("\n") + 1
         signature = match.group(1).strip().replace("\n", " ")
-        signature = re.sub(r"\s+", " ", signature)
+        signature = WHITESPACE_PATTERN.sub(" ", signature)
         outline.append(f"Line {lineno}: {signature}")
     return outline
 
@@ -614,13 +622,8 @@ def _get_outline_kotlin(content: str) -> list[str]:
 def _get_outline_js(content: str) -> list[str]:
     """Helper to outline JS/TS files."""
     outline = []
-    pattern = re.compile(
-        r"^\s*(export\s+)?(default\s+)?(async\s+)?"
-        r"(function|class|const|let|var|interface|type|enum)\s+([\w$]+)",
-        re.MULTILINE,
-    )
     for i, line in enumerate(content.splitlines(), 1):
-        match = pattern.search(line)
+        match = JS_OUTLINE_PATTERN.search(line)
         if match:
             outline.append(f"Line {i}: {match.group(0).strip()}")
     return outline
