@@ -81,9 +81,8 @@ export const Header: React.FC<HeaderProps> = ({
             const data = await res.json();
             if (data.status && data.status.length > 0) {
                 setPushFiles(data.status);
-                const timestamp = new Date().getTime();
-                setPushBranchName(`docs-update-${timestamp}`);
-                setPushCommitMessage("docs: update documentation");
+                setPushBranchName(data.branch || "main");
+                setPushCommitMessage(data.suggested_commit_message || "chore: update files");
                 setShowPushModal(true);
             } else {
                 alert("No changes to push");

@@ -106,7 +106,7 @@ def _get_remote_url():
     return remote_url
 
 
-def _get_current_branch():
+def get_current_branch():
     """Attempts to retrieve the current git branch."""
     branch = "main"  # Default
     try:
@@ -123,6 +123,28 @@ def _get_current_branch():
     return branch
 
 
+def get_local_diff() -> str:
+    """
+    Retrieves the diff of all local changes (unstaged and staged).
+    """
+    try:
+        # Get unstaged changes
+        result = subprocess.run(
+            ["git", "diff", "HEAD"],
+            cwd=CODEBASE_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        logger.error("Error getting git diff: %s", e.stderr)
+        return ""
+    except (subprocess.SubprocessError, OSError) as e:
+        logger.error("Error getting git diff: %s", e)
+        return ""
+
+
 @lru_cache(maxsize=1)
 def get_repo_info():
     """
@@ -130,7 +152,7 @@ def get_repo_info():
     """
     try:
         remote_url = _get_remote_url()
-        branch = _get_current_branch()
+        branch = get_current_branch()
 
         project = "Unknown"
         source_id = ""
@@ -203,7 +225,7 @@ def perform_git_push(
     logger.info("Starting git push to branch %s...", branch_name)
     try:
         # Capture the original active branch
-        original_branch = _get_current_branch()
+        original_branch = get_current_branch()
 
         # Check if branch exists
         branch_exists = False
@@ -218,22 +240,37 @@ def perform_git_push(
             # This is expected if the branch does not exist locally
             logger.debug("Branch %s does not exist locally", branch_name)
 
-        if branch_exists:
-            # Checkout existing branch
-            subprocess.run(
-                ["git", "checkout", branch_name],
-                cwd=CODEBASE_ROOT,
-                check=True,
-                capture_output=True,
-            )
-        else:
-            # Create and checkout new branch
-            subprocess.run(
-                ["git", "checkout", "-b", branch_name],
-                cwd=CODEBASE_ROOT,
-                check=True,
-                capture_output=True,
-            )
+        if branch_name != original_branch:
+            if branch_exists:
+                # Checkout existing branch
+                subprocess.run(
+                    ["git", "checkout", branch_name],
+                    cwd=CODEBASE_ROOT,
+                    check=True,
+                    capture_output=True,
+                )
+            else:
+                try:
+                    # Rename the branch locally before pushing
+                    subprocess.run(
+                        ["git", "branch", "-m", branch_name],
+                        cwd=CODEBASE_ROOT,
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                except subprocess.CalledProcessError as e:
+                    logger.debug(
+                        "git branch -m failed: %s. Falling back to checkout -b",
+                        e.stderr,
+                    )
+                    # Create and checkout new branch if rename failed
+                    subprocess.run(
+                        ["git", "checkout", "-b", branch_name],
+                        cwd=CODEBASE_ROOT,
+                        check=True,
+                        capture_output=True,
+                    )
 
         # Add all changes
         subprocess.run(
@@ -262,12 +299,34 @@ def perform_git_push(
             output += "\n" + result.stderr
 
         if switch_back and original_branch != branch_name:
-            subprocess.run(
-                ["git", "checkout", original_branch],
-                cwd=CODEBASE_ROOT,
-                check=True,
-                capture_output=True,
-            )
+            # Check if original_branch still exists (might have been renamed)
+            branch_exists = False
+            try:
+                subprocess.run(
+                    [
+                        "git",
+                        "show-ref",
+                        "--verify",
+                        "--quiet",
+                        f"refs/heads/{original_branch}",
+                    ],
+                    cwd=CODEBASE_ROOT,
+                    check=True,
+                )
+                branch_exists = True
+            except subprocess.CalledProcessError:
+                logger.debug(
+                    "Original branch %s does not exist, cannot switch back",
+                    original_branch,
+                )
+
+            if branch_exists:
+                subprocess.run(
+                    ["git", "checkout", original_branch],
+                    cwd=CODEBASE_ROOT,
+                    check=True,
+                    capture_output=True,
+                )
 
         return {"success": True, "output": output}
     except subprocess.CalledProcessError as e:
