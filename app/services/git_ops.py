@@ -1068,3 +1068,46 @@ def get_pr_diff(pr_number: int) -> str:
     except (subprocess.SubprocessError, OSError) as e:
         logger.error("Error getting PR diff: %s", e)
         return f"Error retrieving PR diff: {str(e)}"
+
+def get_branches() -> list[str]:
+    """
+    Returns a list of local git branches.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "branch", "--format=%(refname:short)"],
+            cwd=CODEBASE_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        branches = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        return branches
+    except subprocess.CalledProcessError as e:
+        logger.error("Error getting branches: %s", e.stderr)
+        return []
+    except (subprocess.SubprocessError, OSError) as e:
+        logger.error("Error getting branches: %s", e)
+        return []
+
+
+def switch_branch(branch_name: str) -> dict:
+    """
+    Switches to the specified git branch.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "checkout", branch_name],
+            cwd=CODEBASE_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return {"success": True, "output": result.stdout or result.stderr}
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr or e.stdout
+        logger.error("Error switching branch to %s: %s", branch_name, error_msg)
+        return {"success": False, "output": error_msg}
+    except (subprocess.SubprocessError, OSError) as e:
+        logger.error("Error switching branch to %s: %s", branch_name, e)
+        return {"success": False, "output": str(e)}

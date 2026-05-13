@@ -28,6 +28,8 @@ export const Header: React.FC<HeaderProps> = ({
     setCliEditEnabled
 }) => {
     const [status, setStatus] = useState<RepoStatus | null>(null);
+    const [branches, setBranches] = useState<string[]>([]);
+    const [switchingBranch, setSwitchingBranch] = useState(false);
     const [loading, setLoading] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showAgentInfo, setShowAgentInfo] = useState(false);
@@ -60,6 +62,7 @@ export const Header: React.FC<HeaderProps> = ({
             }
         };
         fetchModels();
+            if (showSettings) fetchBranches();
     }, [showSettings]);
 
     const updateStatus = async () => {
@@ -69,6 +72,45 @@ export const Header: React.FC<HeaderProps> = ({
             setStatus(data);
         } catch (e) {
             console.error(e);
+        }
+    };
+
+    const fetchBranches = async () => {
+        try {
+            const res = await fetch('/api/system/branches');
+            const data = await res.json();
+            if (data.branches) {
+                setBranches(data.branches);
+            }
+        } catch (e) {
+            console.error("Failed to fetch branches:", e);
+        }
+    };
+
+    const handleBranchSwitch = async (branchName: string) => {
+        if (!branchName || branchName === status?.branch) return;
+        if (switchingBranch) return;
+        
+        if (!confirm(`Switch to branch "${branchName}"?`)) return;
+
+        setSwitchingBranch(true);
+        try {
+            const res = await fetch('/api/system/branch/switch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ branch_name: branchName })
+            });
+            const data = await res.json();
+            if (data.success) {
+                await updateStatus();
+                alert(`Switched to branch: ${branchName}`);
+            } else {
+                alert(`Failed to switch branch: ${data.output}`);
+            }
+        } catch (e) {
+            alert('Error switching branch: ' + (e as Error).message);
+        } finally {
+            setSwitchingBranch(false);
         }
     };
 
@@ -256,10 +298,30 @@ export const Header: React.FC<HeaderProps> = ({
 
                         <div className="settings-content">
                              <div className="setting-item">
-                                <label>Repository</label>
-                                <span id="repo-status" style={{ display: 'block', padding: '5px 0' }}>
-                                    {status ? `${status.project} (${status.branch})` : 'Loading...'}
-                                </span>
+                                <label>Repository & Branch</label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '5px' }}>
+                                    <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>{status?.project}</span>
+                                    <select
+                                        value={status?.branch || ""}
+                                        onChange={(e) => handleBranchSwitch(e.target.value)}
+                                        disabled={switchingBranch}
+                                        style={{ 
+                                            flex: 1, 
+                                            padding: '4px 8px', 
+                                            borderRadius: '4px', 
+                                            border: '1px solid var(--border-color)', 
+                                            backgroundColor: 'var(--bg-secondary)', 
+                                            color: 'var(--text-color)',
+                                            fontSize: '0.9rem'
+                                        }}
+                                    >
+                                        {!status?.branch && <option value="">Loading...</option>}
+                                        {status?.branch && <option value={status.branch}>{status.branch} (current)</option>}
+                                        {branches.filter(b => b !== status?.branch).map(b => (
+                                            <option key={b} value={b}>{b}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="setting-item">
