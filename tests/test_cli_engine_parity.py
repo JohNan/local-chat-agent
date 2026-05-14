@@ -1,14 +1,16 @@
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+"""
+Tests for CLI engine parity.
+"""
+
 from collections import defaultdict
-import uuid
+from unittest.mock import AsyncMock, patch, MagicMock
+import pytest
 
 from acp.schema import (
     AgentMessageChunk,
     AgentThoughtChunk,
     UserMessageChunk,
     ToolCallStart,
-    ToolCallProgress,
     TextContentBlock,
 )
 from app.services.llm_service import CLILLMService, TurnContext, ACPClientHandler
@@ -16,11 +18,12 @@ from app.services.llm_service import CLILLMService, TurnContext, ACPClientHandle
 
 @pytest.mark.asyncio
 async def test_acp_client_handler_multi_turn_simulation():
+    """Test turn marker simulation."""
     mock_task_state = AsyncMock()
     turn_marker = "==JULES_TURN_12345678=="
     handler = ACPClientHandler(mock_task_state, turn_marker)
 
-    # 1. Simulate history re-emission (before marker) by sending a UserMessageChunk first so that it knows history is there
+    # 1. Simulate history re-emission
     await handler.session_update(
         "sess",
         UserMessageChunk(
@@ -98,6 +101,7 @@ async def test_acp_client_handler_multi_turn_simulation():
 @patch("app.services.llm_service.spawn_agent_process")
 @patch("app.services.chat_manager.get_setting")
 async def test_execute_turn_parity(mock_get_setting, mock_spawn):
+    """Test execute turn parity."""
     mock_get_setting.return_value = "gemini-test"
 
     # Mocking the connection
@@ -110,6 +114,8 @@ async def test_execute_turn_parity(mock_get_setting, mock_spawn):
 
     # Create an async context manager mock
     class AsyncContextManagerMock:
+        """Async context manager."""
+
         async def __aenter__(self):
             return mock_conn, mock_proc
 
@@ -122,7 +128,7 @@ async def test_execute_turn_parity(mock_get_setting, mock_spawn):
     service = CLILLMService()
 
     # Simulate ACP Client handler updates inside prompt using side effect
-    async def side_effect_prompt(session_id, prompt):
+    async def side_effect_prompt(session_id, prompt):  # pylint: disable=unused-argument
         # We need to find the handler in the calling context, but it's simpler
         # just to test execute_turn returns correct defaults when nothing is emitted.
         # But wait, we want to test parity. We can just test the final return structure.
@@ -144,6 +150,7 @@ async def test_execute_turn_parity(mock_get_setting, mock_spawn):
 
 @pytest.mark.asyncio
 async def test_acp_client_handler_no_echo_fallback():
+    """Test no echo."""
     mock_task_state = AsyncMock()
     turn_marker = "==JULES_TURN_NO_ECHO=="
     handler = ACPClientHandler(mock_task_state, turn_marker)
@@ -166,6 +173,7 @@ async def test_acp_client_handler_no_echo_fallback():
 
 @pytest.mark.asyncio
 async def test_acp_sync_with_history_echo():
+    """Test history echo."""
     mock_task_state = AsyncMock()
     turn_marker = "==JULES_TURN_HISTORY_ECHO=="
     handler = ACPClientHandler(mock_task_state, turn_marker)
@@ -221,6 +229,7 @@ async def test_acp_sync_with_history_echo():
 
 @pytest.mark.asyncio
 async def test_acp_sync_fallback_tool_call():
+    """Test fallback tool."""
     mock_task_state = AsyncMock()
     turn_marker = "==JULES_TURN_TOOL_FALLBACK=="
     handler = ACPClientHandler(mock_task_state, turn_marker)

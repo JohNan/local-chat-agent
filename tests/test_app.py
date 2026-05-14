@@ -7,13 +7,12 @@ import os
 import subprocess
 from unittest.mock import MagicMock
 import pytest
-from fastapi.testclient import TestClient
 
 # Ensure we can import app from the root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # pylint: disable=protected-access
-from app.services import git_ops, chat_manager  # pylint: disable=wrong-import-position
+from app.services import git_ops  # pylint: disable=wrong-import-position
 
 
 @pytest.fixture(name="mock_run")
@@ -167,7 +166,7 @@ def test_git_pull_failure(client, mock_run):
     assert "Merge conflict" in data["output"]
 
 
-def test_reset(client, mocker):
+def test_reset(client):
     """Test the /api/reset endpoint."""
     # Since reset logic uses DB, we just verify the endpoint returns 200
     # and chat_manager.reset_history is called (if we mock it)

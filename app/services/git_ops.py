@@ -1069,6 +1069,7 @@ def get_pr_diff(pr_number: int) -> str:
         logger.error("Error getting PR diff: %s", e)
         return f"Error retrieving PR diff: {str(e)}"
 
+
 def get_branches() -> list[str]:
     """
     Returns a list of local git branches.

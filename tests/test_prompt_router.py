@@ -10,6 +10,9 @@ from app.services.prompt_router import (
     PERSONA_FILE,
     load_core_instruction,
     get_system_instruction,
+    classify_intent,
+    Intent,
+    load_cli_core_instruction,
 )
 
 
@@ -63,7 +66,7 @@ def test_load_core_instruction_priority():
         def side_effect(path_str):
             if str(path_str) == "/config/system_core.md":
                 return config_path
-            elif str(path_str) == "app/prompts/system_core.md":
+            if str(path_str) == "app/prompts/system_core.md":
                 return app_path
             return MagicMock()
 
@@ -95,7 +98,7 @@ def test_load_core_instruction_read_error():
         def side_effect(path_str):
             if str(path_str) == "/config/system_core.md":
                 return config_path
-            elif str(path_str) == "app/prompts/system_core.md":
+            if str(path_str) == "app/prompts/system_core.md":
                 return app_path
             return MagicMock()
 
@@ -128,9 +131,6 @@ def test_get_system_instruction_includes_date():
 
         instruction = get_system_instruction("GENERAL")
         assert f"Today's date is {expected_date_str}." in instruction
-
-
-from app.services.prompt_router import classify_intent, Intent
 
 
 def test_classify_intent_success():
@@ -166,7 +166,6 @@ def test_classify_intent_exception():
 
 def test_load_cli_core_instruction_priority():
     """Test that /config/system_core_cli.md is prioritized."""
-    from app.services.prompt_router import load_cli_core_instruction
 
     with patch("app.services.prompt_router.Path") as mock_path:
         # Create mocks for the two paths
@@ -177,7 +176,7 @@ def test_load_cli_core_instruction_priority():
         def side_effect(path_str):
             if str(path_str) == "/config/system_core_cli.md":
                 return config_path
-            elif str(path_str) == "app/prompts/system_core_cli.md":
+            if str(path_str) == "app/prompts/system_core_cli.md":
                 return app_path
             return MagicMock()
 
@@ -202,7 +201,6 @@ def test_load_cli_core_instruction_priority():
 
 def test_load_cli_core_instruction_read_error():
     """Test fallback when reading CLI core instruction fails."""
-    from app.services.prompt_router import load_cli_core_instruction
 
     with patch("app.services.prompt_router.Path") as mock_path:
         config_path = MagicMock()
@@ -211,7 +209,7 @@ def test_load_cli_core_instruction_read_error():
         def side_effect(path_str):
             if str(path_str) == "/config/system_core_cli.md":
                 return config_path
-            elif str(path_str) == "app/prompts/system_core_cli.md":
+            if str(path_str) == "app/prompts/system_core_cli.md":
                 return app_path
             return MagicMock()
 

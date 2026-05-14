@@ -3,7 +3,7 @@ Tests for get_mcp_servers in app/config.py
 """
 
 import json
-from unittest.mock import patch, mock_open
+from unittest.mock import mock_open
 from app.config import get_mcp_servers
 
 
