@@ -145,6 +145,7 @@ def get_local_diff() -> str:
         return ""
 
 
+@lru_cache(maxsize=1)
 def get_repo_info():
     """
     Retrieves Git repository information including project name, branch, and Source ID.
