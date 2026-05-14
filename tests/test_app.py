@@ -75,7 +75,6 @@ def test_list_files(mocker):
 def test_git_status(client, mock_check_output, mocker):
     """Test the /api/status endpoint."""
     # Ensure caches are cleared so we don't get stale data
-    git_ops.get_repo_info.cache_clear()
     git_ops._get_remote_url.cache_clear()
 
     # Mock CODEBASE_ROOT to non-existent path so _get_remote_url
