@@ -67,6 +67,12 @@ class GitPushRequest(BaseModel):
     switch_back: bool = True
 
 
+class BranchSwitchRequest(BaseModel):
+    """Request model for switching branches."""
+
+    branch_name: str
+
+
 @router.get("/api/git_status")
 def api_git_status():
     """Returns the git status."""
@@ -119,6 +125,20 @@ async def api_git_pull():
         logger.info("Git pull successful. Triggering background re-indexing...")
         asyncio.create_task(asyncio.to_thread(rag_manager.index_codebase_task))
 
+    return result
+
+
+@router.get("/api/system/branches")
+def api_get_branches():
+    """Returns a list of local git branches."""
+    branches = git_ops.get_branches()
+    return {"branches": branches}
+
+
+@router.post("/api/system/branch/switch")
+async def api_switch_branch(request: BranchSwitchRequest):
+    """Switches the current git branch."""
+    result = await asyncio.to_thread(git_ops.switch_branch, request.branch_name)
     return result
 
 

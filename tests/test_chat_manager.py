@@ -7,9 +7,8 @@ Tests for the chat manager service.
 import json
 import os
 import sys
-import pytest
-from unittest.mock import patch
 from datetime import datetime, timezone
+import uuid
 
 # Ensure we can import app from the root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -18,10 +17,9 @@ from app.services import chat_manager
 
 
 def insert_message(db, role, parts, created_at=None):
+    """Insert message mock."""
     if created_at is None:
         created_at = datetime.now(timezone.utc).isoformat()
-
-    import uuid
 
     msg_id = str(uuid.uuid4())
     content = ""  # Simplified

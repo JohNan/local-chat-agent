@@ -126,7 +126,8 @@ describe('Header Component', () => {
 
         // Check repo status display
         await waitFor(() => {
-            expect(screen.getByText(/TestRepo \(dev\)/)).toBeInTheDocument();
+            expect(screen.getByText('TestRepo')).toBeInTheDocument();
+            expect(screen.getByText('dev (current)')).toBeInTheDocument();
         });
 
         // Check model selector
@@ -151,7 +152,7 @@ describe('Header Component', () => {
              expect(screen.getByText('model-X')).toBeInTheDocument();
         });
 
-        const select = screen.getByRole('combobox');
+        const select = screen.getByDisplayValue('model-X');
         fireEvent.change(select, { target: { value: 'model-Y' } });
 
         expect(mockSetModel).toHaveBeenCalledWith('model-Y');
