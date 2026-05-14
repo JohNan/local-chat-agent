@@ -299,7 +299,7 @@ export const Header: React.FC<HeaderProps> = ({
                         <div className="settings-content">
                              <div className="setting-item">
                                 <label>Repository & Branch</label>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '5px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '10px', marginTop: '5px' }}>
                                     <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>{status?.project}</span>
                                     <select
                                         value={status?.branch || ""}
