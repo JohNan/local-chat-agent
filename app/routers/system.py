@@ -221,3 +221,21 @@ def api_models():
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Failed to fetch models: %s", e)
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.get("/api/system/personas")
+def api_get_personas():
+    """Returns a list of available personas."""
+    return {"personas": list(prompt_router.PERSONA_PROMPTS.keys())}
+
+class PersonaSwitchRequest(BaseModel):
+    persona: str
+
+@router.post("/api/system/persona/switch")
+async def api_switch_persona(request: PersonaSwitchRequest):
+    """Switches the active persona explicitly."""
+    persona_key = request.persona.upper()
+    if persona_key in prompt_router.PERSONA_PROMPTS:
+        await asyncio.to_thread(prompt_router.save_active_persona, persona_key)
+        return {"success": True, "active_persona": persona_key}
+    return JSONResponse(status_code=400, content={"error": "Invalid persona"})
