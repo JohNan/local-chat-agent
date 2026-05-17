@@ -138,6 +138,7 @@ def test_classify_intent_success():
     with patch("app.services.prompt_router.CLIENT") as mock_client:
         mock_response = MagicMock()
         from app.services.prompt_router import PERSONA_PROMPTS
+
         persona_to_test = "ASK" if "ASK" in PERSONA_PROMPTS else "UI"
         mock_response.parsed = Intent(persona=persona_to_test, task_type="feature")
         mock_client.models.generate_content.return_value = mock_response

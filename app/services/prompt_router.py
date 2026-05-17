@@ -73,16 +73,18 @@ ARCHITECT_RULES = (
     "and a Mermaid.js diagram specific to your domain."
 )
 
+
 def load_persona_prompts() -> dict[str, str]:
+    """Loads persona prompts from the filesystem."""
     prompts = {}
     prompts_dir = Path("app/prompts/personas")
     if prompts_dir.exists():
         for file in prompts_dir.glob("*.md"):
             try:
                 prompts[file.stem.upper()] = file.read_text(encoding="utf-8")
-            except Exception as e:
-                logger.error(f"Failed to read prompt {file}: {e}")
-                
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error("Failed to read prompt %s: %s", file, e)
+
     if not prompts:
         prompts = {
             "UI": (
@@ -109,6 +111,7 @@ def load_persona_prompts() -> dict[str, str]:
         }
     prompts["GENERAL"] = ARCHITECT_RULES
     return prompts
+
 
 PERSONA_PROMPTS = load_persona_prompts()
 
@@ -162,7 +165,6 @@ def classify_intent(user_query: str) -> str:
     if not CLIENT:
         return "GENERAL"
 
-    
     keys_str = ", ".join(PERSONA_PROMPTS.keys())
     prompt = (
         "Classify this developer query into exactly one category: "
@@ -172,7 +174,7 @@ def classify_intent(user_query: str) -> str:
         "'architecture', or 'requirements'.\n\n"
         f"Query: {user_query}"
     )
-    
+
     try:
         response = CLIENT.models.generate_content(
             model="gemini-3-flash-preview",

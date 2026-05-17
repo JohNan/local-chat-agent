@@ -228,8 +228,12 @@ def api_get_personas():
     """Returns a list of available personas."""
     return {"personas": list(prompt_router.PERSONA_PROMPTS.keys())}
 
+
 class PersonaSwitchRequest(BaseModel):
+    """Request schema for switching the active persona."""
+
     persona: str
+
 
 @router.post("/api/system/persona/switch")
 async def api_switch_persona(request: PersonaSwitchRequest):
