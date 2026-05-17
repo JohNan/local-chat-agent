@@ -679,7 +679,9 @@ class ACPClientHandler(Client):
             if stderr:
                 output.append(f"STDERR:\n{stderr.decode().strip()}")
 
-            result_str = "\n".join(output) if output else "Command executed with no output"
+            result_str = (
+                "\n".join(output) if output else "Command executed with no output"
+            )
 
             # Broadcast the command output to logs and as a tool status update
             await self.task_state.broadcast(
