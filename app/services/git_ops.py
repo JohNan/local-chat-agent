@@ -12,6 +12,8 @@ import ast
 import xml.etree.ElementTree as ET
 from functools import lru_cache
 import pathspec
+from app import config
+from app.services import prompt_router
 
 from app.services.lsp_manager import LSPManager
 
@@ -890,8 +892,15 @@ def write_file_safe(filepath: str, content: str) -> str:
     Returns:
         A success message or an error message.
     """
+    if not config.WRITE_ACCESS_ENABLED:
+        return "Error: Write access is currently disabled by global setting."
     try:
         full_path = _validate_path(filepath)
+        active_persona = prompt_router.load_active_persona()
+        if active_persona == "ARCHITECT":
+            docs_root = os.path.abspath(os.path.join(CODEBASE_ROOT, "docs"))
+            if os.path.commonpath([full_path, docs_root]) != docs_root:
+                return "Error: ARCHITECT persona is restricted to the docs/ directory only."
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         with open(full_path, "w", encoding="utf-8") as f:
             f.write(content)
@@ -916,8 +925,15 @@ def replace_in_file_safe(filepath: str, old_string: str, new_string: str) -> str
     Returns:
         A success message or an error message.
     """
+    if not config.WRITE_ACCESS_ENABLED:
+        return "Error: Write access is currently disabled by global setting."
     try:
         full_path = _validate_path(filepath)
+        active_persona = prompt_router.load_active_persona()
+        if active_persona == "ARCHITECT":
+            docs_root = os.path.abspath(os.path.join(CODEBASE_ROOT, "docs"))
+            if os.path.commonpath([full_path, docs_root]) != docs_root:
+                return "Error: ARCHITECT persona is restricted to the docs/ directory only."
 
         if not os.path.exists(full_path):
             return f"Error: File {filepath} not found."
@@ -955,8 +971,17 @@ def write_to_docs(filepath: str, content: str) -> str:
     Returns:
         A success message or an error message.
     """
+    if not config.WRITE_ACCESS_ENABLED:
+        return "Error: Write access is currently disabled by global setting."
+
+    active_persona = prompt_router.load_active_persona()
+    is_architect = active_persona == "ARCHITECT"
+
     try:
         if filepath in ("AGENTS.md", "README.md"):
+            if is_architect:
+                return "Error: ARCHITECT persona is restricted to the docs/ directory only."
+
             full_path = os.path.abspath(os.path.join(CODEBASE_ROOT, filepath))
             # Write the file directly
             with open(full_path, "w", encoding="utf-8") as f:

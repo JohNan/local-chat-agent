@@ -75,6 +75,18 @@ def _embeddings_enabled(include_embeddings: bool | None) -> bool:
     return True
 
 
+async def _is_write_access_enabled(active_persona: str | None) -> bool:
+    """Determines if write access is enabled for the current request."""
+    if not prompt_router.is_persona_write_capable(active_persona):
+        return False
+    from app.config import WRITE_ACCESS_ENABLED
+
+    user_toggle_str = await asyncio.to_thread(
+        chat_manager.get_setting, "write_access_enabled", str(WRITE_ACCESS_ENABLED)
+    )
+    return user_toggle_str.lower() == "true"
+
+
 async def _get_system_instruction(
     user_msg: str,
     enable_search: bool,
@@ -90,9 +102,16 @@ async def _get_system_instruction(
         await asyncio.to_thread(prompt_router.save_active_persona, active_persona)
         logger.info("Classified intent as: %s", active_persona)
 
+    write_enabled = await _is_write_access_enabled(active_persona)
     system_instruction = prompt_router.get_system_instruction(
         active_persona, for_cli=(LLM_ENGINE == "cli")
     )
+    if not write_enabled:
+        system_instruction += (
+            "\n\nREAD-ONLY MODE: You are strictly prohibited from modifying any files, "
+            "running code that writes to disk, or using tools to persist changes. "
+            "Focus on analysis, research, and providing advice."
+        )
     if enable_search:
         system_instruction += (
             "\n\nYou also have access to Google Search to "
@@ -147,7 +166,14 @@ async def _create_post_chat_session(
     chat_session = CLIENT.aio.chats.create(
         model=model,
         config=_build_generation_config(
-            get_tool_config(CLIENT, enable_search, enable_embeddings),
+            get_tool_config(
+                CLIENT,
+                enable_search,
+                enable_embeddings,
+                write_access_enabled=await _is_write_access_enabled(
+                    await asyncio.to_thread(prompt_router.load_active_persona)
+                ),
+            ),
             system_instruction,
             cache_name,
         ),
@@ -320,7 +346,14 @@ async def chat_get(message: str = Query(...)):
     chat_session = CLIENT.aio.chats.create(
         model="gemini-3-pro-preview",
         config=_build_generation_config(
-            get_tool_config(CLIENT, ENABLE_GOOGLE_SEARCH, True),
+            get_tool_config(
+                CLIENT,
+                ENABLE_GOOGLE_SEARCH,
+                True,
+                write_access_enabled=await _is_write_access_enabled(
+                    await asyncio.to_thread(prompt_router.load_active_persona)
+                ),
+            ),
             system_instruction,
             None,
         ),

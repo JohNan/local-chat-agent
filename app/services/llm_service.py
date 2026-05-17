@@ -82,7 +82,9 @@ def clear_cache():
     ACP_CLI_SESSION_ID = None
 
 
-def get_tool_config(client, enable_search, enable_embeddings=True):
+def get_tool_config(
+    client, enable_search, enable_embeddings=True, write_access_enabled=False
+):
     """Configures tools for the agent."""
     function_declarations = [
         types.FunctionDeclaration.from_callable(
@@ -112,10 +114,14 @@ def get_tool_config(client, enable_search, enable_embeddings=True):
         types.FunctionDeclaration.from_callable(
             client=client, callable=web_ops.fetch_url
         ),
-        types.FunctionDeclaration.from_callable(
-            client=client, callable=git_ops.write_to_docs
-        ),
     ]
+
+    if write_access_enabled:
+        function_declarations.append(
+            types.FunctionDeclaration.from_callable(
+                client=client, callable=git_ops.write_to_docs
+            )
+        )
 
     if enable_embeddings:
         function_declarations.append(
@@ -124,15 +130,21 @@ def get_tool_config(client, enable_search, enable_embeddings=True):
             )
         )
 
-    # Append MCP tools
-    function_declarations.extend(MCP_TOOL_DEFINITIONS)
+    # Append MCP tools, filtered by write capability
+    if write_access_enabled:
+        function_declarations.extend(MCP_TOOL_DEFINITIONS)
+    else:
+        write_tool_names = {"write_file", "replace", "write_to_docs", "delete_file"}
+        for tool in MCP_TOOL_DEFINITIONS:
+            if tool.name not in write_tool_names:
+                function_declarations.append(tool)
 
     google_search_tool = types.GoogleSearch() if enable_search else None
 
     return types.Tool(
         function_declarations=function_declarations,
         google_search=google_search_tool,
-        code_execution=types.ToolCodeExecution(),
+        code_execution=types.ToolCodeExecution() if write_access_enabled else None,
     )
 
 

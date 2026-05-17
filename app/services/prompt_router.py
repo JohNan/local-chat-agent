@@ -115,6 +115,29 @@ def load_persona_prompts() -> dict[str, str]:
 
 PERSONA_PROMPTS = load_persona_prompts()
 
+WRITE_CAPABLE_PERSONAS = {
+    "ARCHITECT",
+    "CODE",
+    "DEBUG",
+    "MOBILE",
+    "PLANNER",
+    "SIMPLIFY",
+    "UI",
+    "CI_CD",
+    "DEFAULT",
+    "GENERAL",
+}
+
+READ_ONLY_PERSONAS = {"ASK", "REVIEW", "REVIEW-SECURITY", "BRAINSTORM", "WRITE-PROMPT"}
+
+
+def is_persona_write_capable(persona: str | None) -> bool:
+    """Checks if a persona is allowed to perform write operations."""
+    if not persona:
+        return True
+    return persona.upper() in WRITE_CAPABLE_PERSONAS
+
+
 PERSONA_FILE = "storage/persona_state.json"
 
 

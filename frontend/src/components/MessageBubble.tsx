@@ -37,10 +37,10 @@ interface MessageBubbleProps {
     toolStatus?: string | null;
     deployedSessionId?: string | null;
     onSendMessage?: (text: string) => void;
-    cliEditEnabled?: boolean;
+    writeAccessEnabled?: boolean;
 }
 
-const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolStatus, deployedSessionId, onSendMessage, cliEditEnabled }) => {
+const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolStatus, deployedSessionId, onSendMessage, writeAccessEnabled }) => {
     const [deploying, setDeploying] = useState(false);
     const [deployResult, setDeployResult] = useState<string | null>(
         deployedSessionId ? `Started! (${deployedSessionId})` : null
@@ -473,7 +473,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                                          </>
                                      )}
                                  </button>
-                                 {cliEditEnabled && (
+                                 {writeAccessEnabled && (
                                      <button className="deploy-btn" onClick={applyWithCli} disabled={deploying} style={{ flex: 1, backgroundColor: '#2da44e', borderColor: '#2da44e' }}>
                                          {deploying ? (
                                              <>

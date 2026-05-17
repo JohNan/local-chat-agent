@@ -8,7 +8,7 @@ interface ChatInterfaceProps {
     toolStatus: string | null;
     isLoadingHistory: boolean;
     onSendMessage: (text: string) => void;
-    cliEditEnabled?: boolean;
+    writeAccessEnabled?: boolean;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHistory, toolStatus, isLoadingHistory, onSendMessage, cliEditEnabled }) => {

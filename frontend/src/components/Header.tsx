@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, Terminal, LayoutTemplate, Smartphone, Box, Server, MessageSquare, FileText, Upload } from 'lucide-react';
-import type { RepoStatus } from '../types';
+import type { RepoStatus, PersonaInfo } from '../types';
 
 interface HeaderProps {
     model: string;
@@ -11,8 +11,8 @@ interface HeaderProps {
     setEmbeddingsEnabled: (enabled: boolean) => void;
     onToggleTerminal: () => void;
     isGenerating: boolean;
-    cliEditEnabled?: boolean;
-    setCliEditEnabled?: (val: boolean) => void;
+    writeAccessEnabled?: boolean;
+    setWriteAccessEnabled?: (val: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -24,8 +24,8 @@ export const Header: React.FC<HeaderProps> = ({
     setEmbeddingsEnabled,
     onToggleTerminal,
     isGenerating,
-    cliEditEnabled,
-    setCliEditEnabled
+    writeAccessEnabled,
+    setWriteAccessEnabled
 }) => {
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [branches, setBranches] = useState<string[]>([]);
@@ -41,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
     const [pushing, setPushing] = useState(false);
     const [switchBack, setSwitchBack] = useState(true);
 
-    const [personas, setPersonas] = useState<string[]>([]);
+    const [personas, setPersonas] = useState<PersonaInfo[]>([]);
     const [switchingPersona, setSwitchingPersona] = useState(false);
     const [availableModels, setAvailableModels] = useState<string[]>([
         "gemini-3-pro-preview",
@@ -272,6 +272,9 @@ export const Header: React.FC<HeaderProps> = ({
         }
     };
 
+    const currentPersonaInfo = personas.find(p => p.name === status?.active_persona);
+    const isPersonaWriteCapable = currentPersonaInfo ? currentPersonaInfo.write_capable : true;
+
     return (
         <>
             <div className="header">
@@ -304,7 +307,7 @@ export const Header: React.FC<HeaderProps> = ({
                             }}
                         >
                             {personas.map(p => (
-                                <option key={p} value={p}>{p}</option>
+                                <option key={p.name} value={p.name}>{p.name}</option>
                             ))}
                         </select>
                     </div>
@@ -461,13 +464,13 @@ export const Header: React.FC<HeaderProps> = ({
                             <div className="setting-item" style={{ flexDirection: 'row', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
                                 <input
                                     type="checkbox"
-                                    id="cli-edit-checkbox"
-                                    checked={!!cliEditEnabled}
-                                    onChange={(e) => setCliEditEnabled?.(e.target.checked)}
+                                    id="write-access-checkbox"
+                                    checked={!!writeAccessEnabled}
+                                    onChange={(e) => setWriteAccessEnabled?.(e.target.checked)}
                                     style={{ width: 'auto' }}
                                 />
-                                <label htmlFor="cli-edit-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
-                                    Enable CLI Edit Mode (Local Auto-Fix)
+                                <label htmlFor="write-access-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
+                                    Enable Write Access {!isPersonaWriteCapable && "(Read-Only Persona)"}
                                 </label>
                             </div>
                             <div className="setting-item">
