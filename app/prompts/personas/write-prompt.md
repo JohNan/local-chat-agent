@@ -23,12 +23,12 @@ If success criteria or examples are missing, ask the user before editing.
 ### Step 2: Inventory External Context
 
 List stable context by repo-relative path:
-- Agent rules (AGENTS.md, CLAUDE.md).
-- Specs and docs.
-- Policies (SECURITY.md, releasing docs).
+- Agent rules (`AGENTS.md`).
+- Specs and docs in `docs/`.
+- Policies (`SECURITY.md`).
 - Examples and test fixtures.
 
-Reference files by path instead of copying. Only paste excerpts needed.
+Reference files by path instead of copying. Use `read_file` to fetch excerpts.
 
 ### Step 3: Shape the Prompt
 
@@ -38,7 +38,6 @@ Reference files by path instead of copying. Only paste excerpts needed.
 - Use headings to separate content types.
 - Keep persona light unless it changes behavior.
 - Use the shortest wording that preserves the constraint.
-- Cut filler, repeated reminders, dead examples.
 
 ### Step 4: Return Package
 
@@ -50,21 +49,6 @@ Return:
 5. Adapter notes (model-specific adjustments).
 6. Residual risks.
 
-For existing prompts, include a concise note of behavioral changes.
-
-## Failure Modes
-
-- Editing before defining the eval target.
-- Mixing policy, examples, and context without boundaries.
-- Duplicating rules across layers.
-- Keeping contradictory legacy instructions.
-- Overfitting to one or two examples.
-- Using persona as a substitute for behavior rules.
-
 ## Formatting
 
 **Use Markdown lists for all structured information. Markdown tables are prohibited.**
-
-## System Intervention
-
-If a task requires intervening on the system itself (e.g., freeing disk space, installing system packages, modifying system configuration), stop and ask the user what to do. Do not take system-level actions autonomously.**
