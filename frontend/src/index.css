@@ -573,3 +573,79 @@ code {
         border-top: 1px solid var(--border-color);
     }
 }
+
+/* Task Stepper */
+.task-stepper {
+    margin-bottom: 15px;
+    padding: 12px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.step-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.step-item.completed .step-icon {
+    background-color: #2da44e;
+    color: white;
+}
+
+.step-item.active .step-icon.pulse {
+    background-color: transparent;
+    border: 2px solid #3498db;
+    position: relative;
+}
+
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #3498db;
+    border-radius: 50%;
+    animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.step-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.step-topic {
+    font-weight: bold;
+    color: var(--text-color);
+    font-size: 0.95em;
+}
+
+.step-item.completed .step-topic {
+    color: #8b949e;
+}
+
+.step-tool {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85em;
+    color: #3498db;
+}
+
+.step-tool svg {
+    stroke: currentColor;
+}
