@@ -748,7 +748,7 @@ class ACPClientHandler(Client):
                 # Flush existing buffer
                 combined = self.last_agent_text + self.last_thought_text
                 if combined:
-                    await self._process_new_text(combined)
+                    await self._process_new_text(combined, is_thought=False)
 
             title = "Tool operation"
             if hasattr(update, "title") and update.title:
@@ -832,7 +832,7 @@ class ACPClientHandler(Client):
                     idx + len(self.turn_marker) :
                 ].lstrip("\n")
                 if new_text_after_marker and not is_user_msg:
-                    await self._process_new_text(new_text_after_marker)
+                    await self._process_new_text(new_text_after_marker, is_thought)
             elif is_agent or is_thought:
                 # Fallbacks if marker isn't found yet but we are receiving agent
                 # content
@@ -844,7 +844,7 @@ class ACPClientHandler(Client):
                     # pylint: enable=line-too-long
                     self.marker_found = True
                     if new_raw_text and not is_user_msg:
-                        await self._process_new_text(new_raw_text)
+                        await self._process_new_text(new_raw_text, is_thought)
                 elif len(self.last_agent_text) + len(self.last_thought_text) > 50:
                     logger.warning(
                         "[ACP] Fallback triggered by significant agent content without marker"
@@ -855,13 +855,31 @@ class ACPClientHandler(Client):
                     # buffered in current_text_segment, but we didn't broadcast it yet)
                     await self._process_new_text(
                         self.last_thought_text + self.last_agent_text
-                    )
+                    , is_thought)
         else:
             if new_raw_text and not is_user_msg:
-                await self._process_new_text(new_raw_text)
+                await self._process_new_text(new_raw_text, is_thought)
 
-    async def _process_new_text(self, text: str):
+    async def _process_new_text(self, text: str, is_thought: bool = False):
         self.current_text_segment += text
+        
+        if is_thought:
+            if not hasattr(self, 'thought_broadcast_buffer'):
+                self.thought_broadcast_buffer = ""
+            self.thought_broadcast_buffer += text
+            import re, json
+            matches = list(re.finditer(r'\*\*(.*?)\*\*', self.thought_broadcast_buffer))
+            if matches:
+                last_end = 0
+                for match in matches:
+                    topic = match.group(0)
+                    topic_payload = f"\n{topic}\n"
+                    await self.task_state.broadcast(f"event: message\ndata: {json.dumps(topic_payload)}\n\n")
+                    last_end = match.end()
+                self.thought_broadcast_buffer = self.thought_broadcast_buffer[last_end:]
+            return
+
+        import json
         await self.task_state.broadcast(f"event: message\ndata: {json.dumps(text)}\n\n")
 
     # pylint: disable=too-many-locals

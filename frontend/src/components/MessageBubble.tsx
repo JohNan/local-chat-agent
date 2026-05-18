@@ -143,24 +143,44 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
 
     // Parse message text to extract topics and filter content
     const parseMessageContent = (content: string) => {
-        const lines = content.split('\n');
+        // Fix missing newlines before **
+        const normalizedContent = content.replace(/([^\n])(\**[^*]+\*\*)/g, '$1\n$2');
+        const lines = normalizedContent.split('\n');
         const topics: string[] = [];
         const filteredLines: string[] = [];
+        let currentThought = "";
 
         // Topic matcher: exactly "**Some Text**"
         const topicRegex = /^\*\*(.+)\*\*$/;
         // CLI Status matcher: "[cwd] (Running tool)"
         const statusRegex = /^\[.*?\]\s*\(.*?\)$/;
+        
+        const isFinalAnswerMarker = (line: string) => line.startsWith('#### Tool Usage') || line.startsWith('#### Reasoning Trace');
+        let inThoughts = true;
 
         for (const line of lines) {
-            const topicMatch = line.trim().match(topicRegex);
+            const trimmed = line.trim();
+            if (isFinalAnswerMarker(trimmed)) {
+                inThoughts = false;
+            }
+
+            const topicMatch = trimmed.match(topicRegex);
             if (topicMatch) {
                 topics.push(topicMatch[1]);
+                if (inThoughts) {
+                    currentThought = ""; // Reset thought text on new topic
+                }
                 continue; // Skip adding topic to markdown text
             }
 
-            if (statusRegex.test(line.trim())) {
+            if (statusRegex.test(trimmed)) {
                 continue; // Skip adding redundant status line
+            }
+
+            // In CLI mode, capture the thought text
+            if (inThoughts && topics.length > 0 && !isFinalAnswerMarker(trimmed)) {
+                currentThought += line + "\n";
+                continue; // Don't add to filtered lines yet
             }
 
             filteredLines.push(line);
@@ -173,6 +193,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
         return {
             completedTopics,
             currentTopic,
+            currentThought: currentThought.trim(),
             filteredText: filteredLines.join('\n')
         };
     };
