@@ -5,6 +5,7 @@ import hljs from 'highlight.js';
 import mermaid from 'mermaid';
 import { Bot, Loader2, Rocket, Check, X, User, GitPullRequestArrow, RefreshCw, Copy, FileText, Search, Terminal } from 'lucide-react';
 import type { Message } from '../types';
+import { TaskStepper } from './TaskStepper';
 
 mermaid.initialize({ startOnLoad: false });
 
@@ -139,6 +140,44 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
         });
         return { __html: cleanHtml };
     };
+
+    // Parse message text to extract topics and filter content
+    const parseMessageContent = (content: string) => {
+        const lines = content.split('\n');
+        const topics: string[] = [];
+        const filteredLines: string[] = [];
+
+        // Topic matcher: exactly "**Some Text**"
+        const topicRegex = /^\*\*(.+)\*\*$/;
+        // CLI Status matcher: "[cwd] (Running tool)"
+        const statusRegex = /^\[.*?\]\s*\(.*?\)$/;
+
+        for (const line of lines) {
+            const topicMatch = line.trim().match(topicRegex);
+            if (topicMatch) {
+                topics.push(topicMatch[1]);
+                continue; // Skip adding topic to markdown text
+            }
+
+            if (statusRegex.test(line.trim())) {
+                continue; // Skip adding redundant status line
+            }
+
+            filteredLines.push(line);
+        }
+
+        const currentTopic = topics.length > 0 ? topics[topics.length - 1] : undefined;
+        // The completed topics are all except the current one
+        const completedTopics = topics.length > 1 ? topics.slice(0, topics.length - 1) : [];
+
+        return {
+            completedTopics,
+            currentTopic,
+            filteredText: filteredLines.join('\n')
+        };
+    };
+
+    const parsedContent = parseMessageContent(text);
 
     const handleCodeCopy = (e: React.MouseEvent<HTMLDivElement>) => {
         let target = e.target as HTMLElement;
@@ -441,7 +480,14 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                          ))}
                      </div>
                  )}
-                 <div dangerouslySetInnerHTML={renderMarkdown(text)} onClick={handleCodeCopy} />
+                 {isAi && (parsedContent.currentTopic || parsedContent.completedTopics.length > 0) && (
+                     <TaskStepper
+                        topics={parsedContent.completedTopics}
+                        currentTopic={parsedContent.currentTopic}
+                        activeTool={toolStatus}
+                     />
+                 )}
+                 <div dangerouslySetInnerHTML={renderMarkdown(parsedContent.filteredText)} onClick={handleCodeCopy} />
                  <button
                     onClick={handleCopy}
                     className={`copy-btn ${copyError ? 'error-message' : ''}`}
@@ -450,7 +496,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                  >
                     {copied ? <Check size={14} /> : copyError ? <X size={14} /> : <Copy size={14} />}
                  </button>
-                 {isAi && toolStatus && (
+                 {isAi && toolStatus && !parsedContent.currentTopic && (
                     <div className="tool-usage" style={{ marginLeft: 0 }}>
                         <Loader2 size={16} className="animate-spin" />
                         {toolStatus}

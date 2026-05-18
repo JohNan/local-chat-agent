@@ -679,7 +679,19 @@ class ACPClientHandler(Client):
             if stderr:
                 output.append(f"STDERR:\n{stderr.decode().strip()}")
 
-            return "\n".join(output) if output else "Command executed with no output"
+            result_str = (
+                "\n".join(output) if output else "Command executed with no output"
+            )
+
+            # Broadcast the command output to logs and as a tool status update
+            await self.task_state.broadcast(
+                f"event: log\ndata: {json.dumps(result_str)}\n\n"
+            )
+            await self.task_state.broadcast(
+                f"event: tool\ndata: {json.dumps(f'Command completed: {command[:20]}...')}\n\n"
+            )
+
+            return result_str
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Error executing terminal command: %s", e)
             return f"Error executing command: {e}"
@@ -839,7 +851,6 @@ class ACPClientHandler(Client):
     async def _process_new_text(self, text: str):
         self.current_text_segment += text
         await self.task_state.broadcast(f"event: message\ndata: {json.dumps(text)}\n\n")
-        await self.task_state.broadcast(f"event: log\ndata: {json.dumps(text)}\n\n")
 
     # pylint: disable=too-many-locals
     async def request_permission(
