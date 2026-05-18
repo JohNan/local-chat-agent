@@ -73,30 +73,70 @@ ARCHITECT_RULES = (
     "and a Mermaid.js diagram specific to your domain."
 )
 
-PERSONA_PROMPTS = {
-    "UI": (
-        f"{ARCHITECT_RULES} "
-        "Focus on visual consistency, responsiveness, and Material Design. "
-        "Includes Rule 7 (Visualizing Compose UI)."
-    ),
-    "MOBILE": (
-        f"{ARCHITECT_RULES} "
-        "Focus on Android best practices, lifecycle, and permissions. "
-        "Includes Rule 8 (Android Configuration)."
-    ),
-    "ARCHITECT": f"{ARCHITECT_RULES} "
-    "Focus on system design, modularity, and `AGENTS.md` compliance.",
-    "CI_CD": f"{ARCHITECT_RULES} "
-    "Focus on build stability, Docker, and GitHub Actions.",
-    "PLANNER": (
-        f"{ARCHITECT_RULES} "
-        "Focus on requirements, architecture, and roadmaps. "
-        "Use the write_to_docs tool for any documentation. "
-        "You have permission to update the `AGENTS.md` and `README.md` "
-        "files at the root using the `write_to_docs` tool."
-    ),
-    "GENERAL": ARCHITECT_RULES,
+
+def load_persona_prompts() -> dict[str, str]:
+    """Loads persona prompts from the filesystem."""
+    prompts = {}
+    prompts_dir = Path("app/prompts/personas")
+    if prompts_dir.exists():
+        for file in prompts_dir.glob("*.md"):
+            try:
+                prompts[file.stem.upper()] = file.read_text(encoding="utf-8")
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error("Failed to read prompt %s: %s", file, e)
+
+    if not prompts:
+        prompts = {
+            "UI": (
+                f"{ARCHITECT_RULES} "
+                "Focus on visual consistency, responsiveness, and Material Design. "
+                "Includes Rule 7 (Visualizing Compose UI)."
+            ),
+            "MOBILE": (
+                f"{ARCHITECT_RULES} "
+                "Focus on Android best practices, lifecycle, and permissions. "
+                "Includes Rule 8 (Android Configuration)."
+            ),
+            "ARCHITECT": f"{ARCHITECT_RULES} "
+            "Focus on system design, modularity, and `AGENTS.md` compliance.",
+            "CI_CD": f"{ARCHITECT_RULES} "
+            "Focus on build stability, Docker, and GitHub Actions.",
+            "PLANNER": (
+                f"{ARCHITECT_RULES} "
+                "Focus on requirements, architecture, and roadmaps. "
+                "Use the write_to_docs tool for any documentation. "
+                "You have permission to update the `AGENTS.md` and `README.md` "
+                "files at the root using the `write_to_docs` tool."
+            ),
+        }
+    prompts["GENERAL"] = ARCHITECT_RULES
+    return prompts
+
+
+PERSONA_PROMPTS = load_persona_prompts()
+
+WRITE_CAPABLE_PERSONAS = {
+    "ARCHITECT",
+    "CODE",
+    "DEBUG",
+    "MOBILE",
+    "PLANNER",
+    "SIMPLIFY",
+    "UI",
+    "CI_CD",
+    "DEFAULT",
+    "GENERAL",
 }
+
+READ_ONLY_PERSONAS = {"ASK", "REVIEW", "REVIEW-SECURITY", "BRAINSTORM", "WRITE-PROMPT"}
+
+
+def is_persona_write_capable(persona: str | None) -> bool:
+    """Checks if a persona is allowed to perform write operations."""
+    if not persona:
+        return True
+    return persona.upper() in WRITE_CAPABLE_PERSONAS
+
 
 PERSONA_FILE = "storage/persona_state.json"
 
@@ -148,9 +188,10 @@ def classify_intent(user_query: str) -> str:
     if not CLIENT:
         return "GENERAL"
 
+    keys_str = ", ".join(PERSONA_PROMPTS.keys())
     prompt = (
         "Classify this developer query into exactly one category: "
-        "[UI, MOBILE, ARCHITECT, CI_CD, PLANNER, GENERAL]. "
+        f"[{keys_str}]. "
         "Also determine the task_type (e.g., 'question', 'feature', 'bug').\n\n"
         "Use PLANNER if the user query contains words like 'plan', 'document', "
         "'architecture', or 'requirements'.\n\n"

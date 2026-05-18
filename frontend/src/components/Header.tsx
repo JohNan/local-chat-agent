@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, Terminal, LayoutTemplate, Smartphone, Box, Server, MessageSquare, FileText, Upload } from 'lucide-react';
-import type { RepoStatus } from '../types';
+import type { RepoStatus, PersonaInfo } from '../types';
 
 interface HeaderProps {
     model: string;
@@ -11,8 +11,8 @@ interface HeaderProps {
     setEmbeddingsEnabled: (enabled: boolean) => void;
     onToggleTerminal: () => void;
     isGenerating: boolean;
-    cliEditEnabled?: boolean;
-    setCliEditEnabled?: (val: boolean) => void;
+    writeAccessEnabled?: boolean;
+    setWriteAccessEnabled?: (val: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -24,8 +24,8 @@ export const Header: React.FC<HeaderProps> = ({
     setEmbeddingsEnabled,
     onToggleTerminal,
     isGenerating,
-    cliEditEnabled,
-    setCliEditEnabled
+    writeAccessEnabled,
+    setWriteAccessEnabled
 }) => {
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [branches, setBranches] = useState<string[]>([]);
@@ -41,6 +41,8 @@ export const Header: React.FC<HeaderProps> = ({
     const [pushing, setPushing] = useState(false);
     const [switchBack, setSwitchBack] = useState(true);
 
+    const [personas, setPersonas] = useState<PersonaInfo[]>([]);
+    const [switchingPersona, setSwitchingPersona] = useState(false);
     const [availableModels, setAvailableModels] = useState<string[]>([
         "gemini-3-pro-preview",
         "gemini-2.0-flash-exp",
@@ -61,7 +63,22 @@ export const Header: React.FC<HeaderProps> = ({
                 console.error("Failed to fetch models:", e);
             }
         };
+        const fetchPersonas = async () => {
+            try {
+                const res = await fetch('/api/system/personas');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.personas) {
+                        setPersonas(data.personas);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to fetch personas:", e);
+            }
+        };
+
         fetchModels();
+        fetchPersonas();
             if (showSettings) fetchBranches();
     }, [showSettings]);
 
@@ -114,6 +131,30 @@ export const Header: React.FC<HeaderProps> = ({
         }
     };
 
+
+    const handlePersonaSwitch = async (persona: string) => {
+        if (!persona || persona === status?.active_persona) return;
+        if (switchingPersona) return;
+        
+        setSwitchingPersona(true);
+        try {
+            const res = await fetch('/api/system/persona/switch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ persona: persona })
+            });
+            const data = await res.json();
+            if (data.success) {
+                await updateStatus();
+            } else {
+                alert(`Failed to switch persona: ${data.error}`);
+            }
+        } catch (e) {
+            alert('Error switching persona: ' + (e as Error).message);
+        } finally {
+            setSwitchingPersona(false);
+        }
+    };
 
     const gitStatus = async () => {
         if (loading) return;
@@ -231,6 +272,9 @@ export const Header: React.FC<HeaderProps> = ({
         }
     };
 
+    const currentPersonaInfo = personas.find(p => p.name === status?.active_persona);
+    const isPersonaWriteCapable = currentPersonaInfo ? currentPersonaInfo.write_capable : true;
+
     return (
         <>
             <div className="header">
@@ -238,15 +282,34 @@ export const Header: React.FC<HeaderProps> = ({
                     <Bot size={24} className={isGenerating ? "animate-pulse" : ""} color={isGenerating ? "#4caf50" : "currentColor"} />
                     <span>Gemini Agent</span>
                     <div
-                        title={status?.active_persona || "General"}
+                        title="Select Persona"
                         style={{
                             display: 'flex',
                             alignItems: 'center',
                             marginLeft: '10px',
                             cursor: 'pointer',
+                            position: 'relative'
                         }}
                     >
                         {getPersonaIcon(status?.active_persona)}
+                        <select
+                            value={status?.active_persona || "GENERAL"}
+                            onChange={(e) => handlePersonaSwitch(e.target.value)}
+                            disabled={switchingPersona}
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                opacity: 0,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {personas.map(p => (
+                                <option key={p.name} value={p.name}>{p.name}</option>
+                            ))}
+                        </select>
                     </div>
                     {showAgentInfo && (
                         <div className="agent-info-popover" onClick={(e) => e.stopPropagation()}>
@@ -401,13 +464,13 @@ export const Header: React.FC<HeaderProps> = ({
                             <div className="setting-item" style={{ flexDirection: 'row', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
                                 <input
                                     type="checkbox"
-                                    id="cli-edit-checkbox"
-                                    checked={!!cliEditEnabled}
-                                    onChange={(e) => setCliEditEnabled?.(e.target.checked)}
+                                    id="write-access-checkbox"
+                                    checked={!!writeAccessEnabled}
+                                    onChange={(e) => setWriteAccessEnabled?.(e.target.checked)}
                                     style={{ width: 'auto' }}
                                 />
-                                <label htmlFor="cli-edit-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
-                                    Enable CLI Edit Mode (Local Auto-Fix)
+                                <label htmlFor="write-access-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
+                                    Enable Write Access {!isPersonaWriteCapable && "(Read-Only Persona)"}
                                 </label>
                             </div>
                             <div className="setting-item">

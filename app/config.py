@@ -25,7 +25,11 @@ HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "5000"))
 LLM_ENGINE = os.environ.get("LLM_ENGINE", "sdk").lower()
 
-CLI_EDIT_ENABLED = False
+WRITE_ACCESS_ENABLED = os.environ.get("WRITE_ACCESS_ENABLED", "false").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 CLI_REQUIRE_APPROVAL = os.environ.get("CLI_REQUIRE_APPROVAL", "false").lower() in (
     "true",
     "1",

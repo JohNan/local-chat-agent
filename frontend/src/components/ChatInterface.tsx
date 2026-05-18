@@ -8,10 +8,10 @@ interface ChatInterfaceProps {
     toolStatus: string | null;
     isLoadingHistory: boolean;
     onSendMessage: (text: string) => void;
-    cliEditEnabled?: boolean;
+    writeAccessEnabled?: boolean;
 }
 
-export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHistory, toolStatus, isLoadingHistory, onSendMessage, cliEditEnabled }) => {
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHistory, toolStatus, isLoadingHistory, onSendMessage, writeAccessEnabled }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const prevMsgCountRef = useRef(0);
     const scrollHeightRef = useRef(0);
@@ -81,7 +81,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onLoadHi
                         toolStatus={index === messages.length - 1 ? toolStatus : null}
                         deployedSessionId={deployedSessionId}
                         onSendMessage={onSendMessage}
-                        cliEditEnabled={cliEditEnabled}
+                        writeAccessEnabled={writeAccessEnabled}
                     />
                 );
             })}

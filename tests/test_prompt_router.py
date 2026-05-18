@@ -137,11 +137,14 @@ def test_classify_intent_success():
     """Test that classify_intent correctly extracts persona using Intent schema."""
     with patch("app.services.prompt_router.CLIENT") as mock_client:
         mock_response = MagicMock()
-        mock_response.parsed = Intent(persona="UI", task_type="feature")
+        from app.services.prompt_router import PERSONA_PROMPTS
+
+        persona_to_test = "ASK" if "ASK" in PERSONA_PROMPTS else "UI"
+        mock_response.parsed = Intent(persona=persona_to_test, task_type="feature")
         mock_client.models.generate_content.return_value = mock_response
 
         result = classify_intent("Make this button blue")
-        assert result == "UI"
+        assert result == persona_to_test
 
 
 def test_classify_intent_fallback():

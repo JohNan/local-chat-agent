@@ -20,6 +20,11 @@ export interface HistoryResponse {
     has_more: boolean;
 }
 
+export interface PersonaInfo {
+    name: string;
+    write_capable: boolean;
+}
+
 export interface RepoStatus {
     project: string;
     branch: string;

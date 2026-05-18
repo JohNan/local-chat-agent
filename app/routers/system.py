@@ -165,7 +165,7 @@ class SettingsRequest(BaseModel):
     """Request model for updating settings."""
 
     model: str
-    cli_edit_enabled: bool | None = None
+    write_access_enabled: bool | None = None
     cli_setup_script: str | None = None
 
 
@@ -173,17 +173,19 @@ class SettingsRequest(BaseModel):
 def api_settings():
     """Returns system settings."""
     # pylint: disable=import-outside-toplevel
-    from app.config import CLI_EDIT_ENABLED, CLI_SETUP_SCRIPT
+    from app.config import WRITE_ACCESS_ENABLED, CLI_SETUP_SCRIPT
 
     # pylint: enable=import-outside-toplevel
 
     model = chat_manager.get_setting("default_model", DEFAULT_MODEL)
-    cli_edit_str = chat_manager.get_setting("cli_edit_enabled", str(CLI_EDIT_ENABLED))
-    cli_edit_enabled = cli_edit_str.lower() == "true"
+    write_access_str = chat_manager.get_setting(
+        "write_access_enabled", str(WRITE_ACCESS_ENABLED)
+    )
+    write_access_enabled = write_access_str.lower() == "true"
     cli_setup_script = chat_manager.get_setting("cli_setup_script", CLI_SETUP_SCRIPT)
     return {
         "model": model,
-        "cli_edit_enabled": cli_edit_enabled,
+        "write_access_enabled": write_access_enabled,
         "cli_setup_script": cli_setup_script,
     }
 
@@ -192,9 +194,9 @@ def api_settings():
 def save_settings(request: SettingsRequest):
     """Saves system settings."""
     chat_manager.save_setting("default_model", request.model)
-    if request.cli_edit_enabled is not None:
+    if request.write_access_enabled is not None:
         chat_manager.save_setting(
-            "cli_edit_enabled", str(request.cli_edit_enabled).lower()
+            "write_access_enabled", str(request.write_access_enabled).lower()
         )
     if request.cli_setup_script is not None:
         chat_manager.save_setting("cli_setup_script", request.cli_setup_script)
@@ -221,3 +223,30 @@ def api_models():
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Failed to fetch models: %s", e)
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.get("/api/system/personas")
+def api_get_personas():
+    """Returns a list of available personas with their capabilities."""
+    return {
+        "personas": [
+            {"name": p, "write_capable": prompt_router.is_persona_write_capable(p)}
+            for p in prompt_router.PERSONA_PROMPTS
+        ]
+    }
+
+
+class PersonaSwitchRequest(BaseModel):
+    """Request schema for switching the active persona."""
+
+    persona: str
+
+
+@router.post("/api/system/persona/switch")
+async def api_switch_persona(request: PersonaSwitchRequest):
+    """Switches the active persona explicitly."""
+    persona_key = request.persona.upper()
+    if persona_key in prompt_router.PERSONA_PROMPTS:
+        await asyncio.to_thread(prompt_router.save_active_persona, persona_key)
+        return {"success": True, "active_persona": persona_key}
+    return JSONResponse(status_code=400, content={"error": "Invalid persona"})
