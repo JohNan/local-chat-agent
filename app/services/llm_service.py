@@ -6,6 +6,7 @@ Service for LLM interactions and helper functions.
 import base64
 import asyncio
 import json
+import re
 import os
 import uuid
 import logging
@@ -643,6 +644,7 @@ class ACPClientHandler(Client):
         self.tool_usage_counts = defaultdict(int)
         self.reasoning_trace = []
         self.current_text_segment = ""
+        self.thought_broadcast_buffer = ""
         self.user_msg_seen = False
         self.last_agent_text = ""
         self.last_thought_text = ""
@@ -854,32 +856,30 @@ class ACPClientHandler(Client):
                     # accumulated text (this might be slightly duplicated with what was already
                     # buffered in current_text_segment, but we didn't broadcast it yet)
                     await self._process_new_text(
-                        self.last_thought_text + self.last_agent_text
-                    , is_thought)
+                        self.last_thought_text + self.last_agent_text, is_thought
+                    )
         else:
             if new_raw_text and not is_user_msg:
                 await self._process_new_text(new_raw_text, is_thought)
 
     async def _process_new_text(self, text: str, is_thought: bool = False):
         self.current_text_segment += text
-        
+
         if is_thought:
-            if not hasattr(self, 'thought_broadcast_buffer'):
-                self.thought_broadcast_buffer = ""
             self.thought_broadcast_buffer += text
-            import re, json
-            matches = list(re.finditer(r'\*\*(.*?)\*\*', self.thought_broadcast_buffer))
+            matches = list(re.finditer(r"\*\*(.*?)\*\*", self.thought_broadcast_buffer))
             if matches:
                 last_end = 0
                 for match in matches:
                     topic = match.group(0)
                     topic_payload = f"\n{topic}\n"
-                    await self.task_state.broadcast(f"event: message\ndata: {json.dumps(topic_payload)}\n\n")
+                    await self.task_state.broadcast(
+                        f"event: message\ndata: {json.dumps(topic_payload)}\n\n"
+                    )
                     last_end = match.end()
                 self.thought_broadcast_buffer = self.thought_broadcast_buffer[last_end:]
             return
 
-        import json
         await self.task_state.broadcast(f"event: message\ndata: {json.dumps(text)}\n\n")
 
     # pylint: disable=too-many-locals
