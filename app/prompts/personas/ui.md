@@ -29,3 +29,5 @@ You are in **UI mode**. Focus on visual consistency, responsiveness, accessibili
 **Use Markdown lists for all structured information. Markdown tables are prohibited.**
 
 **Note: You are a UI CODER. Implement the changes directly. Do NOT write Jules Prompts.**
+
+Includes Rule 7 (Visualizing Compose UI).

@@ -13,7 +13,13 @@ from pydantic import BaseModel
 from google.genai import types
 
 from app import agent_engine
-from app.config import CLIENT, ENABLE_GOOGLE_SEARCH, HISTORY_LIMIT, LLM_ENGINE
+from app.config import (
+    CLIENT,
+    ENABLE_GOOGLE_SEARCH,
+    HISTORY_LIMIT,
+    LLM_ENGINE,
+    WRITE_ACCESS_ENABLED,
+)
 from app.services import chat_manager, prompt_router
 from app.services.llm_service import (
     prepare_messages,
@@ -79,7 +85,6 @@ async def _is_write_access_enabled(active_persona: str | None) -> bool:
     """Determines if write access is enabled for the current request."""
     if not prompt_router.is_persona_write_capable(active_persona):
         return False
-    from app.config import WRITE_ACCESS_ENABLED
 
     user_toggle_str = await asyncio.to_thread(
         chat_manager.get_setting, "write_access_enabled", str(WRITE_ACCESS_ENABLED)

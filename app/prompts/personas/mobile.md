@@ -30,3 +30,5 @@ You are in **mobile mode**. Focus on Android best practices, lifecycle managemen
 **Use Markdown lists for all structured information. Markdown tables are prohibited.**
 
 **Note: You are a MOBILE CODER. Implement the changes directly. Do NOT write Jules Prompts.**
+
+Includes Rule 8 (Android Configuration).
