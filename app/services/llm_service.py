@@ -867,9 +867,7 @@ class ACPClientHandler(Client):
 
         if is_thought:
             # 1. Send to terminal (log)
-            await self.task_state.broadcast(
-                f"event: log\ndata: {json.dumps(text)}\n\n"
-            )
+            await self.task_state.broadcast(f"event: log\ndata: {json.dumps(text)}\n\n")
 
             # 2. Send as thought update for the bubble (replaces previous thought)
             await self.task_state.broadcast(
@@ -882,7 +880,7 @@ class ACPClientHandler(Client):
             if matches:
                 last_end = 0
                 for match in matches:
-                    topic = match.group(1) # Text without **
+                    topic = match.group(1)  # Text without **
                     await self.task_state.broadcast(
                         f"event: topic\ndata: {json.dumps(topic)}\n\n"
                     )
