@@ -13,6 +13,9 @@ export interface Message {
     parts?: MessagePart[];
     text?: string; // Helper for when we flatten it
     media?: MediaItem[];
+    currentTopic?: string;
+    completedTopics?: string[];
+    currentThought?: string;
 }
 
 export interface HistoryResponse {

@@ -153,6 +153,9 @@ function App() {
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
         let currentText = "";
+        let currentThought = "";
+        let currentTopic = "";
+        const completedTopics: string[] = [];
 
         let lastUpdate = 0;
         const THROTTLE_MS = 16; // ~60fps
@@ -163,7 +166,14 @@ function App() {
                 // Final update
                 updateLastMessage(last => {
                     if (last && (last.role === 'model' || last.role === 'ai')) {
-                        return { ...last, text: currentText, parts: [{ text: currentText }] };
+                        return { 
+                            ...last, 
+                            text: currentText, 
+                            parts: [{ text: currentText }],
+                            currentThought,
+                            currentTopic,
+                            completedTopics: [...completedTopics]
+                        };
                     }
                     return last;
                 });
@@ -198,6 +208,27 @@ function App() {
                         hasNewText = true;
                     } catch (e) {
                         console.error("Failed to parse message data:", dataStr, e);
+                    }
+                } else if (eventType === 'thought') {
+                    try {
+                        const parsedThought = JSON.parse(dataStr);
+                        currentThought += parsedThought;
+                        hasNewText = true;
+                    } catch (e) {
+                        console.error("Failed to parse thought data:", dataStr, e);
+                    }
+                } else if (eventType === 'topic') {
+                    try {
+                        const parsedTopic = JSON.parse(dataStr);
+                        if (currentTopic !== parsedTopic) {
+                            if (currentTopic) {
+                                completedTopics.push(currentTopic);
+                            }
+                            currentTopic = parsedTopic;
+                            hasNewText = true;
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse topic data:", dataStr, e);
                     }
                 } else if (eventType === 'log') {
                     try {
@@ -238,7 +269,14 @@ function App() {
                     // Final update
                     updateLastMessage(last => {
                         if (last && (last.role === 'model' || last.role === 'ai')) {
-                            return { ...last, text: currentText, parts: [{ text: currentText }] };
+                            return { 
+                            ...last, 
+                            text: currentText, 
+                            parts: [{ text: currentText }],
+                            currentThought,
+                            currentTopic,
+                            completedTopics: [...completedTopics]
+                        };
                         }
                         return last;
                     });
@@ -252,7 +290,14 @@ function App() {
                 if (now - lastUpdate > THROTTLE_MS) {
                     updateLastMessage(last => {
                         if (last && (last.role === 'model' || last.role === 'ai')) {
-                            return { ...last, text: currentText, parts: [{ text: currentText }] };
+                            return { 
+                            ...last, 
+                            text: currentText, 
+                            parts: [{ text: currentText }],
+                            currentThought,
+                            currentTopic,
+                            completedTopics: [...completedTopics]
+                        };
                         }
                         return last;
                     });

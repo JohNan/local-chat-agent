@@ -27,3 +27,43 @@
     margin: 1em 0;
     background: #f6f8fa;
 }
+
+/* Thought Block Styling */
+.thought-block {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    margin: 8px 0;
+    font-size: 0.9em;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.thought-block summary {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #666;
+    user-select: none;
+    outline: none;
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.thought-block summary:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.thought-content {
+    padding: 12px;
+    color: #444;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.thought-content p {
+    margin: 0 0 8px 0;
+}
+
+.thought-content p:last-child {
+    margin-bottom: 0;
+}
