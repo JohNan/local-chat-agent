@@ -866,15 +866,25 @@ class ACPClientHandler(Client):
         self.current_text_segment += text
 
         if is_thought:
+            # 1. Send to terminal (log)
+            await self.task_state.broadcast(
+                f"event: log\ndata: {json.dumps(text)}\n\n"
+            )
+
+            # 2. Send as thought update for the bubble (replaces previous thought)
+            await self.task_state.broadcast(
+                f"event: thought\ndata: {json.dumps(text)}\n\n"
+            )
+
+            # 3. Extract and send topic
             self.thought_broadcast_buffer += text
             matches = list(re.finditer(r"\*\*(.*?)\*\*", self.thought_broadcast_buffer))
             if matches:
                 last_end = 0
                 for match in matches:
-                    topic = match.group(0)
-                    topic_payload = f"\n{topic}\n"
+                    topic = match.group(1) # Text without **
                     await self.task_state.broadcast(
-                        f"event: message\ndata: {json.dumps(topic_payload)}\n\n"
+                        f"event: topic\ndata: {json.dumps(topic)}\n\n"
                     )
                     last_end = match.end()
                 self.thought_broadcast_buffer = self.thought_broadcast_buffer[last_end:]

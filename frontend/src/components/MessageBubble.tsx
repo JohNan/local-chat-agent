@@ -198,7 +198,19 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
         };
     };
 
-    const parsedContent = parseMessageContent(text);
+    const getParsedContent = () => {
+        if (message.currentTopic || (message.completedTopics && message.completedTopics.length > 0) || message.currentThought) {
+            return {
+                completedTopics: message.completedTopics || [],
+                currentTopic: message.currentTopic,
+                currentThought: message.currentThought || "",
+                filteredText: text
+            };
+        }
+        return parseMessageContent(text);
+    };
+
+    const parsedContent = getParsedContent();
 
     const handleCodeCopy = (e: React.MouseEvent<HTMLDivElement>) => {
         let target = e.target as HTMLElement;
@@ -507,6 +519,12 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                         currentTopic={parsedContent.currentTopic}
                         activeTool={toolStatus}
                      />
+                 )}
+                 {isAi && parsedContent.currentThought && !parsedContent.filteredText.includes('#### Reasoning Trace') && (
+                    <details className="thought-block" open={!parsedContent.filteredText}>
+                        <summary>Reasoning Trace</summary>
+                        <div className="thought-content" dangerouslySetInnerHTML={renderMarkdown(parsedContent.currentThought)} />
+                    </details>
                  )}
                  <div dangerouslySetInnerHTML={renderMarkdown(parsedContent.filteredText)} onClick={handleCodeCopy} />
                  <button
