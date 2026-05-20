@@ -772,9 +772,10 @@ class ACPClientHandler(Client):
             await self.task_state.broadcast(
                 f"event: tool\ndata: {json.dumps(tool_status_msg)}\n\n"
             )
-            await self.task_state.broadcast(
-                f"event: log\ndata: {json.dumps(tool_status_msg)}\n\n"
-            )
+            if isinstance(update, ToolCallStart):
+                await self.task_state.broadcast(
+                    f"event: log\ndata: {json.dumps(tool_status_msg)}\n\n"
+                )
             return
 
         chunk = ""
