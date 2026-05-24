@@ -144,7 +144,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
     // Parse message text to extract topics and filter content
     const parseMessageContent = (content: string) => {
         // Fix missing newlines before **
-        const normalizedContent = content.replace(/([^\n])(\**[^*]+\*\*)/g, '$1\n$2');
+        const normalizedContent = content.replace(/([^\n*])(\*\*[\s\S]+?\*\*)$/gm, '$1\n$2');
         const lines = normalizedContent.split('\n');
         const topics: string[] = [];
         const filteredLines: string[] = [];
