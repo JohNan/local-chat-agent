@@ -4,19 +4,20 @@ Tests for system settings endpoints in app/routers/system.py.
 
 import os
 import sys
-import pytest
-from fastapi.testclient import TestClient
 
-# Ensure we can import app from the root
-sys.path.append(os.getcwd())
+from fastapi.testclient import TestClient
 
 from app.main import app
 from app.config import DEFAULT_MODEL
 
+# Ensure we can import app from the root
+sys.path.append(os.getcwd())
+
+
 client = TestClient(app)
 
 
-def test_get_settings_default(clean_db):
+def test_get_settings_default():
     """
     Test that GET /api/settings returns DEFAULT_MODEL when no setting is stored.
     """
@@ -26,7 +27,7 @@ def test_get_settings_default(clean_db):
     assert data["model"] == DEFAULT_MODEL
 
 
-def test_save_and_get_settings(clean_db):
+def test_save_and_get_settings():
     """
     Test that POST /api/settings saves the model and GET /api/settings retrieves it.
     """
@@ -43,7 +44,7 @@ def test_save_and_get_settings(clean_db):
     assert response.json()["model"] == new_model
 
 
-def test_save_settings_invalid_data(clean_db):
+def test_save_settings_invalid_data():
     """
     Test that POST /api/settings with invalid data returns 422.
     """
@@ -52,7 +53,7 @@ def test_save_settings_invalid_data(clean_db):
     assert response.status_code == 422
 
 
-def test_save_settings_update(clean_db):
+def test_save_settings_update():
     """
     Test that updating an existing setting works correctly.
     """

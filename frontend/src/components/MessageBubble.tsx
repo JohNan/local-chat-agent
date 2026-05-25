@@ -513,13 +513,6 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                          ))}
                      </div>
                  )}
-                 {isAi && (parsedContent.currentTopic || parsedContent.completedTopics.length > 0) && (
-                     <TaskStepper
-                        topics={parsedContent.completedTopics}
-                        currentTopic={parsedContent.currentTopic}
-                        activeTool={toolStatus}
-                     />
-                 )}
                  {isAi && parsedContent.currentThought && !parsedContent.filteredText.includes('#### Reasoning Trace') && (
                     <details className="thought-block" open={!parsedContent.filteredText}>
                         <summary>Reasoning Trace</summary>
@@ -527,6 +520,13 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                     </details>
                  )}
                  <div dangerouslySetInnerHTML={renderMarkdown(parsedContent.filteredText)} onClick={handleCodeCopy} />
+                 {isAi && (parsedContent.currentTopic || parsedContent.completedTopics.length > 0) && (
+                     <TaskStepper
+                        topics={parsedContent.completedTopics}
+                        currentTopic={parsedContent.currentTopic}
+                        activeTool={toolStatus}
+                     />
+                 )}
                  <button
                     onClick={handleCopy}
                     className={`copy-btn ${copyError ? 'error-message' : ''}`}

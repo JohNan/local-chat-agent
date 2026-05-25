@@ -13,6 +13,7 @@ from app.services.prompt_router import (
     classify_intent,
     Intent,
     load_cli_core_instruction,
+    PERSONA_PROMPTS,
 )
 
 
@@ -137,7 +138,6 @@ def test_classify_intent_success():
     """Test that classify_intent correctly extracts persona using Intent schema."""
     with patch("app.services.prompt_router.CLIENT") as mock_client:
         mock_response = MagicMock()
-        from app.services.prompt_router import PERSONA_PROMPTS
 
         persona_to_test = "ASK" if "ASK" in PERSONA_PROMPTS else "UI"
         mock_response.parsed = Intent(persona=persona_to_test, task_type="feature")
