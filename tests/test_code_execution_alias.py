@@ -13,7 +13,7 @@ def test_tool_map_alias():
     assert "run_programming_task" in app.services.llm_service.TOOL_MAP
     assert (
         app.services.llm_service.TOOL_MAP["run_programming_task"]
-        == code_executor.execute_code
+        == code_executor.execute_code  # pylint: disable=comparison-with-callable
     )
 
 

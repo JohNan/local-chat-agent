@@ -84,7 +84,7 @@ def test_grep_code_fallback_commands():
     # Mock os.path.exists to simulate no .git directory
     with patch(
         "app.services.git_ops.os.path.exists", return_value=False
-    ) as mock_exists, patch("app.services.git_ops.subprocess.run") as mock_run:
+    ), patch("app.services.git_ops.subprocess.run") as mock_run:
 
         # Configure mock_run result
         mock_result = MagicMock()
