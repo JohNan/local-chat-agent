@@ -217,7 +217,10 @@ def get_git_status() -> list[str]:
 
 
 def perform_git_push(
-    branch_name: str, commit_message: str, switch_back: bool = True, create_pr: bool = False
+    branch_name: str,
+    commit_message: str,
+    switch_back: bool = True,
+    create_pr: bool = False,
 ) -> dict:
     """
     Executes git checkout -b, git add ., git commit -m, and git push.
@@ -302,7 +305,15 @@ def perform_git_push(
         if create_pr:
             try:
                 pr_result = subprocess.run(
-                    ["gh", "pr", "create", "--title", commit_message, "--body", commit_message],
+                    [
+                        "gh",
+                        "pr",
+                        "create",
+                        "--title",
+                        commit_message,
+                        "--body",
+                        commit_message,
+                    ],
                     cwd=CODEBASE_ROOT,
                     capture_output=True,
                     text=True,
@@ -315,7 +326,6 @@ def perform_git_push(
             except FileNotFoundError:
                 logger.error("gh CLI not found")
                 output += "\nFailed to create PR: GitHub CLI (gh) is not installed."
-
 
         if switch_back and original_branch != branch_name:
             # Check if original_branch still exists (might have been renamed)

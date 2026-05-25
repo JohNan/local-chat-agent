@@ -63,6 +63,7 @@ class CommitSuggestion(BaseModel):
     commit_message: str
     branch_name: str
 
+
 class GitPushRequest(BaseModel):
     """Request model for git push."""
 
@@ -101,7 +102,7 @@ def api_git_status():
                     response_mime_type="application/json",
                     response_schema=CommitSuggestion,
                     temperature=0.2,
-                )
+                ),
             )
             if response.parsed and isinstance(response.parsed, CommitSuggestion):
                 suggested_commit_message = response.parsed.commit_message.strip()

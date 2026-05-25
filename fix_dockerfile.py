@@ -1,25 +1,25 @@
 import sys
 
-with open('/codebase/Dockerfile', 'r') as f:
+with open("/codebase/Dockerfile", "r") as f:
     content = f.read()
 
 # First we need to remove the bad RUN line
-lines = content.split('\n')
+lines = content.split("\n")
 new_lines = []
 skip = False
 for line in lines:
-    if line.startswith('# Install gh CLI'):
+    if line.startswith("# Install gh CLI"):
         new_lines.append(line)
         skip = True
         continue
     if skip:
-        if line == '' or line.startswith('# Install Language Servers'):
+        if line == "" or line.startswith("# Install Language Servers"):
             skip = False
         else:
             continue
     new_lines.append(line)
 
-content = '\n'.join(new_lines)
+content = "\n".join(new_lines)
 
 gh_install = """RUN mkdir -p -m 755 /etc/apt/keyrings \\
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/etc/apt/keyrings/githubcli-archive-keyring.gpg \\
@@ -31,8 +31,7 @@ gh_install = """RUN mkdir -p -m 755 /etc/apt/keyrings \\
 
 """
 
-content = content.replace('# Install gh CLI\n', '# Install gh CLI\n' + gh_install)
+content = content.replace("# Install gh CLI\n", "# Install gh CLI\n" + gh_install)
 
-with open('/codebase/Dockerfile', 'w') as f:
+with open("/codebase/Dockerfile", "w") as f:
     f.write(content)
-

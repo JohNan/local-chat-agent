@@ -2,6 +2,8 @@
 Tests for the /api/git_status endpoint.
 """
 
+from app.routers.system import CommitSuggestion
+
 
 def test_api_git_status_empty(client, mocker):
     """Test /api/git_status when there are no changes."""
@@ -19,6 +21,7 @@ def test_api_git_status_empty(client, mocker):
         "status": [],
         "branch": "main",
         "suggested_commit_message": "chore: update files",
+        "suggested_branch_name": "main",
     }
     mock_get_status.assert_called_once()
 
@@ -39,7 +42,9 @@ def test_api_git_status_with_changes(client, mocker):
     # Mock the LLM client behavior
     mock_client = mocker.patch("app.routers.system.CLIENT")
     mock_response = mocker.MagicMock()
-    mock_response.text = "feat: update git status test"
+    mock_response.parsed = CommitSuggestion(
+        commit_message="feat: update git status test", branch_name="feature-branch"
+    )
     mock_client.models.generate_content.return_value = mock_response
 
     response = client.get("/api/git_status")
@@ -50,5 +55,6 @@ def test_api_git_status_with_changes(client, mocker):
         "status": changes,
         "branch": "feature-branch",
         "suggested_commit_message": "feat: update git status test",
+        "suggested_branch_name": "feature-branch",
     }
     mock_get_status.assert_called_once()
