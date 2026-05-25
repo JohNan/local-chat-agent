@@ -8,7 +8,6 @@ import sys
 import os
 import logging
 import subprocess
-from typing import Optional, Dict
 
 # Ensure we can import from the app package
 app_root = os.getcwd()
