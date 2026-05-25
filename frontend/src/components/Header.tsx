@@ -40,6 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
     const [pushCommitMessage, setPushCommitMessage] = useState("");
     const [pushing, setPushing] = useState(false);
     const [switchBack, setSwitchBack] = useState(true);
+    const [createPR, setCreatePR] = useState(false);
 
     const [personas, setPersonas] = useState<PersonaInfo[]>([]);
     const [switchingPersona, setSwitchingPersona] = useState(false);
@@ -164,7 +165,7 @@ export const Header: React.FC<HeaderProps> = ({
             const data = await res.json();
             if (data.status && data.status.length > 0) {
                 setPushFiles(data.status);
-                setPushBranchName(data.branch || "main");
+                setPushBranchName(data.suggested_branch_name || data.branch || "main");
                 setPushCommitMessage(data.suggested_commit_message || "chore: update files");
                 setShowPushModal(true);
             } else {
@@ -187,7 +188,8 @@ export const Header: React.FC<HeaderProps> = ({
                 body: JSON.stringify({
                     branch_name: pushBranchName,
                     commit_message: pushCommitMessage,
-                    switch_back: switchBack
+                    switch_back: switchBack,
+                    create_pr: createPR
                 })
             });
             const data = await res.json();
@@ -600,6 +602,19 @@ export const Header: React.FC<HeaderProps> = ({
                                 />
                                 <label htmlFor="switch-back-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
                                     Switch back to previous branch after push
+                                </label>
+                            </div>
+                            <div className="setting-item" style={{ flexDirection: 'row', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    id="create-pr-checkbox"
+                                    checked={createPR}
+                                    onChange={(e) => setCreatePR(e.target.checked)}
+                                    disabled={pushing}
+                                    style={{ width: 'auto' }}
+                                />
+                                <label htmlFor="create-pr-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
+                                    Create Pull Request (Requires gh CLI)
                                 </label>
                             </div>
                             <div className="setting-actions" style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
