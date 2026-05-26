@@ -1,0 +1,32 @@
+[MASTER]
+ignore=venv,node_modules
+
+[MESSAGES CONTROL]
+# Disable common noise and test-related warnings
+disable=
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    too-many-arguments,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements,
+    redefined-outer-name,
+    unused-argument,
+    import-outside-toplevel,
+    broad-exception-caught,
+    duplicate-code,
+    wrong-import-position,
+    wrong-import-order,
+    consider-using-sys-exit,
+    unspecified-encoding,
+    bare-except,
+    no-member,
+    protected-access,
+    import-error,
+    comparison-with-callable,
+    unused-import,
+    unused-variable
+
+[FORMAT]
+max-line-length=120

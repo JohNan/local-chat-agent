@@ -59,12 +59,18 @@ async def api_status():
     return info
 
 
+class CommitSuggestion(BaseModel):
+    commit_message: str
+    branch_name: str
+
+
 class GitPushRequest(BaseModel):
     """Request model for git push."""
 
     branch_name: str
     commit_message: str
     switch_back: bool = True
+    create_pr: bool = False
 
 
 class BranchSwitchRequest(BaseModel):
@@ -81,19 +87,26 @@ def api_git_status():
     diff = git_ops.get_local_diff()
 
     suggested_commit_message = "chore: update files"
+    suggested_branch_name = current_branch or "main"
     if status and diff and CLIENT:
         prompt = (
-            "Write a concise, conventional commit message based on the following git diff. "
-            "Output ONLY the commit message (max 1 line), "
-            "without any markdown backticks or explanations.\n\n"
-            f"{diff}"
+            "Analyze the following git diff and suggest a concise, conventional commit message "
+            "and a suitable branch name. "
+            f"\n\n{diff}"
         )
         try:
             response = CLIENT.models.generate_content(
-                model="gemini-3-flash-preview", contents=prompt
+                model="gemini-3-flash-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=CommitSuggestion,
+                    temperature=0.2,
+                ),
             )
-            if response and response.text:
-                suggested_commit_message = response.text.strip()
+            if response.parsed and isinstance(response.parsed, CommitSuggestion):
+                suggested_commit_message = response.parsed.commit_message.strip()
+                suggested_branch_name = response.parsed.branch_name.strip()
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Failed to generate commit message: %s", e)
 
@@ -101,6 +114,7 @@ def api_git_status():
         "status": status,
         "branch": current_branch,
         "suggested_commit_message": suggested_commit_message,
+        "suggested_branch_name": suggested_branch_name,
     }
 
 
@@ -112,6 +126,7 @@ async def api_git_push(request: GitPushRequest):
         request.branch_name,
         request.commit_message,
         request.switch_back,
+        request.create_pr,
     )
     return result
 

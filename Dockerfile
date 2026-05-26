@@ -23,6 +23,16 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install gh CLI
+RUN mkdir -p -m 755 /etc/apt/keyrings \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update \
+    && apt-get install gh -y \
+    && rm -rf /var/lib/apt/lists/*
+
+
 # Install Language Servers
 # Python
 RUN pip install python-lsp-server
@@ -41,7 +51,8 @@ RUN uv pip install --system -r requirements.txt
 RUN mkdir -p /root/.ssh && ssh-keyscan github.com >> /root/.ssh/known_hosts && chmod 600 /root/.ssh/known_hosts
 RUN git config --global --add safe.directory /codebase \
     && git config --global user.email "agent@gemini.local" \
-    && git config --global user.name "Gemini Agent"
+    && git config --global user.name "Gemini Agent" \
+    && gh config set git_protocol ssh
 
 # Copy Backend Code
 COPY app/ ./app/

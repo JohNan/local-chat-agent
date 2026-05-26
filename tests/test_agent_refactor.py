@@ -1,9 +1,7 @@
 import asyncio
-import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from app.agent_engine import run_agent_task, TaskState
-from google.genai import types
+from unittest.mock import MagicMock, patch
+from app.agent_engine import run_agent_task
 
 
 # Helper async iterator
@@ -17,8 +15,8 @@ class AsyncIterator:
     async def __anext__(self):
         try:
             return next(self.iter)
-        except StopIteration:
-            raise StopAsyncIteration
+        except StopIteration as exc:
+            raise StopAsyncIteration from exc
 
 
 @pytest.mark.asyncio

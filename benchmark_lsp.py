@@ -51,7 +51,7 @@ def benchmark_blocking():
         t2.join()
         total_end = time.time()
 
-        print(f"\nResults:")
+        print("\nResults:")
         print(f"Lang 1 duration: {results.get('lang1')}s")
         print(f"Lang 2 duration: {results.get('lang2')}s")
         print(f"Total time: {total_end - total_start}s")
