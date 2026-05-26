@@ -21,7 +21,7 @@ for line in lines:
 
 content = "\n".join(new_lines)
 
-gh_install = """RUN mkdir -p -m 755 /etc/apt/keyrings \\
+GH_INSTALL = """RUN mkdir -p -m 755 /etc/apt/keyrings \\
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/etc/apt/keyrings/githubcli-archive-keyring.gpg \\
     && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \\
     && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \\
@@ -31,7 +31,7 @@ gh_install = """RUN mkdir -p -m 755 /etc/apt/keyrings \\
 
 """
 
-content = content.replace("# Install gh CLI\n", "# Install gh CLI\n" + gh_install)
+content = content.replace("# Install gh CLI\n", "# Install gh CLI\n" + GH_INSTALL)
 
 with open("/codebase/Dockerfile", "w") as f:
     f.write(content)

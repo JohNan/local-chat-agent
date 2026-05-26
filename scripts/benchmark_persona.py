@@ -1,4 +1,5 @@
 """Benchmark persona loading performance."""
+
 import time
 import sys
 from pathlib import Path

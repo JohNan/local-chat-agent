@@ -82,9 +82,9 @@ def test_grep_code_truncation(temp_codebase):
 def test_grep_code_fallback_commands():
     """Test grep_code fallback to standard grep when not in a git repo."""
     # Mock os.path.exists to simulate no .git directory
-    with patch(
-        "app.services.git_ops.os.path.exists", return_value=False
-    ), patch("app.services.git_ops.subprocess.run") as mock_run:
+    with patch("app.services.git_ops.os.path.exists", return_value=False), patch(
+        "app.services.git_ops.subprocess.run"
+    ) as mock_run:
 
         # Configure mock_run result
         mock_result = MagicMock()

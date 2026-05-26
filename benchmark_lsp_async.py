@@ -45,7 +45,7 @@ async def benchmark_blocking():
         await asyncio.gather(start_lang("lang1", results), start_lang("lang2", results))
         total_end = time.time()
 
-        print(f"\nResults:")
+        print("\nResults:")
         print(f"Lang 1 duration: {results.get('lang1')}s")
         print(f"Lang 2 duration: {results.get('lang2')}s")
         print(f"Total time: {total_end - total_start}s")
