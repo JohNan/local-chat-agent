@@ -70,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
                 if (res.ok) {
                     const data = await res.json();
                     if (data.personas) {
-                        setPersonas(data.personas);
+                        setPersonas([...data.personas].sort((a, b) => a.name.localeCompare(b.name)));
                     }
                 }
             } catch (e) {
@@ -285,6 +285,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>Gemini Agent</span>
                     <div
                         title="Select Persona"
+                        onClick={(e) => e.stopPropagation()}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
