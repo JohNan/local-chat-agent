@@ -11,10 +11,13 @@ services:
       - ~/.config/gemini:/root/.config/gemini
       - ~/.config/gcloud:/root/.config/gcloud
       - ${SSH_AUTH_SOCK}:/ssh-agent
+      # Uncomment to share GitHub CLI credentials from your host machine
+      # - ~/.config/gh:/root/.config/gh
       # Uncomment the next line to share Gemini CLI OAuth credentials from your host machine
       # - ~/.gemini:/root/.gemini
     environment:
       - GOOGLE_API_KEY
+      # - GH_TOKEN # Uncomment and set in your .env file to authenticate GitHub CLI without mounting config
       # - CHAT_HISTORY_FILE=/config/chat_history.json
       # - JULES_TASKS_FILE=/config/tasks.json
       - SSH_AUTH_SOCK=/ssh-agent

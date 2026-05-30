@@ -96,6 +96,9 @@ If you are using `LLM_ENGINE=cli` and want to authenticate using your Google Acc
 3.  Select **"Sign in with Google"** and follow the prompts. The CLI will provide a URL to visit and ask you to paste back an authorization code.
 4.  Once completed, the OAuth credentials will be saved in `/root/.gemini/` inside the container.
 5.  Alternatively, you can authenticate on your host machine and mount your local `~/.gemini/` directory to the container (see `docker-compose.example.yml`).
+6.  **GitHub CLI (`gh`) Authentication:** If you want to create pull requests, the agent uses the `gh` CLI. You can authenticate it by either:
+    *   Uncommenting `GH_TOKEN` in `docker-compose.yml` and providing your GitHub Personal Access Token.
+    *   Uncommenting the `~/.config/gh:/root/.config/gh` volume mount in `docker-compose.yml` to share your host machine's `gh` credentials.
 
 ## Usage
 

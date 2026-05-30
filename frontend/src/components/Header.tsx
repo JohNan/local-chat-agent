@@ -37,6 +37,8 @@ export const Header: React.FC<HeaderProps> = ({
     const [showPushModal, setShowPushModal] = useState(false);
     const [pushFiles, setPushFiles] = useState<string[]>([]);
     const [pushBranchName, setPushBranchName] = useState("");
+    const [createNewBranch, setCreateNewBranch] = useState(false);
+    const [currentBranchName, setCurrentBranchName] = useState("");
     const [pushCommitMessage, setPushCommitMessage] = useState("");
     const [pushing, setPushing] = useState(false);
     const [switchBack, setSwitchBack] = useState(true);
@@ -165,7 +167,18 @@ export const Header: React.FC<HeaderProps> = ({
             const data = await res.json();
             if (data.status && data.status.length > 0) {
                 setPushFiles(data.status);
-                setPushBranchName(data.suggested_branch_name || data.branch || "main");
+                setCurrentBranchName(data.branch || "main");
+                
+                // If there's a suggested branch that is different from current, default to creating a new branch
+                const suggested = data.suggested_branch_name || "";
+                if (suggested && suggested !== data.branch) {
+                    setCreateNewBranch(true);
+                    setPushBranchName(suggested);
+                } else {
+                    setCreateNewBranch(false);
+                    setPushBranchName(data.branch || "main");
+                }
+                
                 setPushCommitMessage(data.suggested_commit_message || "chore: update files");
                 setShowPushModal(true);
             } else {
@@ -572,14 +585,43 @@ export const Header: React.FC<HeaderProps> = ({
                                 </ul>
                             </div>
                             <div className="setting-item">
-                                <label>Branch Name</label>
-                                <input
-                                    type="text"
-                                    value={pushBranchName}
-                                    onChange={(e) => setPushBranchName(e.target.value)}
-                                    disabled={pushing}
-                                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--chat-bg)', color: 'var(--text-color)' }}
-                                />
+                                <label>Branch</label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'normal' }}>
+                                        <input
+                                            type="radio"
+                                            checked={!createNewBranch}
+                                            onChange={() => {
+                                                setCreateNewBranch(false);
+                                                setPushBranchName(currentBranchName);
+                                            }}
+                                            disabled={pushing}
+                                        />
+                                        Push to current branch ({currentBranchName})
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'normal' }}>
+                                        <input
+                                            type="radio"
+                                            checked={createNewBranch}
+                                            onChange={() => {
+                                                setCreateNewBranch(true);
+                                                // We don't reset pushBranchName here so it retains what they typed or the suggestion
+                                            }}
+                                            disabled={pushing}
+                                        />
+                                        Create new branch
+                                    </label>
+                                    {createNewBranch && (
+                                        <input
+                                            type="text"
+                                            value={pushBranchName}
+                                            onChange={(e) => setPushBranchName(e.target.value)}
+                                            disabled={pushing}
+                                            placeholder="Enter branch name"
+                                            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--chat-bg)', color: 'var(--text-color)', marginTop: '4px' }}
+                                        />
+                                    )}
+                                </div>
                             </div>
                             <div className="setting-item">
                                 <label>Commit Message</label>
