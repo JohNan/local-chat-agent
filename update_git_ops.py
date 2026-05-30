@@ -1,4 +1,4 @@
-with open('app/services/git_ops.py', 'r') as f:
+with open("app/services/git_ops.py", "r") as f:
     content = f.read()
 
 old_code = """            except subprocess.CalledProcessError as e:
@@ -15,5 +15,5 @@ new_code = """            except subprocess.CalledProcessError as e:
 
 content = content.replace(old_code, new_code)
 
-with open('app/services/git_ops.py', 'w') as f:
+with open("app/services/git_ops.py", "w") as f:
     f.write(content)

@@ -1,6 +1,6 @@
 import re
 
-with open('frontend/src/components/Header.tsx', 'r') as f:
+with open("frontend/src/components/Header.tsx", "r") as f:
     content = f.read()
 
 # Add states for branch selection
@@ -8,7 +8,11 @@ state_addition = """    const [pushBranchName, setPushBranchName] = useState("")
     const [createNewBranch, setCreateNewBranch] = useState(false);
     const [currentBranchName, setCurrentBranchName] = useState("");"""
 
-content = re.sub(r'    const \[pushBranchName, setPushBranchName\] = useState\(""\);', state_addition, content)
+content = re.sub(
+    r'    const \[pushBranchName, setPushBranchName\] = useState\(""\);',
+    state_addition,
+    content,
+)
 
 # Update gitStatus function
 gitStatus_old = """                setPushFiles(data.status);
@@ -93,5 +97,5 @@ content = content.replace(branch_ui_old, branch_ui_new)
 # What if createNewBranch is false, pushBranchName is currentBranchName, which is correct.
 # Wait, let's make sure the backend pushes to the current branch.
 
-with open('frontend/src/components/Header.tsx', 'w') as f:
+with open("frontend/src/components/Header.tsx", "w") as f:
     f.write(content)
