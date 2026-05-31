@@ -135,7 +135,14 @@ def get_tool_config(
     if write_access_enabled:
         function_declarations.extend(MCP_TOOL_DEFINITIONS)
     else:
-        write_tool_names = {"write_file", "replace", "write_file_safe", "replace_safe", "write_to_docs", "delete_file"}
+        write_tool_names = {
+            "write_file",
+            "replace",
+            "write_file_safe",
+            "replace_safe",
+            "write_to_docs",
+            "delete_file",
+        }
         for tool in MCP_TOOL_DEFINITIONS:
             if tool.name not in write_tool_names:
                 function_declarations.append(tool)
