@@ -1,4 +1,9 @@
 [[rule]]
-toolName = ["write_file", "replace"]
+toolName = "write_file"
+decision = "deny"
+priority = 999
+
+[[rule]]
+toolName = "replace"
 decision = "deny"
 priority = 999

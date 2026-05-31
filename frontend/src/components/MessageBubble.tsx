@@ -210,7 +210,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
         return parseMessageContent(text);
     };
 
-    const parsedContent = getParsedContent();
+    const parsedContent = getParsedContent(); 
 
     const handleCodeCopy = (e: React.MouseEvent<HTMLDivElement>) => {
         let target = e.target as HTMLElement;
@@ -513,7 +513,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                          ))}
                      </div>
                  )}
-                 {isAi && parsedContent.currentThought && !parsedContent.filteredText.includes('#### Reasoning Trace') && (
+                 {isAi && parsedContent.currentThought && !(parsedContent.filteredText || '').includes('#### Reasoning Trace') && (
                     <details className="thought-block" open={!parsedContent.filteredText}>
                         <summary>Reasoning Trace</summary>
                         <div className="thought-content" dangerouslySetInnerHTML={renderMarkdown(parsedContent.currentThought)} />
