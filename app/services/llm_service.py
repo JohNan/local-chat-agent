@@ -135,7 +135,7 @@ def get_tool_config(
     if write_access_enabled:
         function_declarations.extend(MCP_TOOL_DEFINITIONS)
     else:
-        write_tool_names = {"write_file", "replace", "write_to_docs", "delete_file"}
+        write_tool_names = {"write_file", "replace", "write_file_safe", "replace_safe", "write_to_docs", "delete_file"}
         for tool in MCP_TOOL_DEFINITIONS:
             if tool.name not in write_tool_names:
                 function_declarations.append(tool)
@@ -997,7 +997,7 @@ class CLILLMService(BaseLLMService):
                         "and execute tests to verify your changes. If tests fail, "
                         "diagnose and fix the errors. Ensure to use tools autonomously. "
                         "The built-in write_file and replace tools are disabled. "
-                        "You MUST use the provided MCP tools instead."
+                        "You MUST use the provided MCP tools instead: write_file_safe and replace_safe."
                         "If the built-in shell tool fails for complex redirections, "
                         "use the MCP-provided run_shell_command tool."
                     )
