@@ -69,13 +69,13 @@ def write_to_docs(filename: str, content: str) -> str:
     return git_ops.write_to_docs(filename, content)
 
 
-@mcp.tool()
+@mcp.tool(name="write_file_safe")
 def write_file(filepath: str, content: str) -> str:
     """Safely overwrites a file with new content."""
     return git_ops.write_file_safe(filepath, content)
 
 
-@mcp.tool()
+@mcp.tool(name="replace_safe")
 def replace(filepath: str, old_string: str, new_string: str) -> str:
     """Safely replaces the first occurrence of a string in a file."""
     return git_ops.replace_in_file_safe(filepath, old_string, new_string)
