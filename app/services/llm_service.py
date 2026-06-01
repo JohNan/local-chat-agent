@@ -997,20 +997,24 @@ class CLILLMService(BaseLLMService):
                 )
 
                 prompt_msg = current_msg
+                mcp_tools_instruction = (
+                    "The built-in write_file and replace tools are disabled. "
+                    "You MUST use the provided MCP tools instead: write_file_safe and replace_safe. "
+                    "If the built-in shell tool fails for complex redirections, "
+                    "use the MCP-provided run_shell_command tool."
+                )
+
                 if mode == "implementation":
                     impl_instruction = (
                         "You are an autonomous coding agent. "
                         "Implement the given instructions, modify files using the provided tools, "
                         "and execute tests to verify your changes. If tests fail, "
                         "diagnose and fix the errors. Ensure to use tools autonomously. "
-                        "The built-in write_file and replace tools are disabled. "
-                        "You MUST use the provided MCP tools instead: write_file_safe and replace_safe."
-                        "If the built-in shell tool fails for complex redirections, "
-                        "use the MCP-provided run_shell_command tool."
+                        f"{mcp_tools_instruction}"
                     )
                     prompt_msg = f"{impl_instruction}\n\n{current_msg}"
                 elif turn_context.is_new_context and turn_context.system_instruction:
-                    prompt_msg = f"{turn_context.system_instruction}\n\n{current_msg}"
+                    prompt_msg = f"{turn_context.system_instruction}\n\n{mcp_tools_instruction}\n\n{current_msg}"
 
                 # Append the unique marker to identify where the new response begins
                 prompt_msg = f"{prompt_msg}\n\n{turn_marker}\n\n"
