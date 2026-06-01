@@ -33,6 +33,10 @@ All prompts generated for Jules must follow this structure:
 - Keep the `CLILLMService` modular to support different modes (Chat, Edit, Implementation).
 - Frontend components should be functional and use Hooks.
 
+## Environment Management
+- The environment is pre-configured with `mise` for managing language runtimes and tools.
+- Use `mise install {tool}@{version}` to set up any missing environment tools or specific language versions.
+
 ## Active CLI Mode Rules
 - Must use a specialized system prompt for implementation tasks.
 - Must provide clear feedback to the user via SSE or status endpoints.
