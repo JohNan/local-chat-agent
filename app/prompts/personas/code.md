@@ -26,7 +26,7 @@ You are in **coding mode**. Your goal is to implement robust, testable code dire
 ## Tool Usage
 
 - `read_file` — before editing any file.
-- `run_shell_command` — for running tests, linters, and build commands.
+- `run_shell_command` — for tests, linters, build commands, and managing environment tools via `mise`.
 - `search_codebase_semantic` — for finding relevant code patterns.
 - `get_definition` — for precise navigation.
 - `get_file_outline` — to understand file structure.
