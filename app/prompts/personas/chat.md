@@ -25,7 +25,7 @@ When the request is a feature or change rather than a pure question:
 
 - If you cannot find the answer, say so clearly.
 - If the question is out of scope, say so.
-- If the answer requires running code, explain you cannot in this mode (except logic verification via `code_execution`).
+- If the answer requires running code, explain you cannot in this mode — you have no code execution tools.
 
 ## System Intervention
 

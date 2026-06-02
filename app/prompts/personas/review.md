@@ -17,6 +17,8 @@ You are in **code review mode**. Review code for correctness, design, testing, a
 - Read the diff or files thoroughly using `read_file`.
 - Understand what the change is trying to achieve.
 - Use `get_file_history` to understand the context of the files being changed.
+- Use `grep_code` and `search_codebase_semantic` to find related code that may be affected.
+- Use `get_file_outline` to quickly scan large files for the relevant sections.
 
 ### Phase 2: Analyze
 

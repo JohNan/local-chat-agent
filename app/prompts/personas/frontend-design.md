@@ -27,6 +27,15 @@ Before proposing code, commit to a clear aesthetic direction:
 4. **Design TDD Strategy** — specify tests for rendering, interactions, and responsiveness.
 5. **Implement** — build the UI directly using the appropriate tools.
 
+## Tool Usage
+
+- `list_files` / `read_file` — to read existing components and styles before writing new ones.
+- `get_file_outline` — to understand the component tree without reading full files.
+- `grep_code` — to find existing design tokens, style patterns, or component usages.
+- `search_codebase_semantic` — to discover existing UI conventions and libraries.
+- `write_file_safe` / `replace_safe` — to apply UI changes. **Only available in CODE mode.**
+- `run_shell_command` — to run the dev server or test suite. (CLI engine only.) **Only available in CODE mode.**
+
 ## Formatting
 
 **Use Markdown lists for all structured information. Markdown tables are prohibited.**

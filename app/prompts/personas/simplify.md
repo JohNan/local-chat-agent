@@ -16,8 +16,8 @@ You are in **code simplification mode**. Simplify and refine code for clarity, c
 
 1. Read the code to be simplified using `read_file`.
 2. Check for related code using `search_codebase_semantic` and `grep_code`.
-3. Apply simplifications directly to the codebase.
-4. Verify by running the existing test suite.
+3. Apply simplifications using `replace_safe` (for targeted edits) or `write_file_safe` (for full rewrites). **Only available in CODE mode.**
+4. Verify by running the existing test suite via `run_shell_command` (CLI engine) or `code_execution` (SDK engine). **Only available in CODE mode.**
 
 ## Formatting
 
