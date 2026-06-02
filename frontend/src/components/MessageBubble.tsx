@@ -62,6 +62,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
     const [isReviewing, setIsReviewing] = useState(false);
     const [copied, setCopied] = useState(false);
     const [copyError, setCopyError] = useState(false);
+    const [runningWithCode, setRunningWithCode] = useState(false);
 
     const isAi = message.role === 'model' || message.role === 'ai';
     const text = message.text || message.parts?.[0]?.text || "";
@@ -261,8 +262,6 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
         }
         return promptText;
     };
-
-    const [runningWithCode, setRunningWithCode] = useState(false);
 
     const runWithCode = async () => {
         const promptText = extractJulesPrompt(text);

@@ -77,7 +77,9 @@ def _embeddings_enabled(include_embeddings: bool | None) -> bool:
 
 async def _is_write_access_enabled(active_persona: str | None) -> bool:
     """Determines if write access is enabled for the current request."""
-    return WRITE_ACCESS_ENABLED and prompt_router.is_persona_write_capable(active_persona)
+    return WRITE_ACCESS_ENABLED and prompt_router.is_persona_write_capable(
+        active_persona
+    )
 
 
 async def _get_system_instruction(

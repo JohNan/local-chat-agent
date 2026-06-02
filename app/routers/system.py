@@ -33,7 +33,9 @@ async def api_status():
                 llm_service.format_history, history, include_last=True
             )
             active_persona = info["active_persona"]
-            system_instruction = prompt_router.get_system_instruction(active_persona, user_msg=None)
+            system_instruction = prompt_router.get_system_instruction(
+                active_persona, user_msg=None
+            )
 
             model = await asyncio.to_thread(
                 chat_manager.get_setting, "default_model", DEFAULT_MODEL
