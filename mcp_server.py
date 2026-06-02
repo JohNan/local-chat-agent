@@ -93,6 +93,8 @@ def run_shell_command(command: str) -> str:
     Runs a shell command and returns the output.
     Useful as a fallback if the built-in shell tool fails for complex redirections.
     """
+    if not git_ops._writes_allowed():  # pylint: disable=protected-access
+        return "Error: shell execution disabled in read-only (CHAT) mode."
     try:
         result = subprocess.run(
             command,

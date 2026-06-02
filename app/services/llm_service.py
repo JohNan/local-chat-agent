@@ -36,6 +36,7 @@ from acp.schema import (
 )
 
 from app.services import chat_manager, code_executor, git_ops, rag_manager, web_ops
+from app import config
 from app.config import LLM_ENGINE
 
 
@@ -59,7 +60,6 @@ class BaseLLMService(Protocol):
         current_msg: str,
         task_state: Any,
         turn_context: TurnContext | None = None,
-        mode: str = "chat",
     ) -> tuple[defaultdict, list[str], str]:
         """Executes a single turn of the agent loop."""
 
@@ -87,6 +87,9 @@ def get_tool_config(
     client, enable_search, enable_embeddings=True, write_access_enabled=False
 ):
     """Configures tools for the agent."""
+    # Symmetry with git_ops._writes_allowed(): the global kill-switch must also
+    # be on for any write tool to be offered, regardless of persona capability.
+    write_access_enabled = write_access_enabled and config.WRITE_ACCESS_ENABLED
     function_declarations = [
         types.FunctionDeclaration.from_callable(
             client=client, callable=git_ops.list_files
@@ -420,10 +423,8 @@ class SDKLLMService(BaseLLMService):
         current_msg: str,
         task_state: Any,
         turn_context: TurnContext | None = None,
-        mode: str = "chat",
     ) -> tuple[defaultdict, list[str], str]:
         del turn_context
-        del mode
         return await self._run_loop(chat_session, current_msg, task_state)
 
     async def _stream_with_retry(
@@ -670,10 +671,13 @@ class ACPClientHandler(Client):
 
     async def delete_file(self, session_id: str, filepath: str, **kwargs: Any) -> None:
         """Deletes a file from the codebase."""
-        # pylint: disable=import-outside-toplevel
-
-        git_ops._validate_path(filepath)  # pylint: disable=protected-access
-        os.remove(filepath)
+        if not git_ops._writes_allowed():  # pylint: disable=protected-access
+            raise PermissionError(
+                "Write access is disabled in read-only (CHAT) mode. "
+                "Switch to the CODE persona to delete files."
+            )
+        full_path = git_ops._validate_path(filepath)  # pylint: disable=protected-access
+        os.remove(full_path)
 
     async def list_directory(
         self, session_id: str, directory: str, **kwargs: Any
@@ -961,7 +965,6 @@ class CLILLMService(BaseLLMService):
         current_msg: str,
         task_state: Any,
         turn_context: TurnContext | None = None,
-        mode: str = "chat",
     ) -> tuple[defaultdict, list[str], str]:
         turn_context = turn_context or TurnContext()
         turn_marker = f"==JULES_TURN_{uuid.uuid4().hex[:8]}=="
@@ -997,19 +1000,7 @@ class CLILLMService(BaseLLMService):
                 )
 
                 prompt_msg = current_msg
-                if mode == "implementation":
-                    impl_instruction = (
-                        "You are an autonomous coding agent. "
-                        "Implement the given instructions, modify files using the provided tools, "
-                        "and execute tests to verify your changes. If tests fail, "
-                        "diagnose and fix the errors. Ensure to use tools autonomously. "
-                        "The built-in write_file and replace tools are disabled. "
-                        "You MUST use the provided MCP tools instead: write_file_safe and replace_safe."
-                        "If the built-in shell tool fails for complex redirections, "
-                        "use the MCP-provided run_shell_command tool."
-                    )
-                    prompt_msg = f"{impl_instruction}\n\n{current_msg}"
-                elif turn_context.is_new_context and turn_context.system_instruction:
+                if turn_context.is_new_context and turn_context.system_instruction:
                     prompt_msg = f"{turn_context.system_instruction}\n\n{current_msg}"
 
                 # Append the unique marker to identify where the new response begins

@@ -20,7 +20,6 @@ function App() {
     } = useChatHistory();
 
     const [model, setModel] = useState("gemini-3-pro-preview");
-    const [writeAccessEnabled, setWriteAccessEnabled] = useState(false);
 
     useEffect(() => {
         // Fetch saved model preference
@@ -28,8 +27,7 @@ function App() {
             .then(res => res.json())
             .then(data => {
                 if (data.model) setModel(data.model);
-                if (data.write_access_enabled !== undefined) setWriteAccessEnabled(data.write_access_enabled);
-                            })
+            })
             .catch(err => console.error("Failed to fetch settings:", err));
     }, []);
 
@@ -489,15 +487,6 @@ function App() {
                 setEmbeddingsEnabled={setEmbeddingsEnabled}
                 onToggleTerminal={() => setTerminalOpen(!terminalOpen)}
                 isGenerating={isGenerating}
-                writeAccessEnabled={writeAccessEnabled}
-                setWriteAccessEnabled={(val) => {
-                    setWriteAccessEnabled(val);
-                    fetch('/api/settings', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ write_access_enabled: val, model: model })
-                    }).catch(err => console.error("Failed to save CLI edit setting:", err));
-                }}
             />
             <ChatInterface
                 messages={filteredMessages}
@@ -505,7 +494,6 @@ function App() {
                 toolStatus={currentToolStatus}
                 isLoadingHistory={isFetchingNextPage}
                 onSendMessage={sendMessage}
-                writeAccessEnabled={writeAccessEnabled}
             />
             <InputArea
                 onSendMessage={sendMessage}
