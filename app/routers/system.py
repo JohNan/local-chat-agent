@@ -33,7 +33,9 @@ async def api_status():
                 llm_service.format_history, history, include_last=True
             )
             active_persona = info["active_persona"]
-            system_instruction = prompt_router.get_system_instruction(active_persona)
+            system_instruction = prompt_router.get_system_instruction(
+                active_persona, user_msg=None
+            )
 
             model = await asyncio.to_thread(
                 chat_manager.get_setting, "default_model", DEFAULT_MODEL
@@ -242,11 +244,11 @@ def api_models():
 
 @router.get("/api/system/personas")
 def api_get_personas():
-    """Returns a list of available personas with their capabilities."""
+    """Returns the two selectable top-level personas with their capabilities."""
     return {
         "personas": [
-            {"name": p, "write_capable": prompt_router.is_persona_write_capable(p)}
-            for p in prompt_router.PERSONA_PROMPTS
+            {"name": "CHAT", "write_capable": False},
+            {"name": "CODE", "write_capable": True},
         ]
     }
 
@@ -261,7 +263,7 @@ class PersonaSwitchRequest(BaseModel):
 async def api_switch_persona(request: PersonaSwitchRequest):
     """Switches the active persona explicitly."""
     persona_key = request.persona.upper()
-    if persona_key in prompt_router.PERSONA_PROMPTS:
+    if persona_key in prompt_router.TOP_LEVEL_PERSONAS:
         await asyncio.to_thread(prompt_router.save_active_persona, persona_key)
         return {"success": True, "active_persona": persona_key}
     return JSONResponse(status_code=400, content={"error": "Invalid persona"})

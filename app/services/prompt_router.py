@@ -87,26 +87,14 @@ def load_persona_prompts() -> dict[str, str]:
 
     if not prompts:
         prompts = {
-            "UI": (
-                f"{ARCHITECT_RULES} "
-                "Focus on visual consistency, responsiveness, and Material Design. "
-                "Includes Rule 7 (Visualizing Compose UI)."
+            "CHAT": (
+                "You are in read-only mode. Explore and explain the codebase, "
+                "plan changes, and finish every substantive answer with an ADR "
+                "and a final `## Jules Prompt` heading."
             ),
-            "MOBILE": (
-                f"{ARCHITECT_RULES} "
-                "Focus on Android best practices, lifecycle, and permissions. "
-                "Includes Rule 8 (Android Configuration)."
-            ),
-            "ARCHITECT": f"{ARCHITECT_RULES} "
-            "Focus on system design, modularity, and `AGENTS.md` compliance.",
-            "CI_CD": f"{ARCHITECT_RULES} "
-            "Focus on build stability, Docker, and GitHub Actions.",
-            "PLANNER": (
-                f"{ARCHITECT_RULES} "
-                "Focus on requirements, architecture, and roadmaps. "
-                "Use the write_to_docs tool for any documentation. "
-                "You have permission to update the `AGENTS.md` and `README.md` "
-                "files at the root using the `write_to_docs` tool."
+            "CODE": (
+                "You are in coding mode with full read-write tools. Implement "
+                "changes directly following TDD. Do NOT write Jules Prompts."
             ),
         }
     prompts["GENERAL"] = ARCHITECT_RULES
@@ -115,27 +103,93 @@ def load_persona_prompts() -> dict[str, str]:
 
 PERSONA_PROMPTS = load_persona_prompts()
 
-WRITE_CAPABLE_PERSONAS = {
-    "ARCHITECT",
-    "CODE",
-    "DEBUG",
-    "MOBILE",
-    "PLANNER",
-    "SIMPLIFY",
+TOP_LEVEL_PERSONAS = {"CHAT", "CODE"}
+
+SPECIALIST_PERSONAS = {  # must equal actual .md stems (uppercased)
     "UI",
+    "FRONTEND-DESIGN",
+    "MOBILE",
+    "ARCHITECT",
+    "DEBUG",
     "CI_CD",
-    "DEFAULT",
-    "GENERAL",
+    "SIMPLIFY",
+    "REVIEW",
+    "REVIEW-SECURITY",
+    "BRAINSTORM",
 }
 
-READ_ONLY_PERSONAS = {"ASK", "REVIEW", "REVIEW-SECURITY", "BRAINSTORM", "WRITE-PROMPT"}
+DEFAULT_TOP_LEVEL = "CHAT"  # safe default = read-only
+
+
+# Legacy persona keys (from a stale storage/persona_state.json) mapped onto the
+# new two-tier top-level personas. Write-ish keys become CODE; advisory /
+# ADR-producing keys become CHAT. Unknown keys fall back to CHAT (read-only).
+_LEGACY_TO_TOPLEVEL = {
+    "CODE": "CODE",
+    "DEBUG": "CODE",
+    "MOBILE": "CODE",
+    "UI": "CODE",
+    "FRONTEND-DESIGN": "CODE",
+    "CI_CD": "CODE",
+    "SIMPLIFY": "CODE",
+    "DEFAULT": "CODE",
+    "GENERAL": "CODE",
+    "ASK": "CHAT",
+    "ARCHITECT": "CHAT",
+    "PLAN": "CHAT",
+    "PLANNER": "CHAT",
+    "WRITE-PROMPT": "CHAT",
+    "REVIEW": "CHAT",
+    "REVIEW-SECURITY": "CHAT",
+    "BRAINSTORM": "CHAT",
+    "CHAT": "CHAT",
+}
+
+
+# Closing contract appended to every CHAT system instruction so the obligation
+# survives even if chat.md is overridden via /config. Mirrors AGENTS.md.
+CHAT_OUTPUT_CONTRACT = (
+    "## Mandatory Closing Contract\n\n"
+    "You are in read-only mode. End every substantive answer with, in this order "
+    "and OUTSIDE any `<details>` blocks:\n\n"
+    "1. An **ADR** (Architecture Decision Record) with **Context**, **Decision**, "
+    "and **Consequences** sections justifying the proposed approach.\n"
+    "2. A **Mermaid.js diagram** where relevant, visualizing the data flow or "
+    "component interaction.\n"
+    "3. A final `## Jules Prompt` heading. This MUST be the LAST heading in your "
+    "response. The deployment system extracts everything after the LAST "
+    "`## Jules Prompt` heading and strips `<details>` blocks, so keep the ADR and "
+    "diagram outside `<details>`. Instruct the agent to read `AGENTS.md` first and "
+    "include a one-sentence summary plus actionable requirements and acceptance "
+    "criteria. This block can be delegated to Jules or handed off locally to CODE."
+)
+
+# CLI-engine-specific guidance for write-capable (CODE) sessions: the Gemini CLI
+# policy denies the built-in write_file/replace tools, so the agent must use the
+# MCP equivalents. Appended only for CODE + CLI (CHAT has no write tools).
+CLI_CODE_TOOL_GUIDANCE = (
+    "## Tooling (CLI)\n\n"
+    "Implement autonomously: modify files with the provided tools and run tests to "
+    "verify your changes, diagnosing and fixing failures yourself. The built-in "
+    "`write_file` and `replace` tools are disabled by policy — you MUST use the MCP "
+    "tools `write_file_safe` and `replace_safe` instead. If the built-in shell tool "
+    "fails for complex redirections, use the MCP-provided `run_shell_command` tool."
+)
+
+
+def normalize_persona(key: str | None) -> str:
+    """Maps a (possibly legacy) persona key onto a valid top-level persona."""
+    if not key:
+        return DEFAULT_TOP_LEVEL
+    upper = key.upper()
+    if upper in TOP_LEVEL_PERSONAS:
+        return upper
+    return _LEGACY_TO_TOPLEVEL.get(upper, DEFAULT_TOP_LEVEL)
 
 
 def is_persona_write_capable(persona: str | None) -> bool:
-    """Checks if a persona is allowed to perform write operations."""
-    if not persona:
-        return True
-    return persona.upper() in WRITE_CAPABLE_PERSONAS
+    """Checks if a persona is allowed to perform write operations. Only CODE writes."""
+    return (persona or DEFAULT_TOP_LEVEL).upper() == "CODE"
 
 
 PERSONA_FILE = "storage/persona_state.json"
@@ -149,7 +203,7 @@ def load_active_persona() -> str | None:
     try:
         with open(PERSONA_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-            return data.get("active_persona")
+            return normalize_persona(data.get("active_persona"))
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Failed to load active persona: %s", e)
         return None
@@ -183,18 +237,23 @@ class Intent(BaseModel):
     task_type: str
 
 
-def classify_intent(user_query: str) -> str:
-    """Classifies the user query into a persona category."""
+def classify_specialist(user_query: str) -> str | None:
+    """
+    Classifies the user query into one of the internal specialist knowledge
+    modules. Returns the specialist key (a member of SPECIALIST_PERSONAS) or
+    None when no specialist applies or on any API error (graceful: no
+    specialist knowledge is appended).
+    """
     if not CLIENT:
-        return "GENERAL"
+        return None
 
-    keys_str = ", ".join(PERSONA_PROMPTS.keys())
+    keys_str = ", ".join(sorted(SPECIALIST_PERSONAS))
     prompt = (
-        "Classify this developer query into exactly one category: "
-        f"[{keys_str}]. "
+        "Classify this developer query into exactly one specialist category: "
+        f"[{keys_str}, NONE]. "
+        "Choose the single most relevant specialist whose knowledge would help "
+        "answer the query. If none of them clearly applies, return NONE.\n\n"
         "Also determine the task_type (e.g., 'question', 'feature', 'bug').\n\n"
-        "Use PLANNER if the user query contains words like 'plan', 'document', "
-        "'architecture', or 'requirements'.\n\n"
         f"Query: {user_query}"
     )
 
@@ -210,33 +269,48 @@ def classify_intent(user_query: str) -> str:
         )
         if response.parsed and isinstance(response.parsed, Intent):
             category = response.parsed.persona.strip().upper()
-            if category in PERSONA_PROMPTS:
+            if category in SPECIALIST_PERSONAS:
                 return category
-        return "GENERAL"
+        return None
     except errors.APIError as e:
-        logger.error("APIError classifying intent: %s", e)
-        return "GENERAL"
+        logger.error("APIError classifying specialist: %s", e)
+        return None
     except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("Failed to classify intent: %s", e)
-        return "GENERAL"
+        logger.error("Failed to classify specialist: %s", e)
+        return None
 
 
-def get_system_instruction(persona_key: str, for_cli: bool = False) -> str:
-    """Returns the combined system instruction."""
-    # Ensure a valid key
-    if persona_key not in PERSONA_PROMPTS:
-        persona_key = "GENERAL"
+def get_system_instruction(
+    persona_key: str, user_msg: str | None = None, for_cli: bool = False
+) -> str:
+    """Returns the combined system instruction for a top-level persona."""
+    persona_key = normalize_persona(persona_key)
 
     current_date = datetime.now().strftime("%Y-%m-%d")
     date_context = f"Today's date is {current_date}."
 
-    extra_instruction = PERSONA_PROMPTS.get(persona_key, "")
+    core = CLI_CORE_INSTRUCTION if for_cli else CORE_INSTRUCTION
+    base = PERSONA_PROMPTS.get(persona_key, "")
 
-    if for_cli:
-        if extra_instruction:
-            return f"{date_context}\n\n{CLI_CORE_INSTRUCTION}\n\n{extra_instruction}"
-        return f"{date_context}\n\n{CLI_CORE_INSTRUCTION}"
+    parts = [date_context, core]
+    if base:
+        parts.append(base)
 
-    if extra_instruction:
-        return f"{date_context}\n\n{CORE_INSTRUCTION}\n\n{extra_instruction}"
-    return f"{date_context}\n\n{CORE_INSTRUCTION}"
+    # Append the most relevant specialist knowledge module, but only when an
+    # actual user message is present (the status-poll token-count path passes
+    # no message, so it must not trigger an LLM call on every poll).
+    if user_msg:
+        specialist = classify_specialist(user_msg)
+        if specialist:
+            specialist_prompt = PERSONA_PROMPTS.get(specialist, "")
+            if specialist_prompt:
+                parts.append(
+                    f"### Specialist Knowledge: {specialist}\n{specialist_prompt}"
+                )
+
+    if persona_key == "CHAT":
+        parts.append(CHAT_OUTPUT_CONTRACT)
+    elif persona_key == "CODE" and for_cli:
+        parts.append(CLI_CODE_TOOL_GUIDANCE)
+
+    return "\n\n".join(parts)

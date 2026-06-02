@@ -26,7 +26,8 @@ disable=
     import-error,
     comparison-with-callable,
     unused-import,
-    unused-variable
+    unused-variable,
+    too-few-public-methods
 
 [FORMAT]
 max-line-length=120

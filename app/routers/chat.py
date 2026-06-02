@@ -43,12 +43,6 @@ class ActionResolveRequest(BaseModel):
     edited_arguments: Any | None = None
 
 
-class CliApplyRequest(BaseModel):
-    """Request model for cli apply endpoint."""
-
-    prompt: str
-
-
 class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
 
@@ -83,13 +77,9 @@ def _embeddings_enabled(include_embeddings: bool | None) -> bool:
 
 async def _is_write_access_enabled(active_persona: str | None) -> bool:
     """Determines if write access is enabled for the current request."""
-    if not prompt_router.is_persona_write_capable(active_persona):
-        return False
-
-    user_toggle_str = await asyncio.to_thread(
-        chat_manager.get_setting, "write_access_enabled", str(WRITE_ACCESS_ENABLED)
+    return WRITE_ACCESS_ENABLED and prompt_router.is_persona_write_capable(
+        active_persona
     )
-    return user_toggle_str.lower() == "true"
 
 
 async def _get_system_instruction(
@@ -101,15 +91,13 @@ async def _get_system_instruction(
     """Builds the system instruction for a request."""
     active_persona = await asyncio.to_thread(prompt_router.load_active_persona)
     if not active_persona and classify_if_missing:
-        active_persona = await asyncio.to_thread(
-            prompt_router.classify_intent, user_msg
-        )
+        active_persona = prompt_router.DEFAULT_TOP_LEVEL
         await asyncio.to_thread(prompt_router.save_active_persona, active_persona)
-        logger.info("Classified intent as: %s", active_persona)
+        logger.info("Defaulting to persona: %s", active_persona)
 
     write_enabled = await _is_write_access_enabled(active_persona)
     system_instruction = prompt_router.get_system_instruction(
-        active_persona, for_cli=(LLM_ENGINE == "cli")
+        active_persona, user_msg=user_msg, for_cli=(LLM_ENGINE == "cli")
     )
     if not write_enabled:
         system_instruction += (
@@ -168,6 +156,7 @@ async def _create_post_chat_session(
         system_instruction=system_instruction,
         is_new_context=len(formatted_history) == 0,
     )
+    active_persona = await asyncio.to_thread(prompt_router.load_active_persona)
     chat_session = CLIENT.aio.chats.create(
         model=model,
         config=_build_generation_config(
@@ -175,9 +164,7 @@ async def _create_post_chat_session(
                 CLIENT,
                 enable_search,
                 enable_embeddings,
-                write_access_enabled=await _is_write_access_enabled(
-                    await asyncio.to_thread(prompt_router.load_active_persona)
-                ),
+                write_access_enabled=await _is_write_access_enabled(active_persona),
             ),
             system_instruction,
             cache_name,
@@ -234,51 +221,6 @@ def chat_status():
 async def chat_stream_active():
     """Returns the active stream if one exists (chat path)."""
     return await stream_active()
-
-
-@router.post("/api/cli/apply")
-async def api_cli_apply(request: CliApplyRequest):
-    """Handles autonomous CLI implementation."""
-    # pylint: disable=import-outside-toplevel
-    import os
-    import time
-    from app.config import CLI_SETUP_SCRIPT
-    from app.services import git_ops
-
-    # pylint: enable=import-outside-toplevel
-
-    # 1. Create unique branch
-    timestamp = int(time.time())
-    branch_name = f"jules-implementation-{timestamp}"
-    if not git_ops.create_branch(branch_name):
-        return JSONResponse(
-            status_code=500, content={"error": "Failed to create git branch."}
-        )
-
-    # 2. Run setup script
-    setup_script = chat_manager.get_setting("cli_setup_script", CLI_SETUP_SCRIPT)
-    if os.path.exists(setup_script):
-        logger.info("Executing setup script: %s", setup_script)
-        process = await asyncio.create_subprocess_shell(setup_script)
-        await process.wait()
-        if process.returncode != 0:
-            return JSONResponse(
-                status_code=500, content={"error": "Setup script failed."}
-            )
-
-    # 3. Start task in background
-    queue = asyncio.Queue()
-    asyncio.create_task(
-        agent_engine.run_agent_task(
-            initial_queue=queue,
-            chat_session=None,
-            user_msg=request.prompt,
-            turn_context=None,
-            mode="implementation",
-        )
-    )
-
-    return {"success": True, "branch": branch_name}
 
 
 @router.post("/chat")
@@ -348,6 +290,7 @@ async def chat_get(message: str = Query(...)):
         is_new_context=True,
     )
 
+    active_persona = await asyncio.to_thread(prompt_router.load_active_persona)
     chat_session = CLIENT.aio.chats.create(
         model="gemini-3-pro-preview",
         config=_build_generation_config(
@@ -355,9 +298,7 @@ async def chat_get(message: str = Query(...)):
                 CLIENT,
                 ENABLE_GOOGLE_SEARCH,
                 True,
-                write_access_enabled=await _is_write_access_enabled(
-                    await asyncio.to_thread(prompt_router.load_active_persona)
-                ),
+                write_access_enabled=await _is_write_access_enabled(active_persona),
             ),
             system_instruction,
             None,

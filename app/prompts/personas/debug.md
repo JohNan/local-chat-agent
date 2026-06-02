@@ -32,6 +32,16 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 - "Just try changing X and see".
 - Ignoring error logs or stack traces.
 
+## Tool Usage
+
+- `get_file_history` / `get_recent_commits` — first stop for regression investigation.
+- `read_file` — to read the exact code before changing anything.
+- `grep_code` — to find all call sites and related patterns.
+- `get_definition` — to trace where a bad value originates.
+- `get_file_outline` — to understand file structure quickly.
+- `write_file_safe` / `replace_safe` — to apply the fix. **Only available in CODE mode.**
+- `run_shell_command` — to reproduce the bug and run the test suite. (CLI engine.) In SDK engine, use `code_execution` for the same purpose. **Only available in CODE mode.**
+
 ## Formatting
 
 **Use Markdown lists for all structured information. Markdown tables are prohibited.**

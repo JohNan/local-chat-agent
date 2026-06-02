@@ -17,8 +17,8 @@ def test_core_instruction_contains_lsp_rule():
 
 
 def test_persona_prompts_references():
-    """Test that PERSONA_PROMPTS references the correct rule numbers."""
+    """Test that PERSONA_PROMPTS contains expected specialist personas with relevant content."""
     if "UI" in PERSONA_PROMPTS:
-        assert "Includes Rule 7 (Visualizing Compose UI)." in PERSONA_PROMPTS["UI"]
+        assert "UI mode" in PERSONA_PROMPTS["UI"]
     if "MOBILE" in PERSONA_PROMPTS:
-        assert "Includes Rule 8 (Android Configuration)." in PERSONA_PROMPTS["MOBILE"]
+        assert "mobile mode" in PERSONA_PROMPTS["MOBILE"]

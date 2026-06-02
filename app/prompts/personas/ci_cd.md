@@ -22,9 +22,12 @@ You are in **CI/CD mode**. Focus on build stability, Docker configuration, GitHu
 
 ## Tool Usage
 
-- `read_file` — for analyzing YAML and Dockerfile configurations.
-- `run_shell_command` — for checking local tool versions or environment status.
+- `list_files` — to discover all CI/CD configuration and environment files.
+- `read_file` — to analyze YAML, Dockerfile, and environment configurations.
+- `grep_code` — to find secrets references, environment variable usages, or build script patterns.
 - `get_recent_commits` — to see if recent changes impacted build stability.
+- `write_file_safe` / `replace_safe` — to apply infrastructure changes. **Only available in CODE mode.**
+- `run_shell_command` — to check local tool versions, run build checks, or invoke `mise`. (CLI engine only.) **Only available in CODE mode.**
 
 ## Formatting
 

@@ -38,10 +38,9 @@ interface MessageBubbleProps {
     toolStatus?: string | null;
     deployedSessionId?: string | null;
     onSendMessage?: (text: string) => void;
-    writeAccessEnabled?: boolean;
 }
 
-const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolStatus, deployedSessionId, onSendMessage, writeAccessEnabled }) => {
+const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolStatus, deployedSessionId, onSendMessage }) => {
     const [deploying, setDeploying] = useState(false);
     const [deployResult, setDeployResult] = useState<string | null>(
         deployedSessionId ? `Started! (${deployedSessionId})` : null
@@ -63,6 +62,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
     const [isReviewing, setIsReviewing] = useState(false);
     const [copied, setCopied] = useState(false);
     const [copyError, setCopyError] = useState(false);
+    const [runningWithCode, setRunningWithCode] = useState(false);
 
     const isAi = message.role === 'model' || message.role === 'ai';
     const text = message.text || message.parts?.[0]?.text || "";
@@ -252,45 +252,34 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
 
     const hasJulesPrompt = text.includes("## Jules Prompt");
 
-    const applyWithCli = async () => {
-        setDeployResult(null);
-        setIsError(false);
-        setDeploying(true);
+    const extractJulesPrompt = (rawText: string): string => {
         const marker = "## Jules Prompt";
-        const markerIndex = text.lastIndexOf(marker);
-        let promptText = text;
+        const markerIndex = rawText.lastIndexOf(marker);
+        let promptText = rawText;
         if (markerIndex !== -1) {
-            // Extract text AFTER the marker
-            promptText = text.substring(markerIndex + marker.length).trim();
-            // Remove thought blocks if any
-            promptText = promptText.replace(/<details>[\s\S]*?<\/details>/g, '');
+            promptText = rawText.substring(markerIndex + marker.length).trim();
+            promptText = promptText.replace(/<details>[\s\S]*?<\/details>/g, '').trim();
         }
+        return promptText;
+    };
 
+    const runWithCode = async () => {
+        const promptText = extractJulesPrompt(text);
+        if (!promptText) return;
+        setRunningWithCode(true);
         try {
-            const response = await fetch('/api/cli/apply', {
+            await fetch('/api/system/persona/switch', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ prompt: promptText }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ persona: 'CODE' }),
             });
-
-            if (response.ok) {
-                setDeployResult("Started CLI Implementation");
-                setIsError(false);
-            } else {
-                const data = await response.json();
-                setDeployResult(data.error || "Error applying with CLI");
-                setIsError(true);
-            }
+            onSendMessage?.(promptText);
         } catch (e) {
-            console.error(e);
-            setDeployResult("Error applying with CLI");
-            setIsError(true);
+            console.error("Error switching to CODE persona:", e);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             alert("Error: " + (e as any).message);
         } finally {
-            setDeploying(false);
+            setRunningWithCode(false);
         }
     };
 
@@ -298,24 +287,11 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
         setDeployResult(null);
         setIsError(false);
         setDeploying(true);
-        const marker = "## Jules Prompt";
-        const markerIndex = text.lastIndexOf(marker);
-        let promptText = text;
-        if (markerIndex !== -1) {
-            // Extract text AFTER the marker
-            promptText = text.substring(markerIndex + marker.length);
-        }
-
-        // Trim whitespace
-        promptText = promptText.trim();
+        let promptText = extractJulesPrompt(text);
 
         // Clean markdown code blocks
         promptText = promptText.replace(/^```(markdown)?\s*/, '');
         promptText = promptText.replace(/\s*```$/, '');
-        promptText = promptText.trim();
-
-        // Strip <details> blocks and their contents
-        promptText = promptText.replace(/<details>[\s\S]*?<\/details>/g, '');
         promptText = promptText.trim();
 
         if (promptText) {
@@ -558,17 +534,22 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({ message, toolSta
                                          </>
                                      )}
                                  </button>
-                                 {writeAccessEnabled && (
-                                     <button className="deploy-btn" onClick={applyWithCli} disabled={deploying} style={{ flex: 1, backgroundColor: '#2da44e', borderColor: '#2da44e' }}>
-                                         {deploying ? (
+                                 {onSendMessage && (
+                                     <button
+                                         className="deploy-btn"
+                                         onClick={runWithCode}
+                                         disabled={runningWithCode || !extractJulesPrompt(text)}
+                                         style={{ flex: 1, backgroundColor: '#2da44e', borderColor: '#2da44e' }}
+                                     >
+                                         {runningWithCode ? (
                                              <>
                                                 <Loader2 size={16} className="animate-spin" />
-                                                Applying...
+                                                Switching...
                                              </>
                                          ) : (
                                              <>
                                                 <Terminal size={16} />
-                                                Apply with CLI
+                                                Run with CODE
                                              </>
                                          )}
                                      </button>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, Terminal, LayoutTemplate, Smartphone, Box, Server, MessageSquare, FileText, Upload } from 'lucide-react';
+import { Bot, GitPullRequestArrow, Trash2, Eraser, Settings, X, Terminal, Server, MessageSquare, Upload } from 'lucide-react';
 import type { RepoStatus, PersonaInfo } from '../types';
 
 interface HeaderProps {
@@ -11,8 +11,6 @@ interface HeaderProps {
     setEmbeddingsEnabled: (enabled: boolean) => void;
     onToggleTerminal: () => void;
     isGenerating: boolean;
-    writeAccessEnabled?: boolean;
-    setWriteAccessEnabled?: (val: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -24,8 +22,6 @@ export const Header: React.FC<HeaderProps> = ({
     setEmbeddingsEnabled,
     onToggleTerminal,
     isGenerating,
-    writeAccessEnabled,
-    setWriteAccessEnabled
 }) => {
     const [status, setStatus] = useState<RepoStatus | null>(null);
     const [branches, setBranches] = useState<string[]>([]);
@@ -72,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
                 if (res.ok) {
                     const data = await res.json();
                     if (data.personas) {
-                        setPersonas([...data.personas].sort((a, b) => a.name.localeCompare(b.name)));
+                        setPersonas(data.personas);
                     }
                 }
             } catch (e) {
@@ -278,17 +274,10 @@ export const Header: React.FC<HeaderProps> = ({
 
     const getPersonaIcon = (persona?: string) => {
         switch (persona) {
-            case 'UI': return <LayoutTemplate size={20} />;
-            case 'MOBILE': return <Smartphone size={20} />;
-            case 'ARCHITECT': return <Box size={20} />;
-            case 'CI_CD': return <Server size={20} />;
-            case 'PLANNER': return <FileText size={20} />;
+            case 'CODE': return <Terminal size={20} />;
             default: return <MessageSquare size={20} />;
         }
     };
-
-    const currentPersonaInfo = personas.find(p => p.name === status?.active_persona);
-    const isPersonaWriteCapable = currentPersonaInfo ? currentPersonaInfo.write_capable : true;
 
     return (
         <>
@@ -309,7 +298,7 @@ export const Header: React.FC<HeaderProps> = ({
                     >
                         {getPersonaIcon(status?.active_persona)}
                         <select
-                            value={status?.active_persona || "GENERAL"}
+                            value={status?.active_persona || "CHAT"}
                             onChange={(e) => handlePersonaSwitch(e.target.value)}
                             disabled={switchingPersona}
                             style={{
@@ -477,18 +466,6 @@ export const Header: React.FC<HeaderProps> = ({
                                 </label>
                             </div>
 
-                            <div className="setting-item" style={{ flexDirection: 'row', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-                                <input
-                                    type="checkbox"
-                                    id="write-access-checkbox"
-                                    checked={!!writeAccessEnabled}
-                                    onChange={(e) => setWriteAccessEnabled?.(e.target.checked)}
-                                    style={{ width: 'auto' }}
-                                />
-                                <label htmlFor="write-access-checkbox" style={{ margin: 0, cursor: 'pointer' }}>
-                                    Enable Write Access {!isPersonaWriteCapable && "(Read-Only Persona)"}
-                                </label>
-                            </div>
                             <div className="setting-item">
                                 <button
                                     onClick={clearAndRebuildRag}

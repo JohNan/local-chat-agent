@@ -10,10 +10,11 @@ from app.services.prompt_router import (
     PERSONA_FILE,
     load_core_instruction,
     get_system_instruction,
-    classify_intent,
+    classify_specialist,
     Intent,
     load_cli_core_instruction,
     PERSONA_PROMPTS,
+    SPECIALIST_PERSONAS,
 )
 
 
@@ -28,14 +29,14 @@ def test_load_active_persona_file_not_found():
 
 
 def test_load_active_persona_success():
-    """Test that load_active_persona returns the persona when the file exists and is valid."""
+    """Test that load_active_persona returns the normalized persona when the file exists."""
     load_active_persona.cache_clear()
-    mock_data = json.dumps({"active_persona": "UI"})
+    mock_data = json.dumps({"active_persona": "CHAT"})
     with patch(
         "app.services.prompt_router.os.path.exists", return_value=True
     ) as mock_exists:
         with patch("builtins.open", mock_open(read_data=mock_data)) as mock_file:
-            assert load_active_persona() == "UI"
+            assert load_active_persona() == "CHAT"
             mock_exists.assert_called_with(PERSONA_FILE)
             mock_file.assert_called_with(PERSONA_FILE, "r", encoding="utf-8")
 
@@ -134,37 +135,37 @@ def test_get_system_instruction_includes_date():
         assert f"Today's date is {expected_date_str}." in instruction
 
 
-def test_classify_intent_success():
-    """Test that classify_intent correctly extracts persona using Intent schema."""
+def test_classify_specialist_success():
+    """Test that classify_specialist returns a specialist key from SPECIALIST_PERSONAS."""
     with patch("app.services.prompt_router.CLIENT") as mock_client:
         mock_response = MagicMock()
 
-        persona_to_test = "ASK" if "ASK" in PERSONA_PROMPTS else "UI"
-        mock_response.parsed = Intent(persona=persona_to_test, task_type="feature")
+        specialist_to_test = next(iter(sorted(SPECIALIST_PERSONAS)))
+        mock_response.parsed = Intent(persona=specialist_to_test, task_type="feature")
         mock_client.models.generate_content.return_value = mock_response
 
-        result = classify_intent("Make this button blue")
-        assert result == persona_to_test
+        result = classify_specialist("Make this button blue")
+        assert result == specialist_to_test
 
 
-def test_classify_intent_fallback():
-    """Test that classify_intent falls back to GENERAL when response is missing parsed intent."""
+def test_classify_specialist_fallback():
+    """Test that classify_specialist returns None when response is missing parsed intent."""
     with patch("app.services.prompt_router.CLIENT") as mock_client:
         mock_response = MagicMock()
         mock_response.parsed = None
         mock_client.models.generate_content.return_value = mock_response
 
-        result = classify_intent("Unknown request")
-        assert result == "GENERAL"
+        result = classify_specialist("Unknown request")
+        assert result is None
 
 
-def test_classify_intent_exception():
-    """Test that classify_intent falls back to GENERAL on exception."""
+def test_classify_specialist_exception():
+    """Test that classify_specialist returns None on exception."""
     with patch("app.services.prompt_router.CLIENT") as mock_client:
         mock_client.models.generate_content.side_effect = Exception("API Error")
 
-        result = classify_intent("Unknown request")
-        assert result == "GENERAL"
+        result = classify_specialist("Unknown request")
+        assert result is None
 
 
 def test_load_cli_core_instruction_priority():
@@ -253,9 +254,9 @@ def test_get_system_instruction_for_cli():
         ):
             with patch.dict(
                 "app.services.prompt_router.PERSONA_PROMPTS",
-                {"TEST_PERSONA": "MOCK_EXTRA_INSTRUCTION"},
+                {"CODE": "MOCK_EXTRA_INSTRUCTION"},
             ):
-                instruction = get_system_instruction("TEST_PERSONA", for_cli=True)
+                instruction = get_system_instruction("CODE", for_cli=True)
                 assert "MOCK_CLI_CORE_INSTRUCTION" in instruction
                 assert "MOCK_EXTRA_INSTRUCTION" in instruction
                 assert "Today's date is 2023-10-27" in instruction
