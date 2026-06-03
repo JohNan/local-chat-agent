@@ -750,9 +750,7 @@ class ACPClientHandler(Client):
         return ""
 
     # pylint: disable=too-many-branches,too-many-statements,too-many-return-statements
-    async def session_update(
-        self, _session_id: str, update: Any, **_kwargs: Any
-    ) -> None:
+    async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
         update_type = type(update).__name__
         logger.debug("[ACP] session_update: %s - %s", update_type, str(update)[:100])
 
@@ -906,7 +904,7 @@ class ACPClientHandler(Client):
 
     # pylint: disable=too-many-locals
     async def request_permission(
-        self, options: Any, _session_id: str, tool_call: Any, **_kwargs: Any
+        self, options: Any, session_id: str, tool_call: Any, **kwargs: Any
     ) -> Any:
         try:
             # pylint: disable=import-outside-toplevel
